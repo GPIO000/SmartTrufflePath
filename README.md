@@ -1,5 +1,5 @@
 ==================================================
-RIEPILOGO PROGETTO: TRUFFLE MOBIL FRIST
+RIEPILOGO PROGETTO: TRUFFLE_MOBIL_FRIST
 ==================================================
 
 1. INTERFACCIA & UX MOBIL-FIRST (DASHBOARD PRINCIPALE)
