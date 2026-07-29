@@ -32,6 +32,22 @@ if (navigator.geolocation) {
                 dot.title = "GPS Attivo: " + lat.toFixed(4) + ", " + lng.toFixed(4);
             }
 
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`, {
+                headers: { 'Accept-Language': 'it' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.address) {
+                    const regione = data.address.region || data.address.state || '';
+                    const provincia = data.address.province || data.address.county || '';
+                    
+                    const gpsText = document.getElementById('gps-status-text');
+                    if (gpsText) {
+                        gpsText.innerHTML = `GPS: <b>${regione}</b> > <b>${provincia}</b>`;
+                    }
+                }
+            }).catch(err => console.log("Errore geocodifica:", err));
+
             if (!userMarker) {
                 userMarker = L.marker([lat, lng]).addTo(map)
                     .bindPopup("<b>Sei qui</b><br>Posizione tartufaia rilevata.")
