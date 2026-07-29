@@ -400,7 +400,6 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVendita()">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             break;
-
         case 'storico_ricevute':
             const storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
             let storicoHtml = '<h2>Archivio Storico Ricevute</h2><p>Elenco cronologico delle ricevute di vendita emesse:</p>';
@@ -453,6 +452,7 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
+
         case 'canidiary':
             const cData = JSON.parse(localStorage.getItem('cane_data') || '{}');
             if (cData.nome && !editMode) {
@@ -484,31 +484,57 @@ function openModule(moduleName, editMode = false) {
             break;
 
         case 'vet':
-            const vData = JSON.parse(localStorage.getItem('vet_data') || '{}');
-            if (vData.vaccino && !editMode) {
-                contentHTML = `
-                    <h2>Libretto Sanitario & Vaccini</h2>
-                    <div class="module-card" style="border-left: 4px solid #22c55e;">
-                        <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">💉 Dati Sanitari Registrati</p>
-                        <p><strong>Ultimo Antiparassitario:</strong> ${vData.antiparassitario || 'N.D.'}</p>
-                        <p><strong>Scadenza Vaccino:</strong> ${vData.vaccino}</p>
-                        <div style="display:flex; gap:10px; margin-top:15px;">
-                            <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('vet', true)">✏️ Modifica</button>
-                            <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('vet_data', 'vet')">🗑️ Elimina</button>
-                        </div>
-                    </div>`;
+            const cDataVet = JSON.parse(localStorage.getItem('cane_data') || '{}');
+            const nomeCaneDefault = cDataVet.nome || 'Il tuo cane';
+            const vetHistory = JSON.parse(localStorage.getItem('vet_history_list') || '[]');
+
+            let vetHtml = `
+                <h2>Libretto Sanitario & Profilassi</h2>
+                <p>Storico trattamenti, vaccini e visite per il cane: <strong style="color:#38bdf8;">${nomeCaneDefault}</strong></p>
+                
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Trattamento / Visita</h3>
+                    
+                    <label>Nome Cane (da archivio):</label>
+                    <input type="text" id="vh-cane" class="mod-input" value="${nomeCaneDefault}" readonly style="background:#0f172a; color:#94a3b8;">
+                    
+                    <label>Tipologia Intervento:</label>
+                    <select id="vh-tipo" class="mod-input">
+                        <option value="💉 Vaccino (Antirabbica / Epatite / Parvovirosi ecc.)">Vaccino</option>
+                        <option value="💊 Antiparassitario Intestinale (Verme)">Antiparassitario Intestinale (Pillola)</option>
+                        <option value="💧 Spot-on (Antipulci / Zecche cutaneo)">Spot-on (Antipulci / Zecche)</option>
+                        <option value="🎗️ Collare Antiparassitario">Collare Antiparassitario</option>
+                        <option value="🩺 Visita Veterinaria Generale / Controllo">Visita Veterinaria / Controllo</option>
+                        <option value="🩹 Medicazione Ferita / Estrazione Zecca">Medicazione / Ferita / Zecca</option>
+                    </select>
+
+                    <label>Data del Trattamento:</label>
+                    <input type="date" id="vh-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+
+                    <label>Note / Dettagli (es. Nome farmaco, dosaggio, parere medico):</label>
+                    <input type="text" id="vh-note" class="mod-input" placeholder="Es. Somministrato NexGard / Controllo orecchie ok">
+
+                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" onclick="saveVetHistoryItem()">Registra nel Libretto</button>
+                </div>
+            `;
+
+            if (vetHistory.length === 0) {
+                vetHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun trattamento registrato nello storico sanitario.</p></div>`;
             } else {
-                contentHTML = `
-                    <h2>Libretto Sanitario & Vaccini</h2>
-                    <div class="module-card">
-                        <p>Gestione profilassi sanitaria e antiparassitari.</p>
-                        <label>Ultimo Antiparassitario (Data):</label>
-                        <input type="date" id="v-antiparassitario" class="mod-input" value="${vData.antiparassitario || ''}">
-                        <label>Prossimo Vaccino (Scadenza):</label>
-                        <input type="date" id="v-vaccino" class="mod-input" value="${vData.vaccino || ''}">
-                        <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="saveVet()">Salva Scadenze</button>
-                    </div>`;
+                vetHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Storico Registrazioni:</h3>`;
+                vetHistory.slice().reverse().forEach((item, index) => {
+                    const originalIndex = vetHistory.length - 1 - index;
+                    vetHtml += `
+                        <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:0.95rem;">🐕 ${item.cane}</strong>
+                            <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.tipo}</b></p>
+                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteVetHistoryItem(${originalIndex})">🗑️ Elimina</button>
+                        </div>`;
+                });
             }
+            contentHTML = vetHtml;
             break;
 
         case 'bilancio':
@@ -544,14 +570,42 @@ function openModule(moduleName, editMode = false) {
             return;
 
         case 'vet-emergency':
-            contentHTML = `
-                <h2>Pronto Soccorso Cinofilo H24</h2>
-                <div class="module-card" style="background:#451a03; border:1px solid #78350f;">
-                    <p style="color:#fde047; font-weight:bold;">⚠️ EMERGENZA ESCHE AVVELENATE / VIPERA</p>
-                    <p style="margin-top:8px;">1. Mantenere la calma e isolare il cane.</p>
-                    <p>2. Non indurre il vomito autonomamente.</p>
-                    <a href="tel:3330000000" style="display:block; text-align:center; background:#dc2626; color:#fff; padding:12px; border-radius:6px; margin-top:15px; text-decoration:none; font-weight:bold;">CHIAMA VET URGENZE H24</a>
-                </div>`;
+            const vetClinics = JSON.parse(localStorage.getItem('vet_clinics_list') || '[]');
+            let clinicHtml = `
+                <h2>Pronto Soccorso & Cliniche Veterinarie H24</h2>
+                <p>Gestisci i numeri d'emergenza dei veterinari e delle cliniche della tua zona:</p>
+                
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Clinica / Veterinario H24</h3>
+                    <label>Nome Clinica o Medico:</label>
+                    <input type="text" id="vc-nome" class="mod-input" placeholder="Es. Clinica Veterinaria Centrale">
+                    <label>Numero di Telefono:</label>
+                    <input type="tel" id="vc-tel" class="mod-input" placeholder="Es. 0874123456 o 3331234567">
+                    <label>Note (es. Aperto H24 / Notturno):</label>
+                    <input type="text" id="vc-note" class="mod-input" placeholder="Es. Disponibile festivi e notturno">
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveVetClinic()">Salva Contatto Emergenza</button>
+                </div>
+            `;
+            
+            if (vetClinics.length === 0) {
+                clinicHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna clinica salvata. Aggiungi almeno un numero di pronto soccorso veterinario da chiamare rapidamente in caso di necessità.</p></div>`;
+            } else {
+                clinicHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">I tuoi contatti salvati:</h3>`;
+                vetClinics.forEach((clinic, idx) => {
+                    clinicHtml += `
+                        <div class="module-card" style="border-left: 4px solid #dc2626; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:1rem;">🏥 ${clinic.nome}</strong>
+                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">📞 ${clinic.tel}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 ${clinic.note || 'Nessuna nota'}</p>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <a href="tel:${clinic.tel}" class="overlay-btn" style="background:#dc2626; text-decoration:none; text-align:center; display:inline-block; padding:8px 12px;">📞 Chiama Subito</a>
+                                <button class="overlay-btn" style="background:#0284c7; padding:8px 12px;" onclick="shareLocationToVet('${clinic.tel}')">📍 Invia Posizione GPS</button>
+                                <button class="overlay-btn" style="background:#475569; padding:8px 12px;" onclick="deleteVetClinic(${idx})">🗑️ Elimina</button>
+                            </div>
+                        </div>`;
+                });
+            }
+            contentHTML = clinicHtml;
             break;
 
         default:
@@ -642,16 +696,7 @@ function saveCane() {
     openModule('canidiary');
 }
 
-function saveVet() {
-    const data = {
-        antiparassitario: document.getElementById('v-antiparassitario').value,
-        vaccino: document.getElementById('v-vaccino').value
-    };
-    localStorage.setItem('vet_data', JSON.stringify(data));
-    alert("Dati sanitari salvati con successo!");
-    openModule('vet');
-}
-
+// Nota: La funzione obsoleta saveVet() è stata rimossa completamente.
 function registraVendita() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
@@ -817,7 +862,7 @@ function esportaBackupJSON() {
         pagopa: JSON.parse(localStorage.getItem('pagopa_data') || '{}'),
         f24: JSON.parse(localStorage.getItem('f24_data') || '{}'),
         cane: JSON.parse(localStorage.getItem('cane_data') || '{}'),
-        vet: JSON.parse(localStorage.getItem('vet_data') || '{}'),
+        vet: JSON.parse(localStorage.getItem('vet_history_list') || '[]'),
         poiList: JSON.parse(localStorage.getItem('poi_list') || '[]'),
         storicoVendite: JSON.parse(localStorage.getItem('storico_vendite') || '[]'),
         carCoords: JSON.parse(localStorage.getItem('car_coords') || 'null')
@@ -831,7 +876,6 @@ function esportaBackupJSON() {
     downloadAnchor.click();
     downloadAnchor.remove();
 }
-
 function importBackupData(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -845,7 +889,8 @@ function importBackupData(event) {
             if (importedData.pagopa) localStorage.setItem('pagopa_data', JSON.stringify(importedData.pagopa));
             if (importedData.f24) localStorage.setItem('f24_data', JSON.stringify(importedData.f24));
             if (importedData.cane) localStorage.setItem('cane_data', JSON.stringify(importedData.cane));
-            if (importedData.vet) localStorage.setItem('vet_data', JSON.stringify(importedData.vet));
+            // CORRETTO: Salvataggio corretto della chiave del libretto sanitario
+            if (importedData.vet) localStorage.setItem('vet_history_list', JSON.stringify(importedData.vet));
             if (importedData.poiList) localStorage.setItem('poi_list', JSON.stringify(importedData.poiList));
             if (importedData.storicoVendite) localStorage.setItem('storico_vendite', JSON.stringify(importedData.storicoVendite));
             if (importedData.carCoords) localStorage.setItem('car_coords', JSON.stringify(importedData.carCoords));
@@ -867,6 +912,7 @@ function toggleDrawer() {
         backdrop.classList.toggle('active');
     }
 }
+
 function centerOnUser() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -874,5 +920,72 @@ function centerOnUser() {
         userMarker.openPopup();
     } else {
         alert("Posizione GPS non ancora disponibile.");
+    }
+}
+
+function saveVetClinic() {
+    const nome = document.getElementById('vc-nome').value.trim();
+    const tel = document.getElementById('vc-tel').value.trim();
+    const note = document.getElementById('vc-note').value.trim();
+
+    if (!nome || !tel) {
+        alert("Inserisci almeno il nome della clinica e il numero di telefono.");
+        return;
+    }
+
+    let vetClinics = JSON.parse(localStorage.getItem('vet_clinics_list') || '[]');
+    vetClinics.push({ nome, tel, note });
+    localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
+
+    alert("Clinica veterinaria salvata con successo!");
+    openModule('vet-emergency');
+}
+
+function deleteVetClinic(index) {
+    if (confirm("Vuoi rimuovere questo contatto dalla rubrica di emergenza?")) {
+        let vetClinics = JSON.parse(localStorage.getItem('vet_clinics_list') || '[]');
+        vetClinics.splice(index, 1);
+        localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
+        openModule('vet-emergency');
+    }
+}
+
+function shareLocationToVet(telNumber) {
+    if (userMarker) {
+        const pos = userMarker.getLatLng();
+        const msg = `EMERGENZA VETERINARIA! Ho bisogno di soccorso per il mio cane nel bosco. Le mie coordinate GPS attuali sono: Lat: ${pos.lat.toFixed(6)}, Lng: ${pos.lng.toFixed(6)}. Link mappa: https://maps.google.com/?q=${pos.lat},${pos.lng}`;
+        
+        window.location.href = `sms:${telNumber}?body=${encodeURIComponent(msg)}`;
+    } else {
+        alert("Segnale GPS non ancora disponibile per rilevare la posizione esatta.");
+    }
+}
+
+function saveVetHistoryItem() {
+    const cData = JSON.parse(localStorage.getItem('cane_data') || '{}');
+    const cane = cData.nome || document.getElementById('vh-cane').value || 'Il tuo cane';
+    const tipo = document.getElementById('vh-tipo').value;
+    const data = document.getElementById('vh-data').value;
+    const note = document.getElementById('vh-note').value.trim();
+
+    if (!data) {
+        alert("Inserisci la data del trattamento.");
+        return;
+    }
+
+    let vetHistory = JSON.parse(localStorage.getItem('vet_history_list') || '[]');
+    vetHistory.push({ cane, tipo, data, note });
+    localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
+
+    alert("Trattamento registrato nel libretto sanitario!");
+    openModule('vet');
+}
+
+function deleteVetHistoryItem(index) {
+    if (confirm("Vuoi rimuovere questo record dallo storico sanitario?")) {
+        let vetHistory = JSON.parse(localStorage.getItem('vet_history_list') || '[]');
+        vetHistory.splice(index, 1);
+        localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
+        openModule('vet');
     }
 }
