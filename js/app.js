@@ -622,10 +622,37 @@ function saveVet() {
 
 function registraVendita() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
     
     if (!tData.nome || !tData.cf) {
         alert("Attenzione: Inserisci prima i dati della tua anagrafica e del tesserino nel menu 'Anagrafica & Tesserino Digitale' per emettere una ricevuta a norma di legge.");
+        return;
     }
+
+    if (!f24SavedData.protocollo) {
+        alert("Attenzione: Non hai registrato il protocollo del modello F24 ELIDE (100€) nel menu dedicato. La ricevuta richiede l'assolvimento dell'imposta sostitutiva annua.");
+    }
+
+    const importoCorrente = parseFloat(document.getElementById('r-importo').value) || 0;
+    
+    // --- CONTROLLO SOGLIA 7.000 EURO ANNO SOLARE ---
+    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const annoCorrente = new Date().getFullYear();
+    
+    let totaleAnno = storico
+        .filter(item => {
+            return item.data && item.data.includes(annoCorrente);
+        })
+        .reduce((acc, item) => acc + (parseFloat(item.importo) || 0), 0);
+
+    totaleAnno += importoCorrente;
+
+    if (totaleAnno > 7000) {
+        alert(`🚨 ATTENZIONE: Superamento limite dei 7.000 €!\n\nIl totale delle vendite per l'anno ${annoCorrente} (inclusa questa ricevuta) ha raggiunto € ${totaleAnno.toFixed(2)}.\nOltre questa soglia decade il regime di cessione occasionale (Legge 145/2018). Contatta il tuo commercialista.`);
+    } else if (totaleAnno > 6000) {
+        alert(`⚠️ Avviso Soglia: Ti stai avvicinando al limite massimo di 7.000 € annui (Totale attuale stimato: € ${totaleAnno.toFixed(2)}).`);
+    }
+    // ----------------------------------------------
 
     const vendita = {
         venditoreNome: tData.nome || 'N.D.',
@@ -636,21 +663,20 @@ function registraVendita() {
         acquirenteCf: document.getElementById('r-cf-acquirente').value,
         specie: document.getElementById('r-specie').value,
         peso: document.getElementById('r-peso').value,
-        importo: document.getElementById('r-importo').value,
+        importo: importoCorrente.toFixed(2),
         comune: document.getElementById('r-comune').value,
         lotto: document.getElementById('r-lotto').value,
-        f24: document.getElementById('r-f24').value,
+        f24: document.getElementById('r-f24').value || f24SavedData.protocollo || 'Non inserito',
         data: new Date().toLocaleDateString()
     };
     
-    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     storico.push(vendita);
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
 
     let activeView = document.getElementById('active-module-view');
     activeView.querySelector('.module-body-content').innerHTML = `
         <h2>RICEVUTA DI VENDITA OCCASIONALE TARTUFI</h2>
-        <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
+        <p>Conforme a Legge 145/2018 (Regime dei 100€), Reg. CE 178/02 & DPR 633/1972</p>
         <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px; font-size:0.85rem;">
             <h3 style="color:#000; border-bottom:2px solid #000; padding-bottom:5px; margin-bottom:10px; font-size:1rem; text-align:center;">DOCUMENTO DI VENDITA / TRACCIABILITÀ</h3>
             
@@ -673,13 +699,13 @@ function registraVendita() {
             <p><strong>Quantità / Peso:</strong> ${vendita.peso} grammi</p>
             <p><strong>Comune di Raccolta:</strong> ${vendita.comune}</p>
             <p><strong>Codice Lotto (Tracciabilità):</strong> ${vendita.lotto}</p>
-            <p><strong>Riferimento F24 ELIDE (Imposta Sostitutiva 1853):</strong> ${vendita.f24 || 'Non inserito'}</p>
+            <p><strong>Riferimento F24 ELIDE (Imposta Sostitutiva 100€ - Cod. 1853):</strong> Protocollo N. ${vendita.f24}</p>
             
             <hr style="margin:10px 0; border-color:#000;">
             <p style="font-size:1rem;"><strong>CORRISPETTIVO TOTALE: € ${vendita.importo}</strong></p>
             
             <p style="font-size:0.7rem; margin-top:12px; color:#444; text-align:justify;">
-                <i>Operazione non soggetta a IVA ai sensi del regime di commercializzazione occasionale dei tartufi (Legge 145/2018). Imposta sostitutiva del 23% assolta tramite modello F24 ELIDE. Tracciabilità garantita ai sensi del Regolamento CE n. 178/2002.</i>
+                <i>Operazione non soggetta a IVA ai sensi del regime di commercializzazione occasionale dei tartufi (Legge 145/2018). Imposta sostitutiva annuale di 100 euro assolta tramite F24 ELIDE (esenzione da ritenuta d'acconto del 23%). Tracciabilità garantita ai sensi del Regolamento CE n. 178/2002.</i>
             </p>
         </div>
         <div style="display:flex; gap:10px; margin-top:15px;">
