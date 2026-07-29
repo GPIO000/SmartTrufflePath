@@ -14,15 +14,15 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 
-    <!-- Stili integrati per evitare errori 404 su GitHub Pages -->
+    <!-- Stili corretti con 100dvh e margini sicuri per i tasti mobili -->
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body.no-scroll-body {
-            width: 100vw; height: 100vh; overflow: hidden;
+            width: 100vw; height: 100dvh; overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #121212; color: #ffffff;
         }
-        #app-container { display: flex; flex-direction: column; width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+        #app-container { display: flex; flex-direction: column; width: 100vw; height: 100dvh; position: relative; overflow: hidden; }
         #app-header {
             height: 50px; min-height: 50px; background-color: #1e293b;
             display: flex; align-items: center; justify-content: space-between;
@@ -40,18 +40,18 @@
             color: #f8fafc; box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events: none;
         }
         #map-overlays {
-            position: absolute; bottom: 25px; left: 5px; right: 5px;
-            display: flex; gap: 3px; z-index: 999;
+            position: absolute; bottom: 35px; left: 8px; right: 8px;
+            display: flex; gap: 4px; z-index: 1000;
         }
         .overlay-btn {
-            flex: 1; padding: 10px 2px; background-color: #2563eb; color: white;
+            flex: 1; padding: 12px 2px; background-color: #2563eb; color: white;
             border: none; border-radius: 6px; font-weight: bold; font-size: 0.65rem;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-align: center; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6); text-align: center; cursor: pointer;
         }
         .sos-overlay-btn { background-color: #dc2626; }
         #app-drawer {
             position: fixed; top: 0; left: -100%; width: 80%; max-width: 320px;
-            height: 100vh; background-color: #1e293b; z-index: 2000;
+            height: 100dvh; background-color: #1e293b; z-index: 2000;
             transition: left 0.3s ease-in-out; display: flex; flex-direction: column;
             box-shadow: 5px 0 15px rgba(0,0,0,0.5);
         }
@@ -72,12 +72,12 @@
             text-align: left; font-size: 0.9rem; cursor: pointer;
         }
         #drawer-backdrop {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
             background-color: rgba(0,0,0,0.5); z-index: 1500; display: none;
         }
         #drawer-backdrop.active { display: block; }
         #active-module-view {
-            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100dvh;
             background-color: #0f172a; z-index: 3000; display: none; flex-direction: column; overflow-y: auto;
         }
         .module-header-bar {
@@ -95,7 +95,7 @@
 <body class="no-scroll-body">
 
     <div id="app-container">
-        <!-- Header Superiore (Senza icona del fungo) -->
+        <!-- Header Superiore -->
         <header id="app-header">
             <button id="menu-toggle-btn" onclick="toggleDrawer()">☰</button>
             <h1 id="gps-status-text">Truffle App</h1>
@@ -107,7 +107,7 @@
             <div id="compass-box">🧭 In attesa di posizione GPS...</div>
             <div id="map"></div>
             
-            <!-- Bottoni Overlay con pulsante Elimina Auto e layout flessibile -->
+            <!-- Bottoni Overlay rialzati -->
             <div id="map-overlays">
                 <button class="overlay-btn" onclick="saveCarPosition()">🚗 Auto</button>
                 <button class="overlay-btn" onclick="returnToCar()">🧭 Vai</button>
