@@ -32,18 +32,22 @@ if (navigator.geolocation) {
                 dot.title = "GPS Attivo: " + lat.toFixed(4) + ", " + lng.toFixed(4);
             }
 
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`, {
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12&addressdetails=1`, {
                 headers: { 'Accept-Language': 'it' }
             })
             .then(response => response.json())
             .then(data => {
                 if (data && data.address) {
                     const regione = data.address.region || data.address.state || '';
-                    const provincia = data.address.province || data.address.county || '';
+                    const provincia = data.address.province || data.address.county || data.address.city || '';
                     
                     const gpsText = document.getElementById('gps-status-text');
                     if (gpsText) {
-                        gpsText.innerHTML = `GPS: <b>${regione}</b> > <b>${provincia}</b>`;
+                        if (regione || provincia) {
+                            gpsText.innerHTML = `GPS: <b>${regione}</b> ${provincia ? '> <b>' + provincia + '</b>' : ''}`;
+                        } else {
+                            gpsText.innerHTML = `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                        }
                     }
                 }
             }).catch(err => console.log("Errore geocodifica:", err));
