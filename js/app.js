@@ -57,16 +57,6 @@ if (navigator.geolocation) {
                     .bindPopup("<b>Sei qui</b>")
                     .openPopup();
                 map.setView([lat, lng], 16);
-function centerOnUser() {
-    if (userMarker) {
-        const pos = userMarker.getLatLng();
-        map.setView([pos.lat, pos.lng], 16);
-        userMarker.openPopup();
-    } else {
-        alert("Posizione GPS non ancora disponibile.");
-    }
-}
-
 
                 if (carCoordinates) {
                     carMarker = L.marker([carCoordinates.lat, carCoordinates.lng]).addTo(map)
@@ -875,5 +865,14 @@ function toggleDrawer() {
     if (drawer && backdrop) {
         drawer.classList.toggle('drawer-open');
         backdrop.classList.toggle('active');
+    }
+}
+function centerOnUser() {
+    if (userMarker) {
+        const pos = userMarker.getLatLng();
+        map.setView([pos.lat, pos.lng], 16);
+        userMarker.openPopup();
+    } else {
+        alert("Posizione GPS non ancora disponibile.");
     }
 }
