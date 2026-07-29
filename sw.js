@@ -1,10 +1,12 @@
-const CACHE_NAME = 'truffle-mobil-frist-v4';
+const CACHE_NAME = 'truffle-mobil-frist-v5';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
   './js/app.js',
   './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
