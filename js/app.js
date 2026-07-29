@@ -87,6 +87,7 @@ function renderAllPoiMarkers() {
         poiMapMarkers[index] = marker;
     });
 }
+
 function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI/180;
@@ -213,6 +214,7 @@ function savePoiPosition() {
         alert("Segnale GPS non ancora disponibile per marcare il punto.");
     }
 }
+
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -729,7 +731,6 @@ function deleteDog(index) {
         openModule('canidiary');
     }
 }
-
 function registraVendita() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
@@ -821,6 +822,7 @@ function registraVendita() {
         </div>
     `;
 }
+
 function visualizzaRicevutaSalvata(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const vendita = storico[index];
@@ -868,7 +870,6 @@ function visualizzaRicevutaSalvata(index) {
         </div>
     `;
 }
-
 function esportaDatiCSV() {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     if(storico.length === 0) {
