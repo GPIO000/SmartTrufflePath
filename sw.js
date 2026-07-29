@@ -1,8 +1,7 @@
-const CACHE_NAME = 'truffle-mobil-frist-v5';
+const CACHE_NAME = 'truffle-mobil-frist-v6';
 const ASSETS = [
   './',
   './index.html',
-  './css/style.css',
   './js/app.js',
   './manifest.json',
   './icon-192.png',
