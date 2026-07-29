@@ -19,7 +19,6 @@ let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
 let poiList = JSON.parse(localStorage.getItem('poi_list') || '[]');
 let poiMapMarkers = {}; 
 let targetNavigation = null; 
-
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition(
         (position) => {
@@ -116,7 +115,6 @@ function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
         direction: directions[index]
     };
 }
-
 function updateCompass(currentLat, currentLng) {
     const compassText = document.getElementById('compass-text');
     if (!compassText) return;
@@ -142,6 +140,7 @@ function updateCompass(currentLat, currentLng) {
         compassText.innerHTML = `🧭 Seleziona una destinazione (Auto o Punto)`;
     }
 }
+
 function saveCarPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -159,7 +158,6 @@ function saveCarPosition() {
         alert("Segnale GPS non ancora disponibile per marcare l'auto.");
     }
 }
-
 function deleteCarPosition() {
     if (carCoordinates) {
         if (confirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
@@ -450,6 +448,7 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
+
         case 'canidiary':
             const dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
             if (dogsList.length === 0) {
@@ -495,21 +494,33 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = dogsHtml;
             break;
-
         case 'vet':
+            const dogsListVet = JSON.parse(localStorage.getItem('dogs_list') || '[]');
             const cDataVet = JSON.parse(localStorage.getItem('cane_data') || '{}');
-            const nomeCaneDefault = cDataVet.nome || 'Il tuo cane';
+            const nomeCaneDefault = cDataVet.nome || (dogsListVet.length > 0 ? dogsListVet[0].nome : 'Il tuo cane');
             const vetHistory = JSON.parse(localStorage.getItem('vet_history_list') || '[]');
+
+            let optionsHtml = '';
+            if (dogsListVet.length > 0) {
+                dogsListVet.forEach(dog => {
+                    const selected = dog.nome === nomeCaneDefault ? 'selected' : '';
+                    optionsHtml += `<option value="${dog.nome}" ${selected}>${dog.nome} (${dog.razza})</option>`;
+                });
+            } else {
+                optionsHtml += `<option value="${nomeCaneDefault}">${nomeCaneDefault}</option>`;
+            }
 
             let vetHtml = `
                 <h2>Libretto Sanitario & Profilassi</h2>
-                <p>Storico trattamenti, vaccini e visite per il cane: <strong style="color:#38bdf8;">${nomeCaneDefault}</strong></p>
+                <p>Storico trattamenti, vaccini e visite per il cane:</p>
                 
                 <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
                     <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Trattamento / Visita</h3>
                     
-                    <label>Nome Cane (da archivio):</label>
-                    <input type="text" id="vh-cane" class="mod-input" value="${nomeCaneDefault}" readonly style="background:#0f172a; color:#94a3b8;">
+                    <label>Seleziona Cane:</label>
+                    <select id="vh-cane" class="mod-input">
+                        ${optionsHtml}
+                    </select>
                     
                     <label>Tipologia Intervento:</label>
                     <select id="vh-tipo" class="mod-input">
@@ -549,6 +560,7 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = vetHtml;
             break;
+
         case 'bilancio':
             const venditeSalvate = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
             let totaleIncassato = venditeSalvate.reduce((acc, item) => acc + Number(item.importo), 0);
@@ -733,6 +745,7 @@ function deleteDog(index) {
         openModule('canidiary');
     }
 }
+
 function registraVendita() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
@@ -872,6 +885,7 @@ function visualizzaRicevutaSalvata(index) {
         </div>
     `;
 }
+
 function esportaDatiCSV() {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     if(storico.length === 0) {
@@ -940,6 +954,7 @@ function importBackupData(event) {
     };
     reader.readAsText(file);
 }
+
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
@@ -998,8 +1013,7 @@ function shareLocationToVet(telNumber) {
 }
 
 function saveVetHistoryItem() {
-    const cData = JSON.parse(localStorage.getItem('cane_data') || '{}');
-    const cane = cData.nome || document.getElementById('vh-cane').value || 'Il tuo cane';
+    const cane = document.getElementById('vh-cane').value || 'Il tuo cane';
     const tipo = document.getElementById('vh-tipo').value;
     const data = document.getElementById('vh-data').value;
     const note = document.getElementById('vh-note').value.trim();
