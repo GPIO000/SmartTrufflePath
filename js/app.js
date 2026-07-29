@@ -16,13 +16,59 @@ let userMarker = null;
 let carMarker = null;
 let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
 
-// Gestione multipla dei Punti di Interesse (POI / Tartufaie)
 let poiList = JSON.parse(localStorage.getItem('poi_list') || '[]');
 let poiMapMarkers = {}; 
-
 let targetNavigation = null; 
 
-// Calcolo distanza in metri e freccia di direzione dinamica
+if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(
+        (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            const dot = document.getElementById('gps-status-dot');
+            if (dot) {
+                dot.style.backgroundColor = '#22c55e';
+                dot.title = "GPS Attivo: " + lat.toFixed(4) + ", " + lng.toFixed(4);
+            }
+
+            if (!userMarker) {
+                userMarker = L.marker([lat, lng]).addTo(map)
+                    .bindPopup("<b>Sei qui</b><br>Posizione tartufaia rilevata.")
+                    .openPopup();
+                map.setView([lat, lng], 16);
+
+                if (carCoordinates) {
+                    carMarker = L.marker([carCoordinates.lat, carCoordinates.lng]).addTo(map)
+                        .bindPopup("<b>🚗 La tua Auto</b>");
+                }
+                renderAllPoiMarkers();
+            } else {
+                userMarker.setLatLng([lat, lng]);
+            }
+
+            updateCompass(lat, lng);
+        },
+        (error) => {
+            console.warn("Errore GPS: " + error.message);
+            const dot = document.getElementById('gps-status-dot');
+            if (dot) dot.style.backgroundColor = '#ef4444';
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+    );
+}
+
+function renderAllPoiMarkers() {
+    Object.values(poiMapMarkers).forEach(marker => map.removeLayer(marker));
+    poiMapMarkers = {};
+
+    poiList.forEach((poi, index) => {
+        const marker = L.marker([poi.lat, poi.lng]).addTo(map)
+            .bindPopup(`<b>📍 Tartufo / Punto</b><br>Nota: ${poi.note || 'Nessuna nota'}<br><small>${poi.date}</small>`);
+        poiMapMarkers[index] = marker;
+    });
+}
+
 function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI/180;
@@ -78,55 +124,6 @@ function updateCompass(currentLat, currentLng) {
     }
 }
 
-if (navigator.geolocation) {
-    navigator.geolocation.watchPosition(
-        (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            
-            const dot = document.getElementById('gps-status-dot');
-            if (dot) {
-                dot.style.backgroundColor = '#22c55e';
-                dot.title = "GPS Attivo: " + lat.toFixed(4) + ", " + lng.toFixed(4);
-            }
-
-            if (!userMarker) {
-                userMarker = L.marker([lat, lng]).addTo(map)
-                    .bindPopup("<b>Sei qui</b><br>Posizione tartufaia rilevata.")
-                    .openPopup();
-                map.setView([lat, lng], 16);
-
-                if (carCoordinates) {
-                    carMarker = L.marker([carCoordinates.lat, carCoordinates.lng]).addTo(map)
-                        .bindPopup("<b>🚗 La tua Auto</b>");
-                }
-                renderAllPoiMarkers();
-            } else {
-                userMarker.setLatLng([lat, lng]);
-            }
-
-            updateCompass(lat, lng);
-        },
-        (error) => {
-            console.warn("Errore GPS: " + error.message);
-            const dot = document.getElementById('gps-status-dot');
-            if (dot) dot.style.backgroundColor = '#ef4444';
-        },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
-    );
-}
-
-function renderAllPoiMarkers() {
-    Object.values(poiMapMarkers).forEach(marker => map.removeLayer(marker));
-    poiMapMarkers = {};
-
-    poiList.forEach((poi, index) => {
-        const marker = L.marker([poi.lat, poi.lng]).addTo(map)
-            .bindPopup(`<b>📍 Tartufo / Punto</b><br>Nota: ${poi.note || 'Nessuna nota'}<br><small>${poi.date}</small>`);
-        poiMapMarkers[index] = marker;
-    });
-}
-
 function saveCarPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -145,7 +142,6 @@ function saveCarPosition() {
     }
 }
 
-// --- GESTIONE CANCELLAZIONE POSIZIONE AUTO ---
 function deleteCarPosition() {
     if (carCoordinates) {
         if (confirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
@@ -155,11 +151,7 @@ function deleteCarPosition() {
             }
             carCoordinates = null;
             localStorage.removeItem('car_coords');
-            
-            if (targetNavigation === 'car') {
-                targetNavigation = null;
-            }
-            
+            if (targetNavigation === 'car') targetNavigation = null;
             alert("🚗 Posizione dell'auto rimossa con successo!");
         }
     } else {
@@ -210,9 +202,7 @@ function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
         map.setView([poiList[index].lat, poiList[index].lng], 18);
-        if (poiMapMarkers[index]) {
-            poiMapMarkers[index].openPopup();
-        }
+        if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
         closeActiveModule();
         alert(`🧭 Destinazione impostata sulla bussola: ${poiList[index].note}`);
     }
@@ -253,7 +243,6 @@ function triggerSOS() {
     }
 }
 
-// --- GESTIONE MODULI CON DOPPIA VISTA (LETTURA / MODIFICA) ---
 function openModule(moduleName, editMode = false) {
     toggleDrawer();
     
@@ -356,9 +345,8 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
-            
+
         case 'ricevute':
-            // Recupera automaticamente il protocollo F24 salvato in precedenza
             const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
             const defaultProtocollo = f24SavedData.protocollo || '';
 
@@ -388,6 +376,30 @@ function openModule(moduleName, editMode = false) {
                     <input type="text" id="r-f24" class="mod-input" value="${defaultProtocollo}" placeholder="Inserisci prima l'F24 nel menu apposito">
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVendita()">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
+            break;
+
+        case 'storico_ricevute':
+            const storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+            let storicoHtml = '<h2>Archivio Storico Ricevute</h2><p>Elenco cronologico delle ricevute di vendita emesse:</p>';
+            
+            if (storicoVendite.length === 0) {
+                storicoHtml += '<div class="module-card"><p>Nessuna ricevuta emessa finora.</p></div>';
+            } else {
+                storicoVendite.slice().reverse().forEach((item, index) => {
+                    const originalIndex = storicoVendite.length - 1 - index;
+                    storicoHtml += `
+                        <div class="module-card" style="margin-bottom:12px; border-left: 4px solid #3b82f6;">
+                            <strong style="color:#60a5fa; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${item.data}</strong>
+                            <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${item.acquirente}</b></p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${item.specie} (${item.peso}g)</p>
+                            <p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">Importo: € ${item.importo}</p>
+                            <div style="display:flex; gap:6px; margin-top:10px;">
+                                <button class="overlay-btn" style="background:#2563eb;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza / Stampa</button>
+                            </div>
+                        </div>`;
+                });
+            }
+            contentHTML = storicoHtml;
             break;
 
         case 'f24':
@@ -555,9 +567,7 @@ function openModule(moduleName, editMode = false) {
 
 function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
-    if (activeView) {
-        activeView.style.display = 'none';
-    }
+    if (activeView) activeView.style.display = 'none';
 }
 
 function clearData(storageKey, moduleName) {
@@ -635,14 +645,11 @@ function registraVendita() {
 
     const importoCorrente = parseFloat(document.getElementById('r-importo').value) || 0;
     
-    // --- CONTROLLO SOGLIA 7.000 EURO ANNO SOLARE ---
     let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const annoCorrente = new Date().getFullYear();
     
     let totaleAnno = storico
-        .filter(item => {
-            return item.data && item.data.includes(annoCorrente);
-        })
+        .filter(item => item.data && item.data.includes(annoCorrente))
         .reduce((acc, item) => acc + (parseFloat(item.importo) || 0), 0);
 
     totaleAnno += importoCorrente;
@@ -652,7 +659,6 @@ function registraVendita() {
     } else if (totaleAnno > 6000) {
         alert(`⚠️ Avviso Soglia: Ti stai avvicinando al limite massimo di 7.000 € annui (Totale attuale stimato: € ${totaleAnno.toFixed(2)}).`);
     }
-    // ----------------------------------------------
 
     const vendita = {
         venditoreNome: tData.nome || 'N.D.',
@@ -672,13 +678,14 @@ function registraVendita() {
     
     storico.push(vendita);
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
+    const numeroRicevuta = storico.length;
 
     let activeView = document.getElementById('active-module-view');
     activeView.querySelector('.module-body-content').innerHTML = `
-        <h2>RICEVUTA DI VENDITA OCCASIONALE TARTUFI</h2>
+        <h2>RICEVUTA DI VENDITA OCCASIONALE TARTUFI (N. ${numeroRicevuta})</h2>
         <p>Conforme a Legge 145/2018 (Regime dei 100€), Reg. CE 178/02 & DPR 633/1972</p>
         <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px; font-size:0.85rem;">
-            <h3 style="color:#000; border-bottom:2px solid #000; padding-bottom:5px; margin-bottom:10px; font-size:1rem; text-align:center;">DOCUMENTO DI VENDITA / TRACCIABILITÀ</h3>
+            <h3 style="color:#000; border-bottom:2px solid #000; padding-bottom:5px; margin-bottom:10px; font-size:1rem; text-align:center;">DOCUMENTO DI VENDITA / TRACCIABILITÀ (N. ${numeroRicevuta})</h3>
             
             <div style="margin-bottom: 10px;">
                 <strong>DATI DEL RACCOGLITORE (VENDITORE):</strong><br>
@@ -715,15 +722,63 @@ function registraVendita() {
     `;
 }
 
+function visualizzaRicevutaSalvata(index) {
+    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const vendita = storico[index];
+    
+    if (!vendita) return;
+
+    let activeView = document.getElementById('active-module-view');
+    activeView.querySelector('.module-body-content').innerHTML = `
+        <h2>RICEVUTA DI VENDITA OCCASIONALE TARTUFI (N. ${index + 1})</h2>
+        <p>Conforme a Legge 145/2018 (Regime dei 100€), Reg. CE 178/02 & DPR 633/1972</p>
+        <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px; font-size:0.85rem;">
+            <h3 style="color:#000; border-bottom:2px solid #000; padding-bottom:5px; margin-bottom:10px; font-size:1rem; text-align:center;">DOCUMENTO DI VENDITA / TRACCIABILITÀ (COPIA N. ${index + 1})</h3>
+            
+            <div style="margin-bottom: 10px;">
+                <strong>DATI DEL RACCOGLITORE (VENDITORE):</strong><br>
+                Nominativo: ${vendita.venditoreNome}<br>
+                Codice Fiscale: ${vendita.venditoreCf}<br>
+                Tesserino N.: ${vendita.venditoreTesserino} (${vendita.venditoreRegione})
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+                <strong>DATI DELL'ACQUIRENTE:</strong><br>
+                Intestato a: ${vendita.acquirente} (P.IVA/CF: ${vendita.acquirenteCf})
+            </div>
+
+            <hr style="margin:8px 0; border-color:#ccc;">
+
+            <p><strong>Data Emissione:</strong> ${vendita.data}</p>
+            <p><strong>Specie Botanica:</strong> ${vendita.specie}</p>
+            <p><strong>Quantità / Peso:</strong> ${vendita.peso} grammi</p>
+            <p><strong>Comune di Raccolta:</strong> ${vendita.comune}</p>
+            <p><strong>Codice Lotto (Tracciabilità):</strong> ${vendita.lotto}</p>
+            <p><strong>Riferimento F24 ELIDE (Imposta Sostitutiva 100€ - Cod. 1853):</strong> Protocollo N. ${vendita.f24}</p>
+            
+            <hr style="margin:10px 0; border-color:#000;">
+            <p style="font-size:1rem;"><strong>CORRISPETTIVO TOTALE: € ${vendita.importo}</strong></p>
+            
+            <p style="font-size:0.7rem; margin-top:12px; color:#444; text-align:justify;">
+                <i>Operazione non soggetta a IVA ai sensi del regime di commercializzazione occasionale dei tartufi (Legge 145/2018). Imposta sostitutiva annuale di 100 euro assolta tramite F24 ELIDE (esenzione da ritenuta d'acconto del 23%). Tracciabilità garantita ai sensi del Regolamento CE n. 178/2002.</i>
+            </p>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:15px;">
+            <button class="overlay-btn" style="background:#2563eb;" onclick="window.print()">🖨️ Stampa / Salva PDF</button>
+            <button class="overlay-btn" style="background:#475569;" onclick="openModule('storico_ricevute')">← Torna all'Archivio</button>
+        </div>
+    `;
+}
+
 function esportaDatiCSV() {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     if(storico.length === 0) {
         alert("Nessuna vendita registrata da esportare.");
         return;
     }
-    let csvContent = "data:text/csv;charset=utf-8,Data,Venditore,CF_Venditore,Acquirente,CF_Acquirente,Specie,Peso(g),Importo(Euro),Comune,Lotto,ProtocolloF24\n";
-    storico.forEach(function(row) {
-        csvContent += `${row.data},"${row.venditoreNome}","${row.venditoreCf}","${row.acquirente}","${row.acquirenteCf}","${row.specie}",${row.peso},${row.importo},"${row.comune}","${row.lotto}","${row.f24}"\n`;
+    let csvContent = "data:text/csv;charset=utf-8,N.Ricevuta,Data,Venditore,CF_Venditore,Acquirente,CF_Acquirente,Specie,Peso(g),Importo(Euro),Comune,Lotto,ProtocolloF24\n";
+    storico.forEach(function(row, idx) {
+        csvContent += `${idx + 1},${row.data},"${row.venditoreNome}","${row.venditoreCf}","${row.acquirente}","${row.acquirenteCf}","${row.specie}",${row.peso},${row.importo},"${row.comune}","${row.lotto}","${row.f24}"\n`;
     });
     var encodedUri = encodeURI(csvContent);
     var link = document.createElement("a");
