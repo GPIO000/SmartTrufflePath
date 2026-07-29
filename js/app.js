@@ -88,7 +88,6 @@ function renderAllPoiMarkers() {
         poiMapMarkers[index] = marker;
     });
 }
-
 function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI/180;
@@ -188,7 +187,6 @@ function returnToCar() {
         alert("Nessun parcheggio salvato. Clicca prima su 'Auto'.");
     }
 }
-
 function savePoiPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -262,7 +260,6 @@ function triggerSOS() {
         alert("Impossibile rilevare le coordinate GPS.");
     }
 }
-
 function openModule(moduleName, editMode = false) {
     toggleDrawer();
     
@@ -380,9 +377,15 @@ function openModule(moduleName, editMode = false) {
                     <input type="text" id="r-cf-acquirente" class="mod-input" placeholder="P.IVA o CF acquirente">
                     <label>Specie Tartufo:</label>
                     <select id="r-specie" class="mod-input">
-                        <option value="Pregiato Bianco (Tuber magnatum pico)">Pregiato Bianco (Tuber magnatum pico)</option>
-                        <option value="Nero Pregiato (Tuber melanosporum)">Nero Pregiato (Tuber melanosporum)</option>
-                        <option value="Scorzone (Tuber aestivum)">Scorzone (Tuber aestivum)</option>
+                        <option value="Tuber magnatum Pico (Pregiato Bianco)">Tuber magnatum Pico (Pregiato Bianco)</option>
+                        <option value="Tuber melanosporum Vitt. (Nero Pregiato)">Tuber melanosporum Vitt. (Nero Pregiato)</option>
+                        <option value="Tuber aestivum Vitt. (Scorzone Estivo)">Tuber aestivum Vitt. (Scorzone Estivo)</option>
+                        <option value="Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)">Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)</option>
+                        <option value="Tuber brumale Vitt. (Moscatuto / Invernale)">Tuber brumale Vitt. (Moscatuto / Invernale)</option>
+                        <option value="Tuber brumale var. moschatum De Ferry (Brumale moscato)">Tuber brumale var. moschatum De Ferry (Brumale moscato)</option>
+                        <option value="Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)">Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)</option>
+                        <option value="Tuber macrosporum Vitt. (Nero Liscio)">Tuber macrosporum Vitt. (Nero Liscio)</option>
+                        <option value="Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)">Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)</option>
                     </select>
                     <label>Peso (grammi):</label>
                     <input type="number" id="r-peso" class="mod-input" placeholder="Es. 150">
@@ -450,7 +453,6 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
-
         case 'canidiary':
             const cData = JSON.parse(localStorage.getItem('cane_data') || '{}');
             if (cData.nome && !editMode) {
@@ -557,8 +559,9 @@ function openModule(moduleName, editMode = false) {
     }
 
     activeView.innerHTML = `
-        <div class="module-header-bar">
+        <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
+            <button onclick="toggleDrawer(); closeActiveModule();" class="back-map-btn" style="color: #f8fafc;">☰ Torna al Menu</button>
         </div>
         <div class="module-body-content">
             ${contentHTML}
@@ -584,7 +587,6 @@ function openModule(moduleName, editMode = false) {
         }, 50);
     }
 }
-
 function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
@@ -737,7 +739,7 @@ function registraVendita() {
         </div>
         <div style="display:flex; gap:10px; margin-top:15px;">
             <button class="overlay-btn" style="background:#2563eb;" onclick="window.print()">🖨️ Stampa / Salva PDF</button>
-            <button class="overlay-btn" style="background:#16a34a;" onclick="closeActiveModule()">✔ Fatto / Torna alla Mappa</button>
+            <button class="overlay-btn" style="background:#475569;" onclick="openModule('storico_ricevute')">📁 Vai all'Archivio</button>
         </div>
     `;
 }
