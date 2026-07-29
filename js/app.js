@@ -77,7 +77,6 @@ if (navigator.geolocation) {
         { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
     );
 }
-
 function renderAllPoiMarkers() {
     Object.values(poiMapMarkers).forEach(marker => map.removeLayer(marker));
     poiMapMarkers = {};
@@ -142,7 +141,6 @@ function updateCompass(currentLat, currentLng) {
         compassText.innerHTML = `🧭 Seleziona una destinazione (Auto o Punto)`;
     }
 }
-
 function saveCarPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -536,7 +534,6 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = vetHtml;
             break;
-
         case 'bilancio':
             const venditeSalvate = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
             let totaleIncassato = venditeSalvate.reduce((acc, item) => acc + Number(item.importo), 0);
@@ -696,7 +693,6 @@ function saveCane() {
     openModule('canidiary');
 }
 
-// Nota: La funzione obsoleta saveVet() è stata rimossa completamente.
 function registraVendita() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
@@ -788,7 +784,6 @@ function registraVendita() {
         </div>
     `;
 }
-
 function visualizzaRicevutaSalvata(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const vendita = storico[index];
@@ -876,6 +871,7 @@ function esportaBackupJSON() {
     downloadAnchor.click();
     downloadAnchor.remove();
 }
+
 function importBackupData(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -889,7 +885,6 @@ function importBackupData(event) {
             if (importedData.pagopa) localStorage.setItem('pagopa_data', JSON.stringify(importedData.pagopa));
             if (importedData.f24) localStorage.setItem('f24_data', JSON.stringify(importedData.f24));
             if (importedData.cane) localStorage.setItem('cane_data', JSON.stringify(importedData.cane));
-            // CORRETTO: Salvataggio corretto della chiave del libretto sanitario
             if (importedData.vet) localStorage.setItem('vet_history_list', JSON.stringify(importedData.vet));
             if (importedData.poiList) localStorage.setItem('poi_list', JSON.stringify(importedData.poiList));
             if (importedData.storicoVendite) localStorage.setItem('storico_vendite', JSON.stringify(importedData.storicoVendite));
