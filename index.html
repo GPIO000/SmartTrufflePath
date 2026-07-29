@@ -3,116 +3,367 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Truffle Mobil Frist</title>
-
+    <title>App Tartufaia & Gestione Occasionale</title>
+    
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css">
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
-    <!-- QRCode JS Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        #app-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Mappa a schermo intero */
+        #map {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Barra superiore fluttuante (Bussola & Stato GPS) */
+        .top-bar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 60px; /* Lascia spazio per il tasto zoom di Leaflet */
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            pointer-events: none;
+        }
+
+        .compass-box, .gps-status-box {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #fff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            pointer-events: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #gps-status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ef4444; /* Rosso iniziale (GPS inattivo/ricerca) */
+            display: inline-block;
+        }
+
+        /* Menu a tendina laterale (Drawer) */
+        .drawer {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100%;
+            background: #1e293b;
+            z-index: 1000;
+            transition: left 0.3s ease;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .drawer.drawer-open {
+            left: 0;
+        }
+
+        .drawer-header {
+            padding: 20px;
+            background: #0f172a;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .drawer-header h2 {
+            font-size: 1.1rem;
+            color: #38bdf8;
+        }
+
+        .drawer-menu {
+            overflow-y: auto;
+            flex: 1;
+            padding: 10px 0;
+        }
+
+        .drawer-item {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #cbd5e1;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+        }
+
+        .drawer-item:hover {
+            background: rgba(56, 189, 248, 0.1);
+            color: #fff;
+        }
+
+        /* Pulsante Hamburger per aprire il menu */
+        .menu-toggle-btn {
+            position: absolute;
+            bottom: 25px;
+            left: 20px;
+            z-index: 10;
+            background: #2563eb;
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Sfondo scuro quando il drawer è aperto */
+        .drawer-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(2px);
+            z-index: 999;
+            display: none;
+        }
+
+        .drawer-backdrop.active {
+            display: block;
+        }
+
+        /* Vista Moduli Attivi (Schermata a tutto schermo sopra la mappa) */
+        #active-module-view {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .module-header-bar {
+            padding: 15px 20px;
+            background: #1e293b;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+        }
+
+        .back-map-btn {
+            background: #334155;
+            color: #fff;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .module-body-content {
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+        }
+
+        .module-body-content h2 {
+            font-size: 1.4rem;
+            margin-bottom: 6px;
+            color: #38bdf8;
+        }
+
+        .module-body-content > p {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 20px;
+        }
+
+        .module-card {
+            background: #1e293b;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            margin-bottom: 15px;
+        }
+
+        .mod-input {
+            width: 100%;
+            padding: 10px;
+            background: #0f172a;
+            border: 1px solid #475569;
+            color: #fff;
+            border-radius: 6px;
+            margin-top: 6px;
+            margin-bottom: 14px;
+            font-size: 0.95rem;
+        }
+
+        .mod-input:focus {
+            outline: none;
+            border-color: #38bdf8;
+        }
+
+        label {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            font-weight: 500;
+            display: block;
+        }
+
+        .overlay-btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .overlay-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Pulsanti rapidi flottanti sulla mappa (Auto, Punto, SOS) */
+        .map-floating-controls {
+            position: absolute;
+            bottom: 25px;
+            right: 20px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .map-fab {
+            background: #1e293b;
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 10px 14px;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(6px);
+        }
+    </style>
 </head>
-<body class="no-scroll-body">
+<body>
 
-    <!-- APP CONTAINER (Bloccato a schermo intero, zero scroll) -->
     <div id="app-container">
+        <!-- Mappa Leaflet -->
+        <div id="map"></div>
 
-        <!-- HEADER FISSO CON PULSANTE CASSETTO (MENU) -->
-        <header id="app-header">
-            <button id="menu-toggle-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>
-            <h1>Truffle Mobil Frist</h1>
-            <span id="gps-status-dot" class="dot-offline" title="Stato GPS"></span>
-        </header>
-
-        <!-- MAPPA INTERATTIVA IN PRIMO PIANO (DASHBOARD) -->
-        <main id="map-dashboard">
-            <div id="map"></div>
-
-            <!-- INDICATORE DIREZIONE / BUSSOLA CON FRECCIA IN TEMPO REALE -->
-            <div id="compass-box">
-                <span id="compass-text">🧭 In attesa di destinazione...</span>
+        <!-- Barra Informazioni in Alto (GPS e Bussola) -->
+        <div class="top-bar">
+            <div class="gps-status-box">
+                <span id="gps-status-dot"></span>
+                <span id="gps-status-text" style="font-size: 0.8rem;">Ricerca segnale GPS...</span>
             </div>
-
-            <!-- CONTROLLI RAPIDI IN OVERLAY SULLA MAPPA (SOLLEVATI) -->
-            <div id="map-overlays">
-                <button class="overlay-btn" onclick="saveCarPosition()">🚗 Auto</button>
-                <button class="overlay-btn" onclick="returnToCar()">🧭 Vai Auto</button>
-                <button class="overlay-btn" style="background-color: #dc2626;" onclick="deleteCarPosition()">❌ Cancella Auto</button>
-                <button class="overlay-btn" onclick="savePoiPosition()">📍 Punto</button>
-                <button class="overlay-btn sos-overlay-btn" onclick="triggerSOS()">🚨 SOS</button>
+            <div class="compass-box" id="compass-text">
+                🧭 Seleziona una destinazione (Auto o Punto)
             </div>
-        </main>
+        </div>
 
-        <!-- MENU A CASSETTO (DRAWER) PER TUTTI I MODULI SECONDIARI -->
-        <nav id="app-drawer" class="drawer-closed">
+        <!-- Pulsante Menu Laterale (Hamburger) -->
+        <button class="menu-toggle-btn" onclick="toggleDrawer()">☰</button>
+
+        <!-- Controlli Rapidi Fluttuanti sulla Mappa -->
+        <div class="map-floating-controls">
+            <button class="map-fab" onclick="saveCarPosition()" title="Salva posizione auto">🚗 Auto</button>
+            <button class="map-fab" onclick="returnToCar()" title="Torna all'auto">🔄 Torna Auto</button>
+            <button class="map-fab" onclick="savePoiPosition()" style="background: #16a34a;" title="Salva tartufaia">📍 Punto</button>
+            <button class="map-fab" onclick="triggerSOS()" style="background: #dc2626;" title="Invia SMS Emergenza">🚨 SOS</button>
+        </div>
+
+        <!-- Sfondo Scuro Drawer -->
+        <div id="drawer-backdrop" class="drawer-backdrop" onclick="toggleDrawer()"></div>
+
+        <!-- Menu Laterale Drawer (Moduli) -->
+        <div id="app-drawer" class="drawer">
             <div class="drawer-header">
-                <h2>Menu Principale</h2>
-                <button onclick="toggleDrawer()">✕</button>
+                <h2>Menu Tartufaia</h2>
+                <button onclick="toggleDrawer()" style="background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">✕</button>
             </div>
-            
-            <div class="drawer-content">
-                <!-- Sezione Tartufi & Punti di Interesse -->
-                <div class="drawer-section">
-                    <h3>📍 Tartufaie & Mappa</h3>
-                    <button onclick="openModule('poilist')">Elenco Punti & Tartufaie Salvate</button>
-                </div>
-
-                <!-- Sezione Burocrazia e Tesserini -->
-                <div class="drawer-section">
-                    <h3>📄 Burocrazia & Tesserini</h3>
-                    <button onclick="openModule('tesserino')">Anagrafica & Tesserino Digitale</button>
-                    <button onclick="openModule('pagopa')">Ricevuta PagoPA / QR Code</button>
-                </div>
-
-                <!-- Sezione Fiscale e Vendite (Legge 145/2018 & F24) -->
-                <div class="drawer-section">
-                    <h3>💶 Fiscale & Vendita Occasionale</h3>
-                    <button onclick="openModule('ricevute')">Generatore Ricevute (Reg. CE 178/02)</button>
-                    <button onclick="openModule('f24')">F24 ELIDE (Codice 1853)</button>
-                </div>
-
-                <!-- Sezione Cani e Salute -->
-                <div class="drawer-section">
-                    <h3>🐕 Gestione Cani & Salute</h3>
-                    <button onclick="openModule('canidiary')">Profilo Cani & Diario Ricerca</button>
-                    <button onclick="openModule('vet')">Libretto Sanitario & Vaccini</button>
-                </div>
-
-                <!-- Sezione Economica -->
-                <div class="drawer-section">
-                    <h3>📊 Contabilità & Bilancio</h3>
-                    <button onclick="openModule('bilancio')">Spese, Ricavi & Bilancio Annuo</button>
-                    <button onclick="openModule('export')">Report & Backup Dati (JSON/CSV)</button>
-                </div>
-
-                <!-- Sezione Emergenze e Veterinario H24 -->
-                <div class="drawer-section">
-                    <h3>⚠️ Emergenze & Sicurezza</h3>
-                    <button onclick="openModule('emergency')">Numeri utili (112, CNSAS, Forestali)</button>
-                    <button onclick="openModule('vet-emergency')">Pronto Soccorso Cinofilo H24</button>
-                </div>
+            <div class="drawer-menu">
+                <div class="drawer-item" onclick="openModule('poilist')">📍 Elenco Punti & Tartufaiae</div>
+                <div class="drawer-item" onclick="openModule('tesserino')">🪪 Anagrafica & Tesserino</div>
+                <div class="drawer-item" onclick="openModule('pagopa')">🧾 Ricevuta PagoPA & QR Code</div>
+                <div class="drawer-item" onclick="openModule('ricevute')">📄 Nuova Ricevuta Vendita</div>
+                <div class="drawer-item" onclick="openModule('storico_ricevute')">📚 Archivio Storico Ricevute</div>
+                <div class="drawer-item" onclick="openModule('f24')">🏛️ F24 ELIDE (Imposta Sostitutiva)</div>
+                <div class="drawer-item" onclick="openModule('bilancio')">📊 Contabilità & Bilancio Annuo</div>
+                <div class="drawer-item" onclick="openModule('canidiary')">🐕 Profilo Cani & Diario</div>
+                <div class="drawer-item" onclick="openModule('vet')">💉 Libretto Sanitario & Vaccini</div>
+                <div class="drawer-item" onclick="openModule('vet-emergency')">⚠️ Pronto Soccorso Cinofilo H24</div>
+                <div class="drawer-item" onclick="openModule('export')">💾 Report & Backup Dati</div>
+                <div class="drawer-item" onclick="openModule('emergency')" style="color: #ef4444; font-weight: bold;">📞 Chiamata Rapida 112</div>
             </div>
-        </nav>
+        </div>
 
-        <!-- OVERLAY DI Sfondo per chiudere il cassetto con un tap -->
-        <div id="drawer-backdrop" onclick="toggleDrawer()"></div>
-
+        <!-- Vista Dinamica per i Moduli -->
+        <div id="active-module-view"></div>
     </div>
 
-    <!-- Leaflet JS -->
+    <!-- Script di terze parti (Leaflet e QRCode.js) -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- App JS -->
-    <script src="js/app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <!-- Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(() => console.log("Service Worker registrato con successo!"))
-                .catch((err) => console.log("Errore Service Worker:", err));
-        }
-    </script>
+    <!-- Inclusione dello script principale (diviso nelle 6 parti) -->
+    <script src="js/app.js"></script>
 </body>
 </html>
