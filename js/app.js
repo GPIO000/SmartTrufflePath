@@ -145,6 +145,28 @@ function saveCarPosition() {
     }
 }
 
+// --- GESTIONE CANCELLAZIONE POSIZIONE AUTO ---
+function deleteCarPosition() {
+    if (carCoordinates) {
+        if (confirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
+            if (carMarker) {
+                map.removeLayer(carMarker);
+                carMarker = null;
+            }
+            carCoordinates = null;
+            localStorage.removeItem('car_coords');
+            
+            if (targetNavigation === 'car') {
+                targetNavigation = null;
+            }
+            
+            alert("🚗 Posizione dell'auto rimossa con successo!");
+        }
+    } else {
+        alert("Nessuna posizione dell'auto attualmente salvata.");
+    }
+}
+
 function returnToCar() {
     if (carCoordinates) {
         targetNavigation = 'car';
@@ -230,6 +252,7 @@ function triggerSOS() {
         alert("Impossibile rilevare le coordinate GPS.");
     }
 }
+
 // --- GESTIONE MODULI CON DOPPIA VISTA (LETTURA / MODIFICA) ---
 function openModule(moduleName, editMode = false) {
     toggleDrawer();
@@ -335,6 +358,10 @@ function openModule(moduleName, editMode = false) {
             break;
             
         case 'ricevute':
+            // Recupera automaticamente il protocollo F24 salvato in precedenza
+            const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+            const defaultProtocollo = f24SavedData.protocollo || '';
+
             contentHTML = `
                 <h2>Ricevuta di Vendita Occasionale</h2>
                 <p>Conforme a Reg. CE 178/02 & DPR 633/1972</p>
@@ -353,8 +380,8 @@ function openModule(moduleName, editMode = false) {
                     <input type="number" id="r-importo" class="mod-input" placeholder="Es. 200.00">
                     <label>Comune di Raccolta:</label>
                     <input type="text" id="r-comune" class="mod-input" placeholder="Comune di ritrovamento">
-                    <label>N. Protocollo F24 ELIDE collegato:</label>
-                    <input type="text" id="r-f24" class="mod-input" placeholder="Obbligatorio sotto i 7.000€">
+                    <label>N. Protocollo F24 ELIDE collegato (Compilato in automatico):</label>
+                    <input type="text" id="r-f24" class="mod-input" value="${defaultProtocollo}" placeholder="Inserisci prima l'F24 nel menu apposito">
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVendita()">Registra e Genera Ricevuta</button>
                 </div>`;
             break;
@@ -503,7 +530,6 @@ function openModule(moduleName, editMode = false) {
     `;
     activeView.style.display = 'flex';
 
-    // Se siamo nel modulo pagopa in modalità lettura, generiamo il QR code grafico
     if (moduleName === 'pagopa' && pData.id && !editMode) {
         setTimeout(() => {
             const qrContainer = document.getElementById('qrcode-container');
@@ -530,14 +556,13 @@ function closeActiveModule() {
     }
 }
 
-// Funzione generica per cancellare un dato specifico e ricaricare il modulo
 function clearData(storageKey, moduleName) {
     if (confirm("Vuoi davvero eliminare questi dati?")) {
         localStorage.removeItem(storageKey);
         openModule(moduleName);
     }
 }
-// --- FUNZIONI DI SALVATAGGIO DATI ---
+
 function saveTesserino() {
     const data = {
         nome: document.getElementById('t-nome').value,
@@ -591,7 +616,6 @@ function saveVet() {
     openModule('vet');
 }
 
-// Registrazione vendita con anteprima di stampa/PDF
 function registraVendita() {
     const vendita = {
         acquirente: document.getElementById('r-acquirente').value,
