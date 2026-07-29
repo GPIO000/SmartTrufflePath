@@ -398,7 +398,6 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVendita()">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             break;
-
         case 'storico_ricevute':
             const storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
             let storicoHtml = '<h2>Archivio Storico Ricevute</h2><p>Elenco cronologico delle ricevute di vendita emesse:</p>';
@@ -941,7 +940,6 @@ function importBackupData(event) {
     };
     reader.readAsText(file);
 }
-
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
@@ -1025,5 +1023,26 @@ function deleteVetHistoryItem(index) {
         vetHistory.splice(index, 1);
         localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
         openModule('vet');
+    }
+}
+
+function shareAppUrl() {
+    const appUrl = window.location.href; 
+    const shareData = {
+        title: 'Truffle Mobil Frist',
+        text: 'Scarica e prova la PWA per la gestione della raccolta tartufi e tracciabilità!',
+        url: appUrl
+    };
+
+    if (navigator.share) {
+        navigator.share(shareData)
+            .then(() => console.log('Condivisione riuscita'))
+            .catch((error) => console.log('Errore di condivisione:', error));
+    } else {
+        navigator.clipboard.writeText(appUrl).then(() => {
+            alert("Link dell'app copiato negli appunti!");
+        }).catch(() => {
+            prompt("Copia il link per scaricare/aprire l'app:", appUrl);
+        });
     }
 }
