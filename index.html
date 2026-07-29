@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Truffle Mobil Frist</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <!-- QRCode JS Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="no-scroll-body">
+
+    <!-- APP CONTAINER (Bloccato a schermo intero, zero scroll) -->
+    <div id="app-container">
+
+        <!-- HEADER FISSO CON PULSANTE CASSETTO (MENU) -->
+        <header id="app-header">
+            <button id="menu-toggle-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>
+            <h1>Truffle Mobil Frist</h1>
+            <span id="gps-status-dot" class="dot-offline" title="Stato GPS"></span>
+        </header>
+
+        <!-- MAPPA INTERATTIVA IN PRIMO PIANO (DASHBOARD) -->
+        <main id="map-dashboard">
+            <div id="map"></div>
+
+            <!-- INDICATORE DIREZIONE / BUSSOLA CON FRECCIA IN TEMPO REALE -->
+            <div id="compass-box">
+                <span id="compass-text">🧭 In attesa di destinazione...</span>
+            </div>
+
+            <!-- CONTROLLI RAPIDI IN OVERLAY SULLA MAPPA (SOLLEVATI) -->
+            <div id="map-overlays">
+                <button class="overlay-btn" onclick="saveCarPosition()">🚗 Auto</button>
+                <button class="overlay-btn" onclick="returnToCar()">🧭 Vai Auto</button>
+                <button class="overlay-btn" onclick="savePoiPosition()">📍 Punto</button>
+                <button class="overlay-btn sos-overlay-btn" onclick="triggerSOS()">🚨 SOS</button>
+            </div>
+        </main>
+
+        <!-- MENU A CASSETTO (DRAWER) PER TUTTI I MODULI SECONDIARI -->
+        <nav id="app-drawer" class="drawer-closed">
+            <div class="drawer-header">
+                <h2>Menu Principale</h2>
+                <button onclick="toggleDrawer()">✕</button>
+            </div>
+            
+            <div class="drawer-content">
+                <!-- Sezione Tartufi & Punti di Interesse -->
+                <div class="drawer-section">
+                    <h3>📍 Tartufaie & Mappa</h3>
+                    <button onclick="openModule('poilist')">Elenco Punti & Tartufaie Salvate</button>
+                </div>
+
+                <!-- Sezione Burocrazia e Tesserini -->
+                <div class="drawer-section">
+                    <h3>📄 Burocrazia & Tesserini</h3>
+                    <button onclick="openModule('tesserino')">Anagrafica & Tesserino Digitale</button>
+                    <button onclick="openModule('pagopa')">Ricevuta PagoPA / QR Code</button>
+                </div>
+
+                <!-- Sezione Fiscale e Vendite (Legge 145/2018 & F24) -->
+                <div class="drawer-section">
+                    <h3>💶 Fiscale & Vendita Occasionale</h3>
+                    <button onclick="openModule('ricevute')">Generatore Ricevute (Reg. CE 178/02)</button>
+                    <button onclick="openModule('f24')">F24 ELIDE (Codice 1853)</button>
+                </div>
+
+                <!-- Sezione Cani e Salute -->
+                <div class="drawer-section">
+                    <h3>🐕 Gestione Cani & Salute</h3>
+                    <button onclick="openModule('canidiary')">Profilo Cani & Diario Ricerca</button>
+                    <button onclick="openModule('vet')">Libretto Sanitario & Vaccini</button>
+                </div>
+
+                <!-- Sezione Economica -->
+                <div class="drawer-section">
+                    <h3>📊 Contabilità & Bilancio</h3>
+                    <button onclick="openModule('bilancio')">Spese, Ricavi & Bilancio Annuo</button>
+                    <button onclick="openModule('export')">Report & Backup Dati (JSON/CSV)</button>
+                </div>
+
+                <!-- Sezione Emergenze e Veterinario H24 -->
+                <div class="drawer-section">
+                    <h3>⚠️ Emergenze & Sicurezza</h3>
+                    <button onclick="openModule('emergency')">Numeri utili (112, CNSAS, Forestali)</button>
+                    <button onclick="openModule('vet-emergency')">Pronto Soccorso Cinofilo H24</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- OVERLAY DI Sfondo per chiudere il cassetto con un tap -->
+        <div id="drawer-backdrop" onclick="toggleDrawer()"></div>
+
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- App JS -->
+    <script src="js/app.js"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log("Service Worker registrato con successo!"))
+                .catch((err) => console.log("Errore Service Worker:", err));
+        }
+    </script>
+</body>
+</html>
