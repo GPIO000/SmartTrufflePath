@@ -54,9 +54,19 @@ if (navigator.geolocation) {
 
             if (!userMarker) {
                 userMarker = L.marker([lat, lng]).addTo(map)
-                    .bindPopup("<b>Sei qui</b><br>Posizione tartufaia rilevata.")
+                    .bindPopup("<b>Sei qui</b>")
                     .openPopup();
                 map.setView([lat, lng], 16);
+function centerOnUser() {
+    if (userMarker) {
+        const pos = userMarker.getLatLng();
+        map.setView([pos.lat, pos.lng], 16);
+        userMarker.openPopup();
+    } else {
+        alert("Posizione GPS non ancora disponibile.");
+    }
+}
+
 
                 if (carCoordinates) {
                     carMarker = L.marker([carCoordinates.lat, carCoordinates.lng]).addTo(map)
