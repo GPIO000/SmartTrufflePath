@@ -186,6 +186,7 @@ function returnToCar() {
         alert("Nessun parcheggio salvato. Clicca prima su 'Auto'.");
     }
 }
+
 function savePoiPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -214,7 +215,6 @@ function savePoiPosition() {
         alert("Segnale GPS non ancora disponibile per marcare il punto.");
     }
 }
-
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -328,7 +328,6 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
-            
         case 'pagopa':
             const pData = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
             if (pData.id && !editMode) {
@@ -399,6 +398,7 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVendita()">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             break;
+
         case 'storico_ricevute':
             const storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
             let storicoHtml = '<h2>Archivio Storico Ricevute</h2><p>Elenco cronologico delle ricevute di vendita emesse:</p>';
@@ -451,7 +451,6 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
-
         case 'canidiary':
             const dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
             if (dogsList.length === 0) {
@@ -472,6 +471,8 @@ function openModule(moduleName, editMode = false) {
                     <input type="text" id="c-nome" class="mod-input" placeholder="Es. Argo">
                     <label>Razza:</label>
                     <input type="text" id="c-razza" class="mod-input" value="Lagotto Romagnolo">
+                    <label>Data di Nascita:</label>
+                    <input type="date" id="c-nascita" class="mod-input">
                     <label>Numero Microchip:</label>
                     <input type="text" id="c-microchip" class="mod-input" placeholder="Codice microchip">
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveNewCane()">Salva Nuovo Cane</button>
@@ -487,6 +488,7 @@ function openModule(moduleName, editMode = false) {
                         <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
                             <strong style="color:#f8fafc; font-size:1rem;">🐕 ${dog.nome}</strong>
                             <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">Razza: ${dog.razza}</p>
+                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Nascita: ${dog.nascita || 'Non specificata'}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">Microchip: ${dog.microchip || 'Non inserito'}</p>
                             <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteDog(${idx})">🗑️ Elimina</button>
                         </div>`;
@@ -699,6 +701,7 @@ function saveF24() {
 function saveNewCane() {
     const nome = document.getElementById('c-nome').value.trim();
     const razza = document.getElementById('c-razza').value.trim();
+    const nascita = document.getElementById('c-nascita').value;
     const microchip = document.getElementById('c-microchip').value.trim();
 
     if (!nome) {
@@ -707,10 +710,10 @@ function saveNewCane() {
     }
 
     let dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
-    dogsList.push({ nome, razza, microchip });
+    dogsList.push({ nome, razza, nascita, microchip });
     
     localStorage.setItem('dogs_list', JSON.stringify(dogsList));
-    localStorage.setItem('cane_data', JSON.stringify({ nome, razza, microchip }));
+    localStorage.setItem('cane_data', JSON.stringify({ nome, razza, nascita, microchip }));
 
     alert("Cane aggiunto con successo!");
     openModule('canidiary');
