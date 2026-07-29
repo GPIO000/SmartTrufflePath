@@ -7,7 +7,7 @@
 
 html, body.no-scroll-body {
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: #121212;
@@ -19,7 +19,7 @@ html, body.no-scroll-body {
     display: flex;
     flex-direction: column;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     position: relative;
     overflow: hidden;
 }
@@ -94,23 +94,23 @@ html, body.no-scroll-body {
 /* Pulsanti in overlay sopra la mappa (SOLLEVATI) */
 #map-overlays {
     position: absolute;
-    bottom: 65px;
-    left: 10px;
-    right: 10px;
+    bottom: 20px;
+    left: 5px;
+    right: 5px;
     display: flex;
-    gap: 5px;
+    gap: 3px;
     z-index: 999;
 }
 
 .overlay-btn {
     flex: 1;
-    padding: 12px 2px;
+    padding: 10px 2px;
     background-color: #2563eb;
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     font-weight: bold;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     text-align: center;
     cursor: pointer;
@@ -127,7 +127,7 @@ html, body.no-scroll-body {
     left: -100%;
     width: 80%;
     max-width: 320px;
-    height: 100vh;
+    height: 100dvh;
     background-color: #1e293b;
     z-index: 2000;
     transition: left 0.3s ease-in-out;
@@ -206,7 +206,7 @@ html, body.no-scroll-body {
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     background-color: rgba(0,0,0,0.5);
     z-index: 1500;
     display: none;
@@ -222,7 +222,7 @@ html, body.no-scroll-body {
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     background-color: #0f172a;
     z-index: 3000;
     display: none;
