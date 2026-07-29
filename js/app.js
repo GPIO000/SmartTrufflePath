@@ -213,7 +213,6 @@ function savePoiPosition() {
         alert("Segnale GPS non ancora disponibile per marcare il punto.");
     }
 }
-
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -452,33 +451,46 @@ function openModule(moduleName, editMode = false) {
             break;
 
         case 'canidiary':
-            const cData = JSON.parse(localStorage.getItem('cane_data') || '{}');
-            if (cData.nome && !editMode) {
-                contentHTML = `
-                    <h2>Profilo Cani & Diario Ricerca</h2>
-                    <div class="module-card" style="border-left: 4px solid #22c55e;">
-                        <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">🐕 Cane Registrato</p>
-                        <p><strong>Nome:</strong> ${cData.nome}</p>
-                        <p><strong>Razza:</strong> ${cData.razza}</p>
-                        <p><strong>Microchip:</strong> ${cData.microchip || 'Non inserito'}</p>
-                        <div style="display:flex; gap:10px; margin-top:15px;">
-                            <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('canidiary', true)">✏️ Modifica</button>
-                            <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('cane_data', 'canidiary')">🗑️ Elimina</button>
-                        </div>
-                    </div>`;
-            } else {
-                contentHTML = `
-                    <h2>Profilo Cani & Diario Ricerca</h2>
-                    <div class="module-card">
-                        <label>Nome del Cane:</label>
-                        <input type="text" id="c-nome" class="mod-input" value="${cData.nome || ''}" placeholder="Es. Argo">
-                        <label>Razza:</label>
-                        <input type="text" id="c-razza" class="mod-input" value="${cData.razza || 'Lagotto Romagnolo'}">
-                        <label>Numero Microchip:</label>
-                        <input type="text" id="c-microchip" class="mod-input" value="${cData.microchip || ''}" placeholder="Codice microchip">
-                        <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="saveCane()">Salva Profilo Cane</button>
-                    </div>`;
+            const dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
+            if (dogsList.length === 0) {
+                const oldCane = JSON.parse(localStorage.getItem('cane_data') || 'null');
+                if (oldCane && oldCane.nome) {
+                    dogsList.push(oldCane);
+                    localStorage.setItem('dogs_list', JSON.stringify(dogsList));
+                }
             }
+
+            let dogsHtml = `
+                <h2>Profilo Cani & Diario Ricerca</h2>
+                <p>Gestisci i tuoi cani da tartufo:</p>
+                
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Nuovo Cane</h3>
+                    <label>Nome del Cane:</label>
+                    <input type="text" id="c-nome" class="mod-input" placeholder="Es. Argo">
+                    <label>Razza:</label>
+                    <input type="text" id="c-razza" class="mod-input" value="Lagotto Romagnolo">
+                    <label>Numero Microchip:</label>
+                    <input type="text" id="c-microchip" class="mod-input" placeholder="Codice microchip">
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveNewCane()">Salva Nuovo Cane</button>
+                </div>
+            `;
+
+            if (dogsList.length === 0) {
+                dogsHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun cane registrato.</p></div>`;
+            } else {
+                dogsHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">I tuoi cani registrati:</h3>`;
+                dogsList.forEach((dog, idx) => {
+                    dogsHtml += `
+                        <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:1rem;">🐕 ${dog.nome}</strong>
+                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">Razza: ${dog.razza}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">Microchip: ${dog.microchip || 'Non inserito'}</p>
+                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteDog(${idx})">🗑️ Elimina</button>
+                        </div>`;
+                });
+            }
+            contentHTML = dogsHtml;
             break;
 
         case 'vet':
@@ -682,15 +694,40 @@ function saveF24() {
     openModule('f24');
 }
 
-function saveCane() {
-    const data = {
-        nome: document.getElementById('c-nome').value,
-        razza: document.getElementById('c-razza').value,
-        microchip: document.getElementById('c-microchip').value
-    };
-    localStorage.setItem('cane_data', JSON.stringify(data));
-    alert("Profilo del cane salvato!");
+function saveNewCane() {
+    const nome = document.getElementById('c-nome').value.trim();
+    const razza = document.getElementById('c-razza').value.trim();
+    const microchip = document.getElementById('c-microchip').value.trim();
+
+    if (!nome) {
+        alert("Inserisci almeno il nome del cane.");
+        return;
+    }
+
+    let dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
+    dogsList.push({ nome, razza, microchip });
+    
+    localStorage.setItem('dogs_list', JSON.stringify(dogsList));
+    localStorage.setItem('cane_data', JSON.stringify({ nome, razza, microchip }));
+
+    alert("Cane aggiunto con successo!");
     openModule('canidiary');
+}
+
+function deleteDog(index) {
+    if (confirm("Vuoi davvero rimuovere questo cane dall'elenco?")) {
+        let dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
+        dogsList.splice(index, 1);
+        localStorage.setItem('dogs_list', JSON.stringify(dogsList));
+        
+        if (dogsList.length > 0) {
+            localStorage.setItem('cane_data', JSON.stringify(dogsList[dogsList.length - 1]));
+        } else {
+            localStorage.removeItem('cane_data');
+        }
+
+        openModule('canidiary');
+    }
 }
 
 function registraVendita() {
@@ -857,6 +894,7 @@ function esportaBackupJSON() {
         pagopa: JSON.parse(localStorage.getItem('pagopa_data') || '{}'),
         f24: JSON.parse(localStorage.getItem('f24_data') || '{}'),
         cane: JSON.parse(localStorage.getItem('cane_data') || '{}'),
+        dogsList: JSON.parse(localStorage.getItem('dogs_list') || '[]'),
         vet: JSON.parse(localStorage.getItem('vet_history_list') || '[]'),
         poiList: JSON.parse(localStorage.getItem('poi_list') || '[]'),
         storicoVendite: JSON.parse(localStorage.getItem('storico_vendite') || '[]'),
@@ -885,6 +923,7 @@ function importBackupData(event) {
             if (importedData.pagopa) localStorage.setItem('pagopa_data', JSON.stringify(importedData.pagopa));
             if (importedData.f24) localStorage.setItem('f24_data', JSON.stringify(importedData.f24));
             if (importedData.cane) localStorage.setItem('cane_data', JSON.stringify(importedData.cane));
+            if (importedData.dogsList) localStorage.setItem('dogs_list', JSON.stringify(importedData.dogsList));
             if (importedData.vet) localStorage.setItem('vet_history_list', JSON.stringify(importedData.vet));
             if (importedData.poiList) localStorage.setItem('poi_list', JSON.stringify(importedData.poiList));
             if (importedData.storicoVendite) localStorage.setItem('storico_vendite', JSON.stringify(importedData.storicoVendite));
