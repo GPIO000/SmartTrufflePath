@@ -40,12 +40,12 @@
             color: #f8fafc; box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events: none;
         }
         #map-overlays {
-            position: absolute; bottom: 20px; left: 10px; right: 10px;
-            display: flex; gap: 5px; z-index: 999;
+            position: absolute; bottom: 25px; left: 5px; right: 5px;
+            display: flex; gap: 3px; z-index: 999;
         }
         .overlay-btn {
-            flex: 1; padding: 12px 2px; background-color: #2563eb; color: white;
-            border: none; border-radius: 8px; font-weight: bold; font-size: 0.7rem;
+            flex: 1; padding: 10px 2px; background-color: #2563eb; color: white;
+            border: none; border-radius: 6px; font-weight: bold; font-size: 0.65rem;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-align: center; cursor: pointer;
         }
         .sos-overlay-btn { background-color: #dc2626; }
@@ -95,10 +95,10 @@
 <body class="no-scroll-body">
 
     <div id="app-container">
-        <!-- Header Superiore -->
+        <!-- Header Superiore (Senza icona del fungo) -->
         <header id="app-header">
             <button id="menu-toggle-btn" onclick="toggleDrawer()">☰</button>
-            <h1 id="gps-status-text">🍄 Truffle Mobil Frist</h1>
+            <h1 id="gps-status-text">Truffle App</h1>
             <div id="gps-status-dot" title="GPS in attesa..."></div>
         </header>
 
@@ -107,9 +107,11 @@
             <div id="compass-box">🧭 In attesa di posizione GPS...</div>
             <div id="map"></div>
             
+            <!-- Bottoni Overlay con pulsante Elimina Auto e layout flessibile -->
             <div id="map-overlays">
                 <button class="overlay-btn" onclick="saveCarPosition()">🚗 Auto</button>
-                <button class="overlay-btn" onclick="returnToCar()">🧭 Vai Auto</button>
+                <button class="overlay-btn" onclick="returnToCar()">🧭 Vai</button>
+                <button class="overlay-btn" style="background:#dc2626;" onclick="deleteCarPosition()">🗑️ Del</button>
                 <button class="overlay-btn" onclick="savePoiPosition()">📍 Punto</button>
                 <button class="overlay-btn" onclick="openModule('poilist')">📋 Elenco</button>
                 <button class="overlay-btn sos-overlay-btn" onclick="triggerSOS()">🚨 SOS</button>
