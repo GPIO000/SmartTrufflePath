@@ -364,10 +364,12 @@ function openModule(moduleName, editMode = false) {
 
             contentHTML = `
                 <h2>Ricevuta di Vendita Occasionale</h2>
-                <p>Conforme a Reg. CE 178/02 & DPR 633/1972</p>
+                <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
                 <div class="module-card">
-                    <label>Acquirente (Privato o Ristorante):</label>
-                    <input type="text" id="r-acquirente" class="mod-input" placeholder="Nome acquirente">
+                    <label>Acquirente (Privato o Ristorante / Ragione Sociale):</label>
+                    <input type="text" id="r-acquirente" class="mod-input" placeholder="Nome o Ristorante">
+                    <label>P.IVA / Codice Fiscale Acquirente:</label>
+                    <input type="text" id="r-cf-acquirente" class="mod-input" placeholder="P.IVA o CF acquirente">
                     <label>Specie Tartufo:</label>
                     <select id="r-specie" class="mod-input">
                         <option value="Pregiato Bianco (Tuber magnatum pico)">Pregiato Bianco (Tuber magnatum pico)</option>
@@ -376,13 +378,15 @@ function openModule(moduleName, editMode = false) {
                     </select>
                     <label>Peso (grammi):</label>
                     <input type="number" id="r-peso" class="mod-input" placeholder="Es. 150">
-                    <label>Importo (€):</label>
+                    <label>Importo Totale (€):</label>
                     <input type="number" id="r-importo" class="mod-input" placeholder="Es. 200.00">
-                    <label>Comune di Raccolta:</label>
+                    <label>Comune di Raccolta / Località:</label>
                     <input type="text" id="r-comune" class="mod-input" placeholder="Comune di ritrovamento">
+                    <label>Codice Lotto / Tracciabilità:</label>
+                    <input type="text" id="r-lotto" class="mod-input" value="LOTTO-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-01" placeholder="Codice lotto">
                     <label>N. Protocollo F24 ELIDE collegato (Compilato in automatico):</label>
                     <input type="text" id="r-f24" class="mod-input" value="${defaultProtocollo}" placeholder="Inserisci prima l'F24 nel menu apposito">
-                    <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVendita()">Registra e Genera Ricevuta</button>
+                    <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVendita()">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             break;
 
@@ -617,12 +621,24 @@ function saveVet() {
 }
 
 function registraVendita() {
+    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    
+    if (!tData.nome || !tData.cf) {
+        alert("Attenzione: Inserisci prima i dati della tua anagrafica e del tesserino nel menu 'Anagrafica & Tesserino Digitale' per emettere una ricevuta a norma di legge.");
+    }
+
     const vendita = {
+        venditoreNome: tData.nome || 'N.D.',
+        venditoreCf: tData.cf || 'N.D.',
+        venditoreTesserino: tData.num || 'N.D.',
+        venditoreRegione: tData.regione || 'N.D.',
         acquirente: document.getElementById('r-acquirente').value,
+        acquirenteCf: document.getElementById('r-cf-acquirente').value,
         specie: document.getElementById('r-specie').value,
         peso: document.getElementById('r-peso').value,
         importo: document.getElementById('r-importo').value,
         comune: document.getElementById('r-comune').value,
+        lotto: document.getElementById('r-lotto').value,
         f24: document.getElementById('r-f24').value,
         data: new Date().toLocaleDateString()
     };
@@ -633,18 +649,38 @@ function registraVendita() {
 
     let activeView = document.getElementById('active-module-view');
     activeView.querySelector('.module-body-content').innerHTML = `
-        <h2>RICEVUTA DI VENDITA OCCASIONALE</h2>
-        <p>Conforme a Reg. CE 178/02 & DPR 633/1972</p>
-        <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
-            <h3 style="color:#000; border-bottom:2px solid #000; padding-bottom:5px; margin-bottom:10px;">RICEVUTA TARTUFO</h3>
-            <p><strong>Data:</strong> ${vendita.data}</p>
-            <p><strong>Acquirente:</strong> ${vendita.acquirente}</p>
-            <p><strong>Specie:</strong> ${vendita.specie}</p>
-            <p><strong>Peso:</strong> ${vendita.peso} g</p>
-            <p><strong>Comune Raccolta:</strong> ${vendita.comune}</p>
-            <p><strong>Protocollo F24:</strong> ${vendita.f24}</p>
-            <hr style="margin:10px 0;">
-            <p style="font-size:1.1rem;"><strong>Totale: € ${vendita.importo}</strong></p>
+        <h2>RICEVUTA DI VENDITA OCCASIONALE TARTUFI</h2>
+        <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
+        <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px; font-size:0.85rem;">
+            <h3 style="color:#000; border-bottom:2px solid #000; padding-bottom:5px; margin-bottom:10px; font-size:1rem; text-align:center;">DOCUMENTO DI VENDITA / TRACCIABILITÀ</h3>
+            
+            <div style="margin-bottom: 10px;">
+                <strong>DATI DEL RACCOGLITORE (VENDITORE):</strong><br>
+                Nominativo: ${vendita.venditoreNome}<br>
+                Codice Fiscale: ${vendita.venditoreCf}<br>
+                Tesserino N.: ${vendita.venditoreTesserino} (${vendita.venditoreRegione})
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+                <strong>DATI DELL'ACQUIRENTE:</strong><br>
+                Intestato a: ${vendita.acquirente} (P.IVA/CF: ${vendita.acquirenteCf})
+            </div>
+
+            <hr style="margin:8px 0; border-color:#ccc;">
+
+            <p><strong>Data Emissione:</strong> ${vendita.data}</p>
+            <p><strong>Specie Botanica:</strong> ${vendita.specie}</p>
+            <p><strong>Quantità / Peso:</strong> ${vendita.peso} grammi</p>
+            <p><strong>Comune di Raccolta:</strong> ${vendita.comune}</p>
+            <p><strong>Codice Lotto (Tracciabilità):</strong> ${vendita.lotto}</p>
+            <p><strong>Riferimento F24 ELIDE (Imposta Sostitutiva 1853):</strong> ${vendita.f24 || 'Non inserito'}</p>
+            
+            <hr style="margin:10px 0; border-color:#000;">
+            <p style="font-size:1rem;"><strong>CORRISPETTIVO TOTALE: € ${vendita.importo}</strong></p>
+            
+            <p style="font-size:0.7rem; margin-top:12px; color:#444; text-align:justify;">
+                <i>Operazione non soggetta a IVA ai sensi del regime di commercializzazione occasionale dei tartufi (Legge 145/2018). Imposta sostitutiva del 23% assolta tramite modello F24 ELIDE. Tracciabilità garantita ai sensi del Regolamento CE n. 178/2002.</i>
+            </p>
         </div>
         <div style="display:flex; gap:10px; margin-top:15px;">
             <button class="overlay-btn" style="background:#2563eb;" onclick="window.print()">🖨️ Stampa / Salva PDF</button>
@@ -659,9 +695,9 @@ function esportaDatiCSV() {
         alert("Nessuna vendita registrata da esportare.");
         return;
     }
-    let csvContent = "data:text/csv;charset=utf-8,Data,Acquirente,Specie,Peso(g),Importo(Euro),Comune,ProtocolloF24\n";
+    let csvContent = "data:text/csv;charset=utf-8,Data,Venditore,CF_Venditore,Acquirente,CF_Acquirente,Specie,Peso(g),Importo(Euro),Comune,Lotto,ProtocolloF24\n";
     storico.forEach(function(row) {
-        csvContent += `${row.data},${row.acquirente},${row.specie},${row.peso},${row.importo},${row.comune},${row.f24}\n`;
+        csvContent += `${row.data},"${row.venditoreNome}","${row.venditoreCf}","${row.acquirente}","${row.acquirenteCf}","${row.specie}",${row.peso},${row.importo},"${row.comune}","${row.lotto}","${row.f24}"\n`;
     });
     var encodedUri = encodeURI(csvContent);
     var link = document.createElement("a");
