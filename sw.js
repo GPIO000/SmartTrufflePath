@@ -1,8 +1,9 @@
-const CACHE_NAME = 'truffle-mobile-first-v9';
+const CACHE_NAME = 'truffle-mobile-first-v11';
 const ASSETS = [
   './',
   './index.html',
   './js/app.js',
+  './css/style.css',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
