@@ -1,4 +1,3 @@
-// PARTE 1/12: Inizializzazione della mappa e geolocalizzazione GPS
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
@@ -46,7 +45,6 @@ if (navigator.geolocation) {
         if (dot) dot.style.backgroundColor = '#ef4444';
     }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 });
 }
-// PARTE 2/12: Gestione dei POI sulla mappa, calcolo distanze e orientamento bussola
 function renderAllPoiMarkers() {
     Object.values(poiMapMarkers).forEach(marker => map.removeLayer(marker));
     poiMapMarkers = {};
@@ -95,7 +93,6 @@ function updateCompass(currentLat, currentLng) {
         compassText.innerHTML = `🧭 Seleziona una destinazione (Auto o Punto)`;
     }
 }
-// PARTE 3/12: Funzioni per il salvataggio, rimozione e ritorno alla posizione dell'auto
 function saveCarPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -126,7 +123,6 @@ function returnToCar() {
         if (carMarker) carMarker.openPopup();
     } else { alert("Nessun parcheggio salvato. Clicca prima su 'Auto'."); }
 }
-// PARTE 4/12: Gestione punti di interesse (POI) e tartufaie
 function savePoiPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -184,7 +180,6 @@ function triggerSOS() {
         window.location.href = `sms:?body=${encodeURIComponent(msg)}`;
     } else { alert("Impossibile rilevare le coordinate GPS."); }
 }
-// PARTE 5/12: Gestione apertura moduli principali (poilist, tesserino, pagopa)
 function openModule(moduleName, editMode = false) {
     toggleDrawer();
     let activeView = document.getElementById('active-module-view');
@@ -282,7 +277,6 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
-// PARTE 6/12: Gestione dei moduli ricevute, storico e F24
         case 'ricevute':
             const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
             const defaultProtocollo = f24SavedData.protocollo || '';
@@ -367,7 +361,6 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
-// PARTE 7/12: Gestione dei moduli cani (diario) e polizze assicurative
         case 'canidiary':
             const dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
             let dogsHtml = `
@@ -444,7 +437,6 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = polizzeHtml;
             break;
-// PARTE 8/12: Gestione dei moduli libretto veterinario e registro giornaliero di raccolta
         case 'vet':
             const dogsListVet = JSON.parse(localStorage.getItem('dogs_list') || '[]');
             const cDataVet = JSON.parse(localStorage.getItem('cane_data') || '{}');
@@ -560,7 +552,6 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = registroHtml;
             break;
-// PARTE 9/12: Gestione dei moduli bilancio, export dati ed emergenze veterinarie
         case 'bilancio':
             const venditeSalvate = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
             let totaleIncassato = venditeSalvate.reduce((acc, item) => acc + Number(item.importo), 0);
@@ -645,7 +636,6 @@ function openModule(moduleName, editMode = false) {
         }, 50);
     }
 }
-// PARTE 10/12: Funzioni di salvataggio dati anagrafici, tesserino, F24 e cani
 function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
@@ -703,7 +693,6 @@ function deleteDog(index) {
         openModule('canidiary');
     }
 }
-// PARTE 11/12: Salvataggio polizze, raccolte, vendite, visualizzazione ricevuta conforme e export
 function savePolizza() {
     const compagnia = document.getElementById('pol-compagnia').value.trim();
     const numero = document.getElementById('pol-numero').value.trim();
@@ -773,6 +762,14 @@ function visualizzaRicevutaSalvata(index) {
     if(!v) return;
     let activeView = document.getElementById('active-module-view');
     activeView.querySelector('.module-body-content').innerHTML = `
+        <style>
+            @media print {
+                /* Nasconde i pulsanti di navigazione, la barra superiore e i bottoni di stampa/ritorno */
+                .module-header-bar, .back-map-btn, .overlay-btn {
+                    display: none !important;
+                }
+            }
+        </style>
         <h2>RICEVUTA VENDITA OCCASIONALE N. ${index + 1}</h2>
         <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
         <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
@@ -842,7 +839,6 @@ function importBackupData(event) {
     };
     reader.readAsText(file);
 }
-// PARTE 12/12: Utility di interfaccia, gestione drawer, centro mappa e cliniche veterinarie
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
