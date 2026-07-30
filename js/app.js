@@ -7,8 +7,7 @@ let carMarker = null;
 let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
 let poiList = JSON.parse(localStorage.getItem('poi_list') || '[]');
 let poiMapMarkers = {}; 
-let targetNavigation = null; 
-
+let targetNavigation = null;
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const lat = position.coords.latitude;
@@ -53,6 +52,7 @@ function renderAllPoiMarkers() {
         poiMapMarkers[index] = marker;
     });
 }
+
 function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
@@ -73,6 +73,7 @@ function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
         direction: directions[index]
     };
 }
+
 function updateCompass(currentLat, currentLng) {
     const compassText = document.getElementById('compass-box');
     if (!compassText) return;
@@ -100,6 +101,7 @@ function saveCarPosition() {
         alert("🚗 Posizione dell'auto salvata con successo!");
     } else { alert("Segnale GPS non ancora disponibile per marcare l'auto."); }
 }
+
 function deleteCarPosition() {
     if (carCoordinates) {
         if (confirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
@@ -119,6 +121,7 @@ function returnToCar() {
         if (carMarker) carMarker.openPopup();
     } else { alert("Nessun parcheggio salvato. Clicca prima su 'Auto'."); }
 }
+
 function savePoiPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -139,6 +142,7 @@ function savePoiPosition() {
         alert("📍 Punto salvato con successo e impostato sulla bussola!");
     } else { alert("Segnale GPS non ancora disponibile per marcare il punto."); }
 }
+
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -677,7 +681,6 @@ function saveF24() {
     alert("Protocollo F24 ELIDE salvato correttamente!");
     openModule('f24');
 }
-
 function saveNewCane() {
     const nome = document.getElementById('c-nome').value.trim();
     const razza = document.getElementById('c-razza').value.trim();
@@ -702,6 +705,7 @@ function deleteDog(index) {
         openModule('canidiary');
     }
 }
+
 function savePolizza() {
     const compagnia = document.getElementById('pol-compagnia').value.trim();
     const numero = document.getElementById('pol-numero').value.trim();
@@ -746,7 +750,6 @@ function deleteRaccoltaGiornaliera(index) {
         openModule('registro_giornaliero');
     }
 }
-
 function registraVendita() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
@@ -815,7 +818,6 @@ function visualizzaRicevutaSalvata(index) {
 function chiudiDettaglioRicevuta() {
     openModule('storico_ricevute');
 }
-
 function esportaDatiCSV() {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     if(storico.length === 0) { alert("Nessuna vendita registrata."); return; }
@@ -851,6 +853,7 @@ function importBackupData(event) {
     };
     reader.readAsText(file);
 }
+
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
