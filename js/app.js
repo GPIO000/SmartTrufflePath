@@ -115,8 +115,9 @@ function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
         direction: directions[index]
     };
 }
+
 function updateCompass(currentLat, currentLng) {
-    const compassText = document.getElementById('compass-text');
+    const compassText = document.getElementById('compass-box');
     if (!compassText) return;
 
     let target = null;
@@ -140,7 +141,6 @@ function updateCompass(currentLat, currentLng) {
         compassText.innerHTML = `🧭 Seleziona una destinazione (Auto o Punto)`;
     }
 }
-
 function saveCarPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -158,6 +158,7 @@ function saveCarPosition() {
         alert("Segnale GPS non ancora disponibile per marcare l'auto.");
     }
 }
+
 function deleteCarPosition() {
     if (carCoordinates) {
         if (confirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
@@ -213,6 +214,7 @@ function savePoiPosition() {
         alert("Segnale GPS non ancora disponibile per marcare il punto.");
     }
 }
+
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -326,6 +328,7 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
+
         case 'pagopa':
             const pData = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
             if (pData.id && !editMode) {
@@ -494,6 +497,7 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = dogsHtml;
             break;
+
         case 'vet':
             const dogsListVet = JSON.parse(localStorage.getItem('dogs_list') || '[]');
             const cDataVet = JSON.parse(localStorage.getItem('cane_data') || '{}');
@@ -559,6 +563,59 @@ function openModule(moduleName, editMode = false) {
                 });
             }
             contentHTML = vetHtml;
+            break;
+        case 'registro_giornaliero':
+            const storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
+            
+            let registroHtml = `
+                <h2>Registro Giornaliero Ritrovamenti</h2>
+                <p>Registra i quantitativi raccolti senza coordinate GPS</p>
+                
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Raccolta</h3>
+                    
+                    <label>Data:</label>
+                    <input type="date" id="reg-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+
+                    <label>Specie Tartufo:</label>
+                    <select id="reg-specie" class="mod-input">
+                        <option value="Tuber magnatum Pico (Pregiato Bianco)">Tuber magnatum Pico (Pregiato Bianco)</option>
+                        <option value="Tuber melanosporum Vitt. (Nero Pregiato)">Tuber melanosporum Vitt. (Nero Pregiato)</option>
+                        <option value="Tuber aestivum Vitt. (Scorzone Estivo)">Tuber aestivum Vitt. (Scorzone Estivo)</option>
+                        <option value="Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)">Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)</option>
+                        <option value="Tuber brumale Vitt. (Moscatuto / Invernale)">Tuber brumale Vitt. (Moscatuto / Invernale)</option>
+                        <option value="Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)">Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)</option>
+                        <option value="Tuber macrosporum Vitt. (Nero Liscio)">Tuber macrosporum Vitt. (Nero Liscio)</option>
+                        <option value="Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)">Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)</option>
+                    </select>
+
+                    <label>Peso Totale (grammi):</label>
+                    <input type="number" id="reg-peso" class="mod-input" placeholder="Es. 250">
+
+                    <label>Note (es. Bosco di castagni, condizioni meteo):</label>
+                    <input type="text" id="reg-note" class="mod-input" placeholder="Es. Terreno umido, ottima cercata">
+
+                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" onclick="saveRaccoltaGiornaliera()">Salva nel Registro</button>
+                </div>
+            `;
+
+            if (storicoRaccolta.length === 0) {
+                registroHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun ritrovamento registrato finora.</p></div>`;
+            } else {
+                registroHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Storico Raccolte:</h3>`;
+                storicoRaccolta.slice().reverse().forEach((item, index) => {
+                    const originalIndex = storicoRaccolta.length - 1 - index;
+                    registroHtml += `
+                        <div class="module-card" style="border-left: 4px solid #10b981; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:0.95rem;">📅 ${item.data}</strong>
+                            <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.specie}</b></p>
+                            <p style="font-size:0.85rem; color:#22c55e; margin: 2px 0;">⚖️ Peso: <b>${item.peso} g</b></p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteRaccoltaGiornaliera(${originalIndex})">🗑️ Elimina</button>
+                        </div>`;
+                });
+            }
+            contentHTML = registroHtml;
             break;
 
         case 'bilancio':
@@ -635,7 +692,6 @@ function openModule(moduleName, editMode = false) {
         default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
     }
-
     activeView.innerHTML = `
         <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
@@ -665,6 +721,7 @@ function openModule(moduleName, editMode = false) {
         }, 50);
     }
 }
+
 function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
@@ -676,7 +733,6 @@ function clearData(storageKey, moduleName) {
         openModule(moduleName);
     }
 }
-
 function saveTesserino() {
     const data = {
         nome: document.getElementById('t-nome').value,
@@ -746,6 +802,34 @@ function deleteDog(index) {
     }
 }
 
+function saveRaccoltaGiornaliera() {
+    const data = document.getElementById('reg-data').value;
+    const specie = document.getElementById('reg-specie').value;
+    const peso = parseFloat(document.getElementById('reg-peso').value) || 0;
+    const note = document.getElementById('reg-note').value.trim();
+
+    if (!data || peso <= 0) {
+        alert("Inserisci una data valida e un peso maggiore di zero.");
+        return;
+    }
+
+    let storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
+    storicoRaccolta.push({ data, specie, peso, note });
+    
+    localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
+
+    alert("Raccolta registrata con successo!");
+    openModule('registro_giornaliero');
+}
+
+function deleteRaccoltaGiornaliera(index) {
+    if (confirm("Vuoi davvero rimuovere questo record dal registro?")) {
+        let storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
+        storicoRaccolta.splice(index, 1);
+        localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
+        openModule('registro_giornaliero');
+    }
+}
 function registraVendita() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
@@ -885,7 +969,6 @@ function visualizzaRicevutaSalvata(index) {
         </div>
     `;
 }
-
 function esportaDatiCSV() {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     if(storico.length === 0) {
@@ -915,6 +998,7 @@ function esportaBackupJSON() {
         vet: JSON.parse(localStorage.getItem('vet_history_list') || '[]'),
         poiList: JSON.parse(localStorage.getItem('poi_list') || '[]'),
         storicoVendite: JSON.parse(localStorage.getItem('storico_vendite') || '[]'),
+        storicoRaccolta: JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]'),
         carCoords: JSON.parse(localStorage.getItem('car_coords') || 'null')
     };
 
@@ -944,6 +1028,7 @@ function importBackupData(event) {
             if (importedData.vet) localStorage.setItem('vet_history_list', JSON.stringify(importedData.vet));
             if (importedData.poiList) localStorage.setItem('poi_list', JSON.stringify(importedData.poiList));
             if (importedData.storicoVendite) localStorage.setItem('storico_vendite', JSON.stringify(importedData.storicoVendite));
+            if (importedData.storicoRaccolta) localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(importedData.storicoRaccolta));
             if (importedData.carCoords) localStorage.setItem('car_coords', JSON.stringify(importedData.carCoords));
 
             alert("Backup ripristinato con successo!");
@@ -954,7 +1039,6 @@ function importBackupData(event) {
     };
     reader.readAsText(file);
 }
-
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
