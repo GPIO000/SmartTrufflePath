@@ -360,7 +360,11 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${item.acquirente}</b></p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${item.specie} (${item.peso}g)</p>
                             <p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">Importo: € ${item.importo}</p>
-                            <button class="overlay-btn" style="background:#2563eb; margin-top:8px;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza / Stampa</button>
+                            <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+                                <button class="overlay-btn" style="background:#2563eb; padding:6px 10px; font-size:0.75rem;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza</button>
+                                <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="modificaRicevuta(${originalIndex})">✏️ Modifica</button>
+                                <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="eliminaRicevutaConDoppiaConferma(${originalIndex})">🗑️ Elimina</button>
+                            </div>
                         </div>`;
                 });
             }
@@ -888,6 +892,87 @@ function visualizzaRicevutaSalvata(index) {
         <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
     `;
 }
+function eliminaRicevutaConDoppiaConferma(index) {
+    const primaConferma = confirm("Sei sicuro di voler eliminare questa ricevuta dallo storico?");
+    if (primaConferma) {
+        const secondaConferma = confirm("ATTENZIONE: L'operazione è irreversibile. Vuoi davvero confermare l'eliminazione definitiva?");
+        if (secondaConferma) {
+            let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+            storico.splice(index, 1);
+            localStorage.setItem('storico_vendite', JSON.stringify(storico));
+            alert("Ricevuta eliminata con successo.");
+            openModule('storico_ricevute');
+        }
+    }
+}
+
+function modificaRicevuta(index) {
+    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const v = storico[index];
+    if (!v) return;
+
+    // Apre il modulo di emissione ricevuta pre-compilandolo con i dati attuali
+    openModule('ricevute');
+
+    setTimeout(() => {
+        const elAcquirente = document.getElementById('r-acquirente');
+        const elCf = document.getElementById('r-cf-acquirente');
+        const elSpecie = document.getElementById('r-specie');
+        const elPeso = document.getElementById('r-peso');
+        const elImporto = document.getElementById('r-importo');
+        const elComune = document.getElementById('r-comune');
+        const elLotto = document.getElementById('r-lotto');
+        const elF24 = document.getElementById('r-f24');
+
+        if (elAcquirente) elAcquirente.value = v.acquirente || '';
+        if (elCf) elCf.value = v.acquirenteCf || '';
+        if (elSpecie) elSpecie.value = v.specie || '';
+        if (elPeso) elPeso.value = v.peso || '';
+        if (elImporto) elImporto.value = v.importo || '';
+        if (elComune) elComune.value = v.comune || '';
+        if (elLotto) elLotto.value = v.lotto || '';
+        if (elF24) elF24.value = v.f24 || '';
+
+        // Modifica il comportamento del bottone di salvataggio per aggiornare anziché creare un doppione
+        const btnRegistra = document.querySelector('#active-module-view button[onclick="registraVendita()"]');
+        if (btnRegistra) {
+            btnRegistra.innerText = "Aggiorna Ricevuta Esistente";
+            btnRegistra.setAttribute('onclick', `salvaModificaRicevuta(${index})`);
+        }
+    }, 50);
+}
+function salvaModificaRicevuta(index) {
+    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    
+    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
+    if (!acquirenteNome) {
+        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
+        return;
+    }
+
+    const importoCorrente = parseFloat(document.getElementById('r-importo').value) || 0;
+
+    storico[index] = {
+        venditoreNome: tData.nome || storico[index].venditoreNome, 
+        venditoreCf: tData.cf || storico[index].venditoreCf, 
+        venditoreTesserino: tData.num || storico[index].venditoreTesserino, 
+        venditoreRegione: tData.regione || storico[index].venditoreRegione,
+        acquirente: acquirenteNome, 
+        acquirenteCf: document.getElementById('r-cf-acquirente').value.trim(),
+        specie: document.getElementById('r-specie').value, 
+        peso: document.getElementById('r-peso').value, 
+        importo: importoCorrente.toFixed(2),
+        comune: document.getElementById('r-comune').value.trim(), 
+        lotto: document.getElementById('r-lotto').value.trim(), 
+        f24: document.getElementById('r-f24').value.trim(), 
+        data: storico[index].data // Mantiene la data originale della ricevuta
+    };
+
+    localStorage.setItem('storico_vendite', JSON.stringify(storico));
+    alert("Ricevuta aggiornata con successo!");
+    openModule('storico_ricevute');
+}
 
 async function condividiRicevuta(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
@@ -941,7 +1026,6 @@ async function condividiRicevuta(index) {
         window.location.href = whatsappUrl;
     }
 }
-
 function chiudiDettaglioRicevuta() {
     openModule('storico_ricevute');
 }
