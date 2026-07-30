@@ -877,6 +877,18 @@ function registraVenditaConPrezzoKg() {
     }
     // ---------------------------------
 
+    // --- CONTROLLO PROTOCOLLO F24 ---
+    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+    const f24InputVal = document.getElementById('r-f24').value.trim();
+    const protocolloF24 = f24InputVal || f24SavedData.protocollo;
+
+    if (!protocolloF24) {
+        alert("Attenzione: Impossibile procedere. Manca il numero di protocollo F24 ELIDE per l'imposta sostitutiva.");
+        openModule('f24'); // Reindirizza l'utente al modulo F24
+        return;
+    }
+    // --------------------------------
+
     const acquirenteNome = document.getElementById('r-acquirente').value.trim();
     const acquirenteCf = document.getElementById('r-cf-acquirente').value.trim();
     
@@ -885,11 +897,11 @@ function registraVenditaConPrezzoKg() {
         return;
     }
 
-    // Resto della logica di salvataggio...
+    // Gestione rubrica clienti
     let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
     const clienteEsistente = rubricaClienti.find(c => c.nome.toLowerCase() === acquirenteNome.toLowerCase());
     
-    if (!clienteEsistenedente) { // Nota: correggere in clienteEsistente
+    if (!clienteEsistente) {
         rubricaClienti.push({
             nome: acquirenteNome,
             cf: acquirenteCf,
@@ -904,7 +916,6 @@ function registraVenditaConPrezzoKg() {
     const pesoGrammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
     const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
     const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
-    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
 
     let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const vendita = {
@@ -919,7 +930,7 @@ function registraVenditaConPrezzoKg() {
         importo: importoTotale.toFixed(2),
         comune: document.getElementById('r-comune').value.trim(), 
         lotto: document.getElementById('r-lotto').value.trim(), 
-        f24: document.getElementById('r-f24').value.trim() || f24SavedData.protocollo || 'Non inserito', 
+        f24: protocolloF24, 
         data: new Date().toLocaleDateString()
     };
     
