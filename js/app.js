@@ -1,11 +1,11 @@
-// All'inizio del file app.js, dopo const map = L.map(...)
-setTimeout(() => {
-    map.invalidateSize();
-}, 200);
-
+// Inizializzazione Mappa corretta (ordine invertito per evitare ReferenceError)
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+
+setTimeout(() => {
+    map.invalidateSize();
+}, 300);
 
 let userMarker = null;
 let carMarker = null;
@@ -13,6 +13,7 @@ let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
 let poiList = JSON.parse(localStorage.getItem('poi_list') || '[]');
 let poiMapMarkers = {}; 
 let targetNavigation = null;
+
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const lat = position.coords.latitude;
@@ -686,6 +687,7 @@ function saveF24() {
     alert("Protocollo F24 ELIDE salvato correttamente!");
     openModule('f24');
 }
+
 function saveNewCane() {
     const nome = document.getElementById('c-nome').value.trim();
     const razza = document.getElementById('c-razza').value.trim();
@@ -733,7 +735,6 @@ function deletePolizza(index) {
         openModule('polizze');
     }
 }
-
 function saveRaccoltaGiornaliera() {
     const data = document.getElementById('reg-data').value;
     const specie = document.getElementById('reg-specie').value;
@@ -755,6 +756,7 @@ function deleteRaccoltaGiornaliera(index) {
         openModule('registro_giornaliero');
     }
 }
+
 function registraVendita() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
@@ -869,7 +871,6 @@ function centerOnUser() {
     if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], 16); userMarker.openPopup(); }
     else { alert("Posizione GPS non disponibile."); }
 }
-
 function saveVetClinic() {
     const nome = document.getElementById('vc-nome').value.trim();
     const tel = document.getElementById('vc-tel').value.trim();
