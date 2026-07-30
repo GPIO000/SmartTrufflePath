@@ -12,6 +12,7 @@ html, body.no-scroll-body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: #121212;
     color: #ffffff;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* Contenitore principale a schermo intero */
@@ -168,6 +169,7 @@ html, body.no-scroll-body {
     flex: 1;
     overflow-y: auto;
     padding: 15px;
+    -webkit-overflow-scrolling: touch;
 }
 
 .drawer-section {
@@ -228,6 +230,7 @@ html, body.no-scroll-body {
     display: none;
     flex-direction: column;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .module-header-bar {
@@ -286,4 +289,42 @@ html, body.no-scroll-body {
     border: 1px solid #475569;
     color: #fff;
     border-radius: 6px;
+    font-size: 0.95rem;
+}
+
+/* Regole di stampa per ricevute e moduli */
+@media print {
+    .module-header-bar, 
+    .back-map-btn, 
+    .overlay-btn, 
+    button {
+        display: none !important;
+    }
+    
+    body, html, #app-container, #active-module-view {
+        background: white !important;
+        color: black !important;
+        height: auto !important;
+        overflow: visible !important;
+        position: static !important;
+    }
+
+    #active-module-view {
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+    
+    .module-card {
+        background: white !important;
+        color: black !important;
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        padding: 15px !important;
+    }
+
+    #qrcode-container img {
+        display: block;
+        margin: 0 auto;
+    }
 }
