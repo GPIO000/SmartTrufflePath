@@ -1,12 +1,13 @@
 {
-  "name": "Truffle Mobil Frist",
+  "id": "./index.html",
+  "name": "Truffle App",
   "short_name": "TruffleApp",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1a1a1a",
-  "theme_color": "#2c3e50",
+  "background_color": "#121212",
+  "theme_color": "#1e293b",
   "icons": [
     {
       "src": "icon-192.png",

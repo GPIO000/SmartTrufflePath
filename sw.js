@@ -1,4 +1,4 @@
-const CACHE_NAME = 'truffle-mobil-frist-v7';
+const CACHE_NAME = 'truffle-mobile-first-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -41,8 +41,25 @@ self.addEventListener('activate', (e) => {
 
 // Intercettazione richieste con strategia Cache-First e fallback di rete
 self.addEventListener('fetch', (e) => {
-  // Ignora richieste non GET (es. estensioni, chrome-extension, ecc.)
+  // Ignora richieste non GET
   if (e.request.method !== 'GET') return;
+
+  // Gestione speciale per le tile delle mappe (OpenStreetMap) o risorse esterne dinamiche
+  if (e.request.url.includes('tile.openstreetmap.org')) {
+    e.respondWith(
+      caches.match(e.request).then((cachedResponse) => {
+        return cachedResponse || fetch(e.request).then((networkResponse) => {
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, networkResponse.clone());
+            return networkResponse;
+          });
+        }).catch(() => {
+          // Fallback silenzioso se manca la mappa offline
+        });
+      })
+    );
+    return;
+  }
 
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
@@ -50,12 +67,10 @@ self.addEventListener('fetch', (e) => {
         return cachedResponse;
       }
       return fetch(e.request).then((networkResponse) => {
-        // Opzionale: puoi aggiungere qui una logica per mettere in cache 
-        // le nuove risorse dinamiche se necessario.
         return networkResponse;
       }).catch(() => {
-        // Fallback di sicurezza offline (es. se richiami una pagina html offline)
-        if (e.request.headers.get('accept').includes('text/html')) {
+        // Fallback di sicurezza offline per pagine HTML
+        if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
           return caches.match('./index.html');
         }
       });
