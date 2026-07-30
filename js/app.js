@@ -13,7 +13,6 @@ let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
 let poiList = JSON.parse(localStorage.getItem('poi_list') || '[]');
 let poiMapMarkers = {}; 
 let targetNavigation = null;
-
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const lat = position.coords.latitude;
@@ -79,7 +78,6 @@ function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
         direction: directions[index]
     };
 }
-
 function updateCompass(currentLat, currentLng) {
     const compassText = document.getElementById('compass-box');
     if (!compassText) return;
@@ -107,7 +105,6 @@ function saveCarPosition() {
         alert("🚗 Posizione dell'auto salvata con successo!");
     } else { alert("Segnale GPS non ancora disponibile per marcare l'auto."); }
 }
-
 function deleteCarPosition() {
     if (carCoordinates) {
         if (confirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
@@ -148,7 +145,6 @@ function savePoiPosition() {
         alert("📍 Punto salvato con successo e impostato sulla bussola!");
     } else { alert("Segnale GPS non ancora disponibile per marcare il punto."); }
 }
-
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -307,7 +303,12 @@ function openModule(moduleName, editMode = false) {
                         <option value="Tuber macrosporum Vitt. (Nero Liscio)">Tuber macrosporum Vitt. (Nero Liscio)</option>
                         <option value="Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)">Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)</option>
                     </select>
-
+                 <label>Classificazione Qualità:</label>
+                    <select id="r-qualita" class="mod-input">
+                        <option value="Prima Scelta">Prima Scelta</option>
+                        <option value="Seconda Scelta">Seconda Scelta</option>
+                        <option value="Terza Scelta">Terza Scelta</option>
+                    </select>
                     <label>Peso (grammi):</label>
                     <input type="number" id="pesoGrammi" class="mod-input" placeholder="Es. 150" oninput="calcolaTotale()">
 
@@ -329,23 +330,17 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVenditaConPrezzoKg()">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             break;
-
         case 'clienti':
             const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
             const storicoVenditeClienti = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-            
             let clientiHtml = '<h2>Rubrica Clienti</h2><p>Elenco dei clienti e ristoranti salvati automaticamente:</p>';
-            
             if (rubricaClienti.length === 0) {
                 clientiHtml += '<div class="module-card"><p>Nessun cliente registrato in rubrica. Emetti una ricevuta per aggiungerli automaticamente.</p></div>';
             } else {
                 clientiHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Clienti Registrati (${rubricaClienti.length}):</h3>`;
-                
                 rubricaClienti.forEach((cliente, idx) => {
-                    // Calcola le vendite effettuate a questo cliente
                     const venditeCliente = storicoVenditeClienti.filter(v => v.acquirente.toLowerCase() === cliente.nome.toLowerCase());
                     const totaleSpeso = venditeCliente.reduce((acc, v) => acc + Number(v.importo), 0);
-                    
                     clientiHtml += `
                         <div class="module-card" style="border-left: 4px solid #38bdf8; margin-bottom: 12px;">
                             <strong style="color:#f8fafc; font-size:1rem;">👤 ${cliente.nome}</strong>
@@ -731,7 +726,6 @@ function saveF24() {
     alert("Protocollo F24 ELIDE salvato correttamente!");
     openModule('f24');
 }
-
 function saveNewCane() {
     const nome = document.getElementById('c-nome').value.trim();
     const razza = document.getElementById('c-razza').value.trim();
@@ -810,84 +804,33 @@ function deleteRaccoltaGiornaliera(index) {
     }
 }
 
-function registraVendita() {
-    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
-    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
-    if (!tData.nome || !tData.cf) { alert("Inserisci prima i dati della tua anagrafica."); return; }
-    
-    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
-    const acquirenteCf = document.getElementById('r-cf-acquirente').value.trim();
-    
-    if (!acquirenteNome) {
-        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
-        return;
-    }
-
-    // --- SALVATAGGIO AUTOMATICO IN RUBRICA CLIENTI ---
-    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
-    // Controlla se il cliente esiste già (basandosi sul nome o P.IVA/CF per evitare duplicati)
-    const clienteEsistente = rubricaClienti.find(c => c.nome.toLowerCase() === acquirenteNome.toLowerCase());
-    
-    if (!clienteEsistente) {
-        rubricaClienti.push({
-            nome: acquirenteNome,
-            cf: acquirenteCf,
-            dataUltimoAcquisto: new Date().toLocaleDateString()
-        });
-    } else {
-        // Aggiorna la data dell'ultimo acquisto se il cliente esiste già
-        clienteEsistente.dataUltimoAcquisto = new Date().toLocaleDateString();
-        if(acquirenteCf) clienteEsistente.cf = acquirenteCf;
-    }
-    localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
-    // ------------------------------------------------
-
-    const importoCorrente = parseFloat(document.getElementById('r-importo').value) || 0;
-    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-    const vendita = {
-        venditoreNome: tData.nome, venditoreCf: tData.cf, venditoreTesserino: tData.num || 'N.D.', venditoreRegione: tData.regione || 'N.D.',
-        acquirente: acquirenteNome, acquirenteCf: acquirenteCf,
-        specie: document.getElementById('r-specie').value, peso: document.getElementById('r-peso').value, importo: importoCorrente.toFixed(2),
-        comune: document.getElementById('r-comune').value.trim(), lotto: document.getElementById('r-lotto').value.trim(), f24: document.getElementById('r-f24').value.trim() || f24SavedData.protocollo || 'Non inserito', data: new Date().toLocaleDateString()
-    };
-    storico.push(vendita);
-    localStorage.setItem('storico_vendite', JSON.stringify(storico));
-    alert("Ricevuta registrata e cliente salvato in rubrica con successo!");
-    openModule('storico_ricevute');
-}
 function calcolaTotale() {
     const grammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
     const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
     
     if (grammi > 0 && prezzoKg > 0) {
-        // Formula: (Grammi / 1000) * Prezzo al kg
         const totale = (grammi / 1000) * prezzoKg;
-        
-        // Imposta il valore arrotondato a 2 decimali
         document.getElementById('importoTotale').value = totale.toFixed(2);
     }
 }
+
 function registraVenditaConPrezzoKg() {
-    // --- CONTROLLO DATI ANAGRAFICI ---
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     if (!tData.nome || !tData.cf) {
         alert("Attenzione: Impossibile procedere. Manca la comunicazione dei dati anagrafici e del tesserino.");
-        openModule('tesserino'); // Reindirizza l'utente al modulo anagrafica
+        openModule('tesserino');
         return;
     }
-    // ---------------------------------
 
-    // --- CONTROLLO PROTOCOLLO F24 ---
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
     const f24InputVal = document.getElementById('r-f24').value.trim();
     const protocolloF24 = f24InputVal || f24SavedData.protocollo;
 
     if (!protocolloF24) {
         alert("Attenzione: Impossibile procedere. Manca il numero di protocollo F24 ELIDE per l'imposta sostitutiva.");
-        openModule('f24'); // Reindirizza l'utente al modulo F24
+        openModule('f24');
         return;
     }
-    // --------------------------------
 
     const acquirenteNome = document.getElementById('r-acquirente').value.trim();
     const acquirenteCf = document.getElementById('r-cf-acquirente').value.trim();
@@ -897,7 +840,6 @@ function registraVenditaConPrezzoKg() {
         return;
     }
 
-    // Gestione rubrica clienti
     let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
     const clienteEsistente = rubricaClienti.find(c => c.nome.toLowerCase() === acquirenteNome.toLowerCase());
     
@@ -914,6 +856,7 @@ function registraVenditaConPrezzoKg() {
     localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
 
     const pesoGrammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
+    const qualitaScelta = document.getElementById('r-qualita').value;
     const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
     const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
 
@@ -926,6 +869,7 @@ function registraVenditaConPrezzoKg() {
         acquirente: acquirenteNome, 
         acquirenteCf: acquirenteCf,
         specie: document.getElementById('r-specie').value, 
+        qualita: qualitaScelta,
         peso: pesoGrammi, 
         importo: importoTotale.toFixed(2),
         comune: document.getElementById('r-comune').value.trim(), 
@@ -939,7 +883,6 @@ function registraVenditaConPrezzoKg() {
     alert("Ricevuta registrata e cliente salvato in rubrica con successo!");
     openModule('storico_ricevute');
 }
-
 function visualizzaRicevutaSalvata(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const v = storico[index];
@@ -949,13 +892,10 @@ function visualizzaRicevutaSalvata(index) {
         <h2>RICEVUTA VENDITA OCCASIONALE N. ${index + 1}</h2>
         <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
         <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
-            
-            <!-- TESTO NORMATIVO AGGIUNTO QUI -->
             <p style="font-size: 0.72rem; color: #444; text-align: justify; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 8px; line-height: 1.3;">
                 <strong>DICHIARAZIONE DI CESSIONE OCCASIONALE E TRACCIABILITÀ:</strong> 
                 Operazione effettuata nell'ambito della raccolta hobbistica/occasionale dei tartufi, esonerata dall'obbligo di emissione di fattura elettronica e di certificazione fiscale ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 e s.m.i., nonché in conformità alle disposizioni di cui alla Legge 30 dicembre 2018, n. 145 (commi 110-112). Si attesta inoltre la piena tracciabilità del prodotto alimentare ai sensi degli artt. 18 e 19 del Regolamento (CE) n. 178/2002 del Parlamento Europeo e del Consiglio, e del Regolamento di esecuzione (UE) n. 931/2011, garantendo il rispetto delle norme igienico-sanitarie e di sicurezza alimentare.
             </p>
-
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati del Venditore (Cessionario occasionale)</h3>
             <p><strong>Nome e Cognome:</strong> ${v.venditoreNome}</p>
             <p><strong>Codice Fiscale:</strong> ${v.venditoreCf}</p>
@@ -966,6 +906,7 @@ function visualizzaRicevutaSalvata(index) {
             <p><strong>P.IVA / Codice Fiscale:</strong> ${v.acquirenteCf || 'Non inserito'}</p>
             <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dettagli Prodotto & Tracciabilità</h3>
             <p><strong>Specie di Tartufo:</strong> ${v.specie}</p>
+            <p><strong>Classificazione Qualità:</strong> ${v.qualita || 'Non specificata'}</p>
             <p><strong>Peso:</strong> ${v.peso} grammi</p>
             <p><strong>Comune di Raccolta / Località:</strong> ${v.comune}</p>
             <p><strong>Codice Lotto / Tracciabilità:</strong> ${v.lotto}</p>
@@ -984,10 +925,10 @@ function visualizzaRicevutaSalvata(index) {
         </div>
         <button class="overlay-btn" style="background:#2563eb; margin-top:15px; width:100%;" onclick="window.print()">🖨️ Stampa / Salva PDF Conforme</button>
         <button class="overlay-btn" style="background:#0284c7; margin-top:10px; width:100%;" onclick="condividiRicevuta(${index})">📤 Condividi Ricevuta (WhatsApp / PDF)</button>
-
         <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
     `;
 }
+
 function eliminaRicevutaConDoppiaConferma(index) {
     const primaConferma = confirm("Sei sicuro di voler eliminare questa ricevuta dallo storico?");
     if (primaConferma) {
@@ -1007,15 +948,16 @@ function modificaRicevuta(index) {
     const v = storico[index];
     if (!v) return;
 
-    // Apre il modulo di emissione ricevuta pre-compilandolo con i dati attuali
     openModule('ricevute');
 
     setTimeout(() => {
         const elAcquirente = document.getElementById('r-acquirente');
         const elCf = document.getElementById('r-cf-acquirente');
         const elSpecie = document.getElementById('r-specie');
-        const elPeso = document.getElementById('r-peso');
-        const elImporto = document.getElementById('r-importo');
+        const elQualita = document.getElementById('r-qualita');
+        const elPeso = document.getElementById('pesoGrammi');
+        const elPrezzoKg = document.getElementById('prezzoKg');
+        const elImporto = document.getElementById('importoTotale');
         const elComune = document.getElementById('r-comune');
         const elLotto = document.getElementById('r-lotto');
         const elF24 = document.getElementById('r-f24');
@@ -1023,20 +965,22 @@ function modificaRicevuta(index) {
         if (elAcquirente) elAcquirente.value = v.acquirente || '';
         if (elCf) elCf.value = v.acquirenteCf || '';
         if (elSpecie) elSpecie.value = v.specie || '';
+        if (elQualita) elQualita.value = v.qualita || 'Prima Scelta';
         if (elPeso) elPeso.value = v.peso || '';
         if (elImporto) elImporto.value = v.importo || '';
         if (elComune) elComune.value = v.comune || '';
         if (elLotto) elLotto.value = v.lotto || '';
         if (elF24) elF24.value = v.f24 || '';
 
-        // Modifica il comportamento del bottone di salvataggio per aggiornare anziché creare un doppione
-        const btnRegistra = document.querySelector('#active-module-view button[onclick="registraVendita()"]');
+        const btnRegistra = document.querySelector('#active-module-view button[onclick="registraVenditaConPrezzoKg()"]');
+
         if (btnRegistra) {
             btnRegistra.innerText = "Aggiorna Ricevuta Esistente";
             btnRegistra.setAttribute('onclick', `salvaModificaRicevuta(${index})`);
         }
     }, 50);
 }
+
 function salvaModificaRicevuta(index) {
     let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
@@ -1047,7 +991,7 @@ function salvaModificaRicevuta(index) {
         return;
     }
 
-    const importoCorrente = parseFloat(document.getElementById('r-importo').value) || 0;
+    const importoCorrente = parseFloat(document.getElementById('importoTotale').value) || 0;
 
     storico[index] = {
         venditoreNome: tData.nome || storico[index].venditoreNome, 
@@ -1057,12 +1001,13 @@ function salvaModificaRicevuta(index) {
         acquirente: acquirenteNome, 
         acquirenteCf: document.getElementById('r-cf-acquirente').value.trim(),
         specie: document.getElementById('r-specie').value, 
-        peso: document.getElementById('r-peso').value, 
+        qualita: document.getElementById('r-qualita').value,
+        peso: document.getElementById('pesoGrammi').value, 
         importo: importoCorrente.toFixed(2),
         comune: document.getElementById('r-comune').value.trim(), 
         lotto: document.getElementById('r-lotto').value.trim(), 
         f24: document.getElementById('r-f24').value.trim(), 
-        data: storico[index].data // Mantiene la data originale della ricevuta
+        data: storico[index].data
     };
 
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
@@ -1122,9 +1067,11 @@ async function condividiRicevuta(index) {
         window.location.href = whatsappUrl;
     }
 }
+
 function chiudiDettaglioRicevuta() {
     openModule('storico_ricevute');
 }
+
 function esportaDatiCSV() {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     if(storico.length === 0) { alert("Nessuna vendita registrata."); return; }
@@ -1171,6 +1118,7 @@ function centerOnUser() {
     if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], 16); userMarker.openPopup(); }
     else { alert("Posizione GPS non disponibile."); }
 }
+
 function saveVetClinic() {
     const nome = document.getElementById('vc-nome').value.trim();
     const tel = document.getElementById('vc-tel').value.trim();
