@@ -318,6 +318,34 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVendita()">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             break;
+        case 'clienti':
+            const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+            const storicoVenditeClienti = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+            
+            let clientiHtml = '<h2>Rubrica Clienti</h2><p>Elenco dei clienti e ristoranti salvati automaticamente:</p>';
+            
+            if (rubricaClienti.length === 0) {
+                clientiHtml += '<div class="module-card"><p>Nessun cliente registrato in rubrica. Emetti una ricevuta per aggiungerli automaticamente.</p></div>';
+            } else {
+                clientiHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Clienti Registrati (${rubricaClienti.length}):</h3>`;
+                
+                rubricaClienti.forEach((cliente, idx) => {
+                    // Calcola le vendite effettuate a questo cliente
+                    const venditeCliente = storicoVenditeClienti.filter(v => v.acquirente.toLowerCase() === cliente.nome.toLowerCase());
+                    const totaleSpeso = venditeCliente.reduce((acc, v) => acc + Number(v.importo), 0);
+                    
+                    clientiHtml += `
+                        <div class="module-card" style="border-left: 4px solid #38bdf8; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:1rem;">👤 ${cliente.nome}</strong>
+                            <p style="font-size:0.85rem; color:#cbd5e1; margin: 4px 0;">P.IVA / CF: ${cliente.cf || 'Non inserito'}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin: 2px 0;">📅 Ultimo acquisto: ${cliente.dataUltimoAcquisto || 'N.D.'}</p>
+                            <p style="font-size:0.85rem; color:#22c55e; font-weight:bold; margin-top: 4px;">Totale Acquisti: € ${totaleSpeso.toFixed(2)} (${venditeCliente.length} ricevute)</p>
+                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem; margin-top:8px;" onclick="deleteCliente(${idx})">🗑️ Rimuovi da Rubrica</button>
+                        </div>`;
+                });
+            }
+            contentHTML = clientiHtml;
+            break;
         case 'storico_ricevute':
             const storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
             let storicoHtml = '<h2>Archivio Storico Ricevute</h2><p>Elenco cronologico delle ricevute di vendita emesse:</p>';
@@ -713,6 +741,15 @@ function deleteDog(index) {
     }
 }
 
+function deleteCliente(index) {
+    if (confirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
+        let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+        rubricaClienti.splice(index, 1);
+        localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
+        openModule('clienti');
+    }
+}
+
 function savePolizza() {
     const compagnia = document.getElementById('pol-compagnia').value.trim();
     const numero = document.getElementById('pol-numero').value.trim();
@@ -761,17 +798,45 @@ function registraVendita() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
     if (!tData.nome || !tData.cf) { alert("Inserisci prima i dati della tua anagrafica."); return; }
+    
+    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
+    const acquirenteCf = document.getElementById('r-cf-acquirente').value.trim();
+    
+    if (!acquirenteNome) {
+        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
+        return;
+    }
+
+    // --- SALVATAGGIO AUTOMATICO IN RUBRICA CLIENTI ---
+    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    // Controlla se il cliente esiste già (basandosi sul nome o P.IVA/CF per evitare duplicati)
+    const clienteEsistente = rubricaClienti.find(c => c.nome.toLowerCase() === acquirenteNome.toLowerCase());
+    
+    if (!clienteEsistente) {
+        rubricaClienti.push({
+            nome: acquirenteNome,
+            cf: acquirenteCf,
+            dataUltimoAcquisto: new Date().toLocaleDateString()
+        });
+    } else {
+        // Aggiorna la data dell'ultimo acquisto se il cliente esiste già
+        clienteEsistente.dataUltimoAcquisto = new Date().toLocaleDateString();
+        if(acquirenteCf) clienteEsistente.cf = acquirenteCf;
+    }
+    localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
+    // ------------------------------------------------
+
     const importoCorrente = parseFloat(document.getElementById('r-importo').value) || 0;
     let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const vendita = {
         venditoreNome: tData.nome, venditoreCf: tData.cf, venditoreTesserino: tData.num || 'N.D.', venditoreRegione: tData.regione || 'N.D.',
-        acquirente: document.getElementById('r-acquirente').value.trim(), acquirenteCf: document.getElementById('r-cf-acquirente').value.trim(),
+        acquirente: acquirenteNome, acquirenteCf: acquirenteCf,
         specie: document.getElementById('r-specie').value, peso: document.getElementById('r-peso').value, importo: importoCorrente.toFixed(2),
         comune: document.getElementById('r-comune').value.trim(), lotto: document.getElementById('r-lotto').value.trim(), f24: document.getElementById('r-f24').value.trim() || f24SavedData.protocollo || 'Non inserito', data: new Date().toLocaleDateString()
     };
     storico.push(vendita);
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
-    alert("Ricevuta registrata con successo!");
+    alert("Ricevuta registrata e cliente salvato in rubrica con successo!");
     openModule('storico_ricevute');
 }
 
