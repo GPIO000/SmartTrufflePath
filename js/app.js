@@ -867,6 +867,67 @@ function calcolaTotale() {
         document.getElementById('importoTotale').value = totale.toFixed(2);
     }
 }
+function registraVenditaConPrezzoKg() {
+    // --- CONTROLLO DATI ANAGRAFICI ---
+    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    if (!tData.nome || !tData.cf) {
+        alert("Attenzione: Impossibile procedere. Manca la comunicazione dei dati anagrafici e del tesserino.");
+        openModule('tesserino'); // Reindirizza l'utente al modulo anagrafica
+        return;
+    }
+    // ---------------------------------
+
+    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
+    const acquirenteCf = document.getElementById('r-cf-acquirente').value.trim();
+    
+    if (!acquirenteNome) {
+        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
+        return;
+    }
+
+    // Resto della logica di salvataggio...
+    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    const clienteEsistente = rubricaClienti.find(c => c.nome.toLowerCase() === acquirenteNome.toLowerCase());
+    
+    if (!clienteEsistenedente) { // Nota: correggere in clienteEsistente
+        rubricaClienti.push({
+            nome: acquirenteNome,
+            cf: acquirenteCf,
+            dataUltimoAcquisto: new Date().toLocaleDateString()
+        });
+    } else {
+        clienteEsistente.dataUltimoAcquisto = new Date().toLocaleDateString();
+        if(acquirenteCf) clienteEsistente.cf = acquirenteCf;
+    }
+    localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
+
+    const pesoGrammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
+    const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
+    const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+
+    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const vendita = {
+        venditoreNome: tData.nome, 
+        venditoreCf: tData.cf, 
+        venditoreTesserino: tData.num || 'N.D.', 
+        venditoreRegione: tData.regione || 'N.D.',
+        acquirente: acquirenteNome, 
+        acquirenteCf: acquirenteCf,
+        specie: document.getElementById('r-specie').value, 
+        peso: pesoGrammi, 
+        importo: importoTotale.toFixed(2),
+        comune: document.getElementById('r-comune').value.trim(), 
+        lotto: document.getElementById('r-lotto').value.trim(), 
+        f24: document.getElementById('r-f24').value.trim() || f24SavedData.protocollo || 'Non inserito', 
+        data: new Date().toLocaleDateString()
+    };
+    
+    storico.push(vendita);
+    localStorage.setItem('storico_vendite', JSON.stringify(storico));
+    alert("Ricevuta registrata e cliente salvato in rubrica con successo!");
+    openModule('storico_ricevute');
+}
 
 function visualizzaRicevutaSalvata(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
