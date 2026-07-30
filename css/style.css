@@ -294,7 +294,7 @@ html, body.no-scroll-body {
 .mod-input {
     width: 100%;
     padding: 10px;
-    margin-top: 5px;
+    margin-top: 5px5px;
     margin-bottom: 12px;
     background-color: #0f172a;
     border: 1px solid #475569;
@@ -303,8 +303,12 @@ html, body.no-scroll-body {
     font-size: 0.95rem;
 }
 
-/* Regole di stampa per ricevute e moduli */
+/* Regole di stampa ottimizzate per ricevute e moduli */
 @media print {
+    /* Nascondi completamente tutto ciò che appartiene all'interfaccia dell'app */
+    #app-container,
+    #app-drawer,
+    #drawer-backdrop,
     .module-header-bar, 
     .back-map-btn, 
     .overlay-btn, 
@@ -312,26 +316,56 @@ html, body.no-scroll-body {
         display: none !important;
     }
     
-    body, html, #app-container, #active-module-view {
-        background: white !important;
-        color: black !important;
+    /* Resetta sfondi e colori per la stampa su carta / PDF bianco */
+    body, html {
+        background: #ffffff !important;
+        color: #000000 !important;
         height: auto !important;
         overflow: visible !important;
         position: static !important;
     }
 
+    /* Isola e mostra solo il contenitore del modulo attivo a schermo intero per la stampa */
     #active-module-view {
         display: block !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
         width: 100% !important;
         height: auto !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        z-index: 99999 !important;
+        overflow: visible !important;
+    }
+
+    .module-body-content {
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    .module-body-content h2,
+    .module-body-content p {
+        color: #000000 !important;
     }
     
     .module-card {
-        background: white !important;
-        color: black !important;
-        border: 1px solid #ccc !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: none !important;
         box-shadow: none !important;
-        padding: 15px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Input e moduli stampati in modo pulito senza bordi scuri da schermo */
+    .mod-input {
+        background: transparent !important;
+        border: none !important;
+        border-bottom: 1px solid #000 !important;
+        color: #000 !important;
+        border-radius: 0 !important;
     }
 
     #qrcode-container img {
