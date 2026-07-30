@@ -784,6 +784,13 @@ function visualizzaRicevutaSalvata(index) {
         <h2>RICEVUTA VENDITA OCCASIONALE N. ${index + 1}</h2>
         <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
         <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
+            
+            <!-- TESTO NORMATIVO AGGIUNTO QUI -->
+            <p style="font-size: 0.72rem; color: #444; text-align: justify; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 8px; line-height: 1.3;">
+                <strong>DICHIARAZIONE DI CESSIONE OCCASIONALE E TRACCIABILITÀ:</strong> 
+                Operazione effettuata nell'ambito della raccolta hobbistica/occasionale dei tartufi, esonerata dall'obbligo di emissione di fattura elettronica e di certificazione fiscale ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 e s.m.i., nonché in conformità alle disposizioni di cui alla Legge 30 dicembre 2018, n. 145 (commi 110-112). Si attesta inoltre la piena tracciabilità del prodotto alimentare ai sensi degli artt. 18 e 19 del Regolamento (CE) n. 178/2002 del Parlamento Europeo e del Consiglio, e del Regolamento di esecuzione (UE) n. 931/2011, garantendo il rispetto delle norme igienico-sanitarie e di sicurezza alimentare.
+            </p>
+
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati del Venditore (Cessionario occasionale)</h3>
             <p><strong>Nome e Cognome:</strong> ${v.venditoreNome}</p>
             <p><strong>Codice Fiscale:</strong> ${v.venditoreCf}</p>
@@ -816,6 +823,7 @@ function visualizzaRicevutaSalvata(index) {
         <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
     `;
 }
+
 async function condividiRicevuta(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const v = storico[index];
