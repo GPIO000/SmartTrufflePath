@@ -291,8 +291,10 @@ function openModule(moduleName, editMode = false) {
                 <div class="module-card">
                     <label>Acquirente (Privato o Ristorante / Ragione Sociale):</label>
                     <input type="text" id="r-acquirente" class="mod-input" placeholder="Nome o Ristorante">
+                    
                     <label>P.IVA / Codice Fiscale Acquirente:</label>
                     <input type="text" id="r-cf-acquirente" class="mod-input" placeholder="P.IVA o CF acquirente">
+                    
                     <label>Specie Tartufo:</label>
                     <select id="r-specie" class="mod-input">
                         <option value="Tuber magnatum Pico (Pregiato Bianco)">Tuber magnatum Pico (Pregiato Bianco)</option>
@@ -305,19 +307,29 @@ function openModule(moduleName, editMode = false) {
                         <option value="Tuber macrosporum Vitt. (Nero Liscio)">Tuber macrosporum Vitt. (Nero Liscio)</option>
                         <option value="Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)">Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)</option>
                     </select>
+
                     <label>Peso (grammi):</label>
-                    <input type="number" id="r-peso" class="mod-input" placeholder="Es. 150">
+                    <input type="number" id="pesoGrammi" class="mod-input" placeholder="Es. 150" oninput="calcolaTotale()">
+
+                    <label>Prezzo al kg (€):</label>
+                    <input type="number" id="prezzoKg" class="mod-input" placeholder="Es. 1500.00" oninput="calcolaTotale()">
+
                     <label>Importo Totale (€):</label>
-                    <input type="number" id="r-importo" class="mod-input" placeholder="Es. 200.00">
+                    <input type="number" id="importoTotale" class="mod-input" placeholder="Es. 200.00">
+
                     <label>Comune di Raccolta / Località:</label>
                     <input type="text" id="r-comune" class="mod-input" placeholder="Comune di ritrovamento">
+                    
                     <label>Codice Lotto / Tracciabilità:</label>
                     <input type="text" id="r-lotto" class="mod-input" value="LOTTO-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-01" placeholder="Codice lotto">
+                    
                     <label>N. Protocollo F24 ELIDE collegato:</label>
                     <input type="text" id="r-f24" class="mod-input" value="${defaultProtocollo}" placeholder="Protocollo F24">
-                    <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVendita()">Registra e Genera Ricevuta Conforme</button>
+                    
+                    <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVenditaConPrezzoKg()">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             break;
+
         case 'clienti':
             const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
             const storicoVenditeClienti = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
