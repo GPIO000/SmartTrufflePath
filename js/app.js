@@ -811,8 +811,62 @@ function visualizzaRicevutaSalvata(index) {
             </div>
         </div>
         <button class="overlay-btn" style="background:#2563eb; margin-top:15px; width:100%;" onclick="window.print()">🖨️ Stampa / Salva PDF Conforme</button>
+        <button class="overlay-btn" style="background:#0284c7; margin-top:10px; width:100%;" onclick="condividiRicevuta(${index})">📤 Condividi Ricevuta (WhatsApp / PDF)</button>
+
         <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
     `;
+}
+async function condividiRicevuta(index) {
+    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const v = storico[index];
+    if(!v) return;
+
+    const testoMessaggio = `📄 RICEVUTA VENDITA OCCASIONALE N. ${index + 1}\n` +
+        `Data: ${v.data}\n` +
+        `Venditore: ${v.venditoreNome} (CF: ${v.venditoreCf})\n` +
+        `Acquirente: ${v.acquirente}\n` +
+        `Specie: ${v.specie} (${v.peso}g)\n` +
+        `Importo: € ${v.importo}\n` +
+        `Comune: ${v.comune} | Lotto: ${v.lotto}`;
+
+    if (navigator.share) {
+        try {
+            if (typeof html2pdf !== 'undefined') {
+                const element = document.querySelector('.module-card');
+                const options = {
+                    margin: 10,
+                    filename: `Ricevuta_${index + 1}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                
+                const pdfBlob = await html2pdf().from(element).set(options).output('blob');
+                const file = new File([pdfBlob], `Ricevuta_${index + 1}.pdf`, { type: 'application/pdf' });
+
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        title: `Ricevuta N. ${index + 1}`,
+                        text: testoMessaggio,
+                        files: [file]
+                    });
+                    return;
+                }
+            }
+            
+            await navigator.share({
+                title: `Ricevuta N. ${index + 1}`,
+                text: testoMessaggio
+            });
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.log("Condivisione annullata o non riuscita", err);
+            }
+        }
+    } else {
+        const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(testoMessaggio)}`;
+        window.location.href = whatsappUrl;
+    }
 }
 
 function chiudiDettaglioRicevuta() {
