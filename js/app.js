@@ -781,13 +781,6 @@ function visualizzaRicevutaSalvata(index) {
     if(!v) return;
     let activeView = document.getElementById('active-module-view');
     activeView.querySelector('.module-body-content').innerHTML = `
-        <style>
-            @media print {
-                .module-header-bar, .back-map-btn, .overlay-btn {
-                    display: none !important;
-                }
-            }
-        </style>
         <h2>RICEVUTA VENDITA OCCASIONALE N. ${index + 1}</h2>
         <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
         <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
