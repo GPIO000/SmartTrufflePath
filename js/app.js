@@ -31,7 +31,6 @@ if (navigator.geolocation) {
                 }
             }
         }).catch(err => console.log("Errore geocodifica:", err));
-
         if (!userMarker) {
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>Sei qui</b>").openPopup();
             map.setView([lat, lng], 16);
@@ -54,7 +53,6 @@ function renderAllPoiMarkers() {
         poiMapMarkers[index] = marker;
     });
 }
-
 function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
@@ -75,7 +73,6 @@ function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
         direction: directions[index]
     };
 }
-
 function updateCompass(currentLat, currentLng) {
     const compassText = document.getElementById('compass-box');
     if (!compassText) return;
@@ -103,7 +100,6 @@ function saveCarPosition() {
         alert("🚗 Posizione dell'auto salvata con successo!");
     } else { alert("Segnale GPS non ancora disponibile per marcare l'auto."); }
 }
-
 function deleteCarPosition() {
     if (carCoordinates) {
         if (confirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
@@ -130,7 +126,7 @@ function savePoiPosition() {
         if (note === null) return;
         const newPoi = {
             lat: pos.lat, lng: pos.lng,
-            note: note || "Punto di interesse",
+            note: note.trim() || "Punto di interesse",
             date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
         };
         poiList.push(newPoi);
@@ -143,7 +139,6 @@ function savePoiPosition() {
         alert("📍 Punto salvato con successo e impostato sulla bussola!");
     } else { alert("Segnale GPS non ancora disponibile per marcare il punto."); }
 }
-
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -491,8 +486,11 @@ function openModule(moduleName, editMode = false) {
             break;
         case 'registro_giornaliero':
             const storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
-            const filtroAnno = document.getElementById && document.getElementById('filtro-anno') ? document.getElementById('filtro-anno').value : 'tutti';
-            const filtroSpecie = document.getElementById && document.getElementById('filtro-specie') ? document.getElementById('filtro-specie').value : 'tutte';
+            const elAnno = document.getElementById('filtro-anno');
+            const filtroAnno = elAnno ? elAnno.value : 'tutti';
+            const elSpecie = document.getElementById('filtro-specie');
+            const filtroSpecie = elSpecie ? elSpecie.value : 'tutte';
+
             let anniDisponibili = [...new Set(storicoRaccolta.map(item => item.data ? item.data.slice(0,4) : ''))].filter(Boolean);
             if(anniDisponibili.length === 0) anniDisponibili = [new Date().getFullYear().toString()];
             let opzioniAnniHtml = `<option value="tutti">Tutti gli anni</option>`;
@@ -649,21 +647,32 @@ function clearData(storageKey, moduleName) {
 }
 
 function saveTesserino() {
-    const data = { nome: document.getElementById('t-nome').value, cf: document.getElementById('t-cf').value, regione: document.getElementById('t-regione').value, num: document.getElementById('t-num').value };
+    const data = { 
+        nome: document.getElementById('t-nome').value.trim(), 
+        cf: document.getElementById('t-cf').value.trim().toUpperCase(), 
+        regione: document.getElementById('t-regione').value.trim(), 
+        num: document.getElementById('t-num').value.trim() 
+    };
     localStorage.setItem('tesserino_data', JSON.stringify(data));
     alert("Dati tesserino salvati con successo!");
     openModule('tesserino');
 }
 
 function savePagoPA() {
-    const data = { id: document.getElementById('p-id').value, data: document.getElementById('p-data').value };
+    const data = { 
+        id: document.getElementById('p-id').value.trim(), 
+        data: document.getElementById('p-data').value 
+    };
     localStorage.setItem('pagopa_data', JSON.stringify(data));
     alert("Quietanza PagoPA salvata!");
     openModule('pagopa');
 }
 
 function saveF24() {
-    const data = { anno: document.getElementById('f-anno').value, protocollo: document.getElementById('f-protocollo').value };
+    const data = { 
+        anno: document.getElementById('f-anno').value.trim(), 
+        protocollo: document.getElementById('f-protocollo').value.trim() 
+    };
     localStorage.setItem('f24_data', JSON.stringify(data));
     alert("Protocollo F24 ELIDE salvato correttamente!");
     openModule('f24');
@@ -746,9 +755,9 @@ function registraVendita() {
     let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const vendita = {
         venditoreNome: tData.nome, venditoreCf: tData.cf, venditoreTesserino: tData.num || 'N.D.', venditoreRegione: tData.regione || 'N.D.',
-        acquirente: document.getElementById('r-acquirente').value, acquirenteCf: document.getElementById('r-cf-acquirente').value,
+        acquirente: document.getElementById('r-acquirente').value.trim(), acquirenteCf: document.getElementById('r-cf-acquirente').value.trim(),
         specie: document.getElementById('r-specie').value, peso: document.getElementById('r-peso').value, importo: importoCorrente.toFixed(2),
-        comune: document.getElementById('r-comune').value, lotto: document.getElementById('r-lotto').value, f24: document.getElementById('r-f24').value || f24SavedData.protocollo || 'Non inserito', data: new Date().toLocaleDateString()
+        comune: document.getElementById('r-comune').value.trim(), lotto: document.getElementById('r-lotto').value.trim(), f24: document.getElementById('r-f24').value.trim() || f24SavedData.protocollo || 'Non inserito', data: new Date().toLocaleDateString()
     };
     storico.push(vendita);
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
@@ -764,7 +773,6 @@ function visualizzaRicevutaSalvata(index) {
     activeView.querySelector('.module-body-content').innerHTML = `
         <style>
             @media print {
-                /* Nasconde i pulsanti di navigazione, la barra superiore e i bottoni di stampa/ritorno */
                 .module-header-bar, .back-map-btn, .overlay-btn {
                     display: none !important;
                 }
@@ -800,8 +808,12 @@ function visualizzaRicevutaSalvata(index) {
             </div>
         </div>
         <button class="overlay-btn" style="background:#2563eb; margin-top:15px; width:100%;" onclick="window.print()">🖨️ Stampa / Salva PDF Conforme</button>
-        <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="openModule('storico_ricevute')">← Torna all'Archivio</button>
+        <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
     `;
+}
+
+function chiudiDettaglioRicevuta() {
+    openModule('storico_ricevute');
 }
 
 function esportaDatiCSV() {
