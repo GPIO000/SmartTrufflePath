@@ -1184,3 +1184,24 @@ function shareAppUrl() {
     if (navigator.share) { navigator.share({ title: 'Truffle App', url: appUrl }).catch(() => {}); }
     else { navigator.clipboard.writeText(appUrl).then(() => alert("Link copiato!")); }
 }
+// AGGIUNGI QUESTO BLOCCO PER ABILITARE I TASTI DEL MENU
+document.addEventListener('DOMContentLoaded', () => {
+    // Seleziona tutti i pulsanti o gli elementi interattivi dentro il menu laterale
+    const menuButtons = document.querySelectorAll('#app-drawer button, .menu-item, [onclick*="openModule"]');
+    
+    menuButtons.forEach(button => {
+        // Rimuove eventuali conflitti e ascolta il click
+        button.addEventListener('click', (e) => {
+            // Estrae il nome del modulo dall'attributo onclick inline se presente, o da un data attribute
+            const onclickAttr = button.getAttribute('onclick');
+            if (onclickAttr && onclickAttr.includes('openModule')) {
+                // Estrae la stringa tra virgolette dentro openModule('nome_modulo')
+                const match = onclickAttr.match(/openModule\(['"]([^'"]+)['"]\)/);
+                if (match && match[1]) {
+                    e.preventDefault();
+                    openModule(match[1]);
+                }
+            }
+        });
+    });
+});
