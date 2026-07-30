@@ -843,6 +843,18 @@ function registraVendita() {
     alert("Ricevuta registrata e cliente salvato in rubrica con successo!");
     openModule('storico_ricevute');
 }
+function calcolaTotale() {
+    const grammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
+    const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
+    
+    if (grammi > 0 && prezzoKg > 0) {
+        // Formula: (Grammi / 1000) * Prezzo al kg
+        const totale = (grammi / 1000) * prezzoKg;
+        
+        // Imposta il valore arrotondato a 2 decimali
+        document.getElementById('importoTotale').value = totale.toFixed(2);
+    }
+}
 
 function visualizzaRicevutaSalvata(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
