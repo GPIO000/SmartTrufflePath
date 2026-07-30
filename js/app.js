@@ -673,16 +673,26 @@ function openModule(moduleName, editMode = false) {
     `;
     activeView.style.display = 'flex';
     if (moduleName === 'pagopa' && pData.id && !editMode) {
-        setTimeout(() => {
+        const attemptGeneration = (retries = 5) => {
             const qrContainer = document.getElementById('qrcode-container');
             if (qrContainer && typeof QRCode !== 'undefined') {
                 qrContainer.innerHTML = "";
                 let qrString = `TARTUFO-REGIONE|ID:${pData.id}|DATA:${pData.data}`;
-                new QRCode(qrContainer, { text: qrString, width: 128, height: 128, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
+                new QRCode(qrContainer, { 
+                    text: qrString, 
+                    width: 128, 
+                    height: 128, 
+                    colorDark : "#000000", 
+                    colorLight : "#ffffff", 
+                    correctLevel : QRCode.CorrectLevel.H 
+                });
+            } else if (retries > 0) {
+                setTimeout(() => attemptGeneration(retries - 1), 100);
             }
-        }, 50);
+        };
+        setTimeout(attemptGeneration, 100);
     }
-}
+
 function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
