@@ -692,7 +692,7 @@ function openModule(moduleName, editMode = false) {
             }
         };
         setTimeout(attemptGeneration, 100);
-    }
+        }
 
 function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
