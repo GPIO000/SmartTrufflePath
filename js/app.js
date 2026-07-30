@@ -1,90 +1,55 @@
-// Inizializzazione della mappa e geolocalizzazione
-const map = L.map('map', {
-    zoomControl: false
-}).setView([41.8719, 12.5674], 6);
-
-L.control.zoom({
-    position: 'topright'
-}).addTo(map);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap'
-}).addTo(map);
+// PARTE 1/12: Inizializzazione della mappa e geolocalizzazione GPS
+const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
+L.control.zoom({ position: 'topright' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
 
 let userMarker = null;
 let carMarker = null;
 let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
-
 let poiList = JSON.parse(localStorage.getItem('poi_list') || '[]');
 let poiMapMarkers = {}; 
 let targetNavigation = null; 
+
 if (navigator.geolocation) {
-    navigator.geolocation.watchPosition(
-        (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            
-            const dot = document.getElementById('gps-status-dot');
-            if (dot) {
-                dot.style.backgroundColor = '#22c55e';
-                dot.title = "GPS Attivo: " + lat.toFixed(4) + ", " + lng.toFixed(4);
-            }
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`, {
-                headers: { 'Accept-Language': 'it' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data && data.address) {
-                    const regione = data.address.region || data.address.state || '';
-                    const provincia = data.address.province || data.address.county || '';
-                    const comune = data.address.city || data.address.town || data.address.village || data.address.municipality || '';
-                    
-                    const gpsText = document.getElementById('gps-status-text');
-                    if (gpsText) {
-                        let parti = [];
-                        if (regione) parti.push(`<b>${regione}</b>`);
-                        if (provincia) parti.push(`<b>${provincia}</b>`);
-                        if (comune) parti.push(`<b>${comune}</b>`);
-
-                        if (parti.length > 0) {
-                            gpsText.innerHTML = `GPS: ${parti.join(' > ')}`;
-                        } else {
-                            gpsText.innerHTML = `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                        }
-                    }
+    navigator.geolocation.watchPosition((position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const dot = document.getElementById('gps-status-dot');
+        if (dot) { dot.style.backgroundColor = '#22c55e'; dot.title = "GPS Attivo: " + lat.toFixed(4) + ", " + lng.toFixed(4); }
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`, { headers: { 'Accept-Language': 'it' } })
+        .then(res => res.json()).then(data => {
+            if (data && data.address) {
+                const regione = data.address.region || data.address.state || '';
+                const provincia = data.address.province || data.address.county || '';
+                const comune = data.address.city || data.address.town || data.address.village || data.address.municipality || '';
+                const gpsText = document.getElementById('gps-status-text');
+                if (gpsText) {
+                    let parti = [];
+                    if (regione) parti.push(`<b>${regione}</b>`);
+                    if (provincia) parti.push(`<b>${provincia}</b>`);
+                    if (comune) parti.push(`<b>${comune}</b>`);
+                    gpsText.innerHTML = parti.length > 0 ? `GPS: ${parti.join(' > ')}` : `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                 }
-            }).catch(err => console.log("Errore geocodifica:", err));
-
-            if (!userMarker) {
-                userMarker = L.marker([lat, lng]).addTo(map)
-                    .bindPopup("<b>Sei qui</b>")
-                    .openPopup();
-                map.setView([lat, lng], 16);
-
-                if (carCoordinates) {
-                    carMarker = L.marker([carCoordinates.lat, carCoordinates.lng]).addTo(map)
-                        .bindPopup("<b>🚗 La tua Auto</b>");
-                }
-                renderAllPoiMarkers();
-            } else {
-                userMarker.setLatLng([lat, lng]);
             }
+        }).catch(err => console.log("Errore geocodifica:", err));
 
-            updateCompass(lat, lng);
-        },
-        (error) => {
-            console.warn("Errore GPS: " + error.message);
-            const dot = document.getElementById('gps-status-dot');
-            if (dot) dot.style.backgroundColor = '#ef4444';
-        },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
-    );
+        if (!userMarker) {
+            userMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>Sei qui</b>").openPopup();
+            map.setView([lat, lng], 16);
+            if (carCoordinates) { carMarker = L.marker([carCoordinates.lat, carCoordinates.lng]).addTo(map).bindPopup("<b>🚗 La tua Auto</b>"); }
+            renderAllPoiMarkers();
+        } else { userMarker.setLatLng([lat, lng]); }
+        updateCompass(lat, lng);
+    }, (error) => {
+        console.warn("Errore GPS: " + error.message);
+        const dot = document.getElementById('gps-status-dot');
+        if (dot) dot.style.backgroundColor = '#ef4444';
+    }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 });
 }
+// PARTE 2/12: Gestione dei POI sulla mappa, calcolo distanze e orientamento bussola
 function renderAllPoiMarkers() {
     Object.values(poiMapMarkers).forEach(marker => map.removeLayer(marker));
     poiMapMarkers = {};
-
     poiList.forEach((poi, index) => {
         const marker = L.marker([poi.lat, poi.lng]).addTo(map)
             .bindPopup(`<b>📍 Tartufo / Punto</b><br>Nota: ${poi.note || 'Nessuna nota'}<br><small>${poi.date}</small>`);
@@ -94,50 +59,35 @@ function renderAllPoiMarkers() {
 
 function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
-    const φ1 = lat1 * Math.PI/180;
-    const φ2 = lat2 * Math.PI/180;
-    const Δφ = (lat2-lat1) * Math.PI/180;
-    const Δλ = (lon2-lon1) * Math.PI/180;
-
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     const distance = R * c;
-
     const y = Math.sin(Δλ) * Math.cos(φ2);
     const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
     let brng = Math.atan2(y, x) * 180 / Math.PI;
     brng = (brng + 360) % 360;
-
     const arrows = ['⬆️', '↗️', '➡️', '↘️', '⬇️', '↙️', '⬅️', '↖️'];
     const directions = ['Nord', 'Nord-Est', 'Est', 'Sud-Est', 'Sud', 'Sud-Ovest', 'Ovest', 'Nord-Ovest'];
     const index = Math.round((brng / 45)) % 8;
-    
     return {
         distance: distance > 1000 ? (distance / 1000).toFixed(2) + ' km' : Math.round(distance) + ' m',
         arrow: arrows[index],
         direction: directions[index]
     };
 }
+
 function updateCompass(currentLat, currentLng) {
     const compassText = document.getElementById('compass-box');
     if (!compassText) return;
-
-    let target = null;
-    let label = '';
-
+    let target = null, label = '';
     if (targetNavigation === 'car' && carCoordinates) {
-        target = carCoordinates;
-        label = '🚗 Auto';
+        target = carCoordinates; label = '🚗 Auto';
     } else if (typeof targetNavigation === 'string' && targetNavigation.startsWith('poi_')) {
         const index = parseInt(targetNavigation.split('_')[1]);
-        if (poiList[index]) {
-            target = poiList[index];
-            label = `📍 ${poiList[index].note || 'Punto'}`;
-        }
+        if (poiList[index]) { target = poiList[index]; label = `📍 ${poiList[index].note || 'Punto'}`; }
     }
-
     if (target) {
         const res = calculateDistanceAndBearing(currentLat, currentLng, target.lat, target.lng);
         compassText.innerHTML = `🧭 <b>${label}:</b> ${res.arrow} ${res.distance} (${res.direction})`;
@@ -145,39 +95,28 @@ function updateCompass(currentLat, currentLng) {
         compassText.innerHTML = `🧭 Seleziona una destinazione (Auto o Punto)`;
     }
 }
-
+// PARTE 3/12: Funzioni per il salvataggio, rimozione e ritorno alla posizione dell'auto
 function saveCarPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
         carCoordinates = { lat: pos.lat, lng: pos.lng };
         localStorage.setItem('car_coords', JSON.stringify(carCoordinates));
-
-        if (carMarker) {
-            carMarker.setLatLng([pos.lat, pos.lng]);
-        } else {
-            carMarker = L.marker([pos.lat, pos.lng]).addTo(map)
-                .bindPopup("<b>🚗 La tua Auto</b>");
-        }
+        if (carMarker) { carMarker.setLatLng([pos.lat, pos.lng]); }
+        else { carMarker = L.marker([pos.lat, pos.lng]).addTo(map).bindPopup("<b>🚗 La tua Auto</b>"); }
         alert("🚗 Posizione dell'auto salvata con successo!");
-    } else {
-        alert("Segnale GPS non ancora disponibile per marcare l'auto.");
-    }
+    } else { alert("Segnale GPS non ancora disponibile per marcare l'auto."); }
 }
+
 function deleteCarPosition() {
     if (carCoordinates) {
         if (confirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
-            if (carMarker) {
-                map.removeLayer(carMarker);
-                carMarker = null;
-            }
+            if (carMarker) { map.removeLayer(carMarker); carMarker = null; }
             carCoordinates = null;
             localStorage.removeItem('car_coords');
             if (targetNavigation === 'car') targetNavigation = null;
             alert("🚗 Posizione dell'auto rimossa con successo!");
         }
-    } else {
-        alert("Nessuna posizione dell'auto attualmente salvata.");
-    }
+    } else { alert("Nessuna posizione dell'auto attualmente salvata."); }
 }
 
 function returnToCar() {
@@ -185,39 +124,30 @@ function returnToCar() {
         targetNavigation = 'car';
         map.setView([carCoordinates.lat, carCoordinates.lng], 18);
         if (carMarker) carMarker.openPopup();
-    } else {
-        alert("Nessun parcheggio salvato. Clicca prima su 'Auto'.");
-    }
+    } else { alert("Nessun parcheggio salvato. Clicca prima su 'Auto'."); }
 }
-
+// PARTE 4/12: Gestione punti di interesse (POI) e tartufaie
 function savePoiPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
         const note = prompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "Tartufaia");
         if (note === null) return;
-
         const newPoi = {
-            lat: pos.lat,
-            lng: pos.lng,
+            lat: pos.lat, lng: pos.lng,
             note: note || "Punto di interesse",
             date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
         };
-
         poiList.push(newPoi);
         localStorage.setItem('poi_list', JSON.stringify(poiList));
-
         const newIndex = poiList.length - 1;
         renderAllPoiMarkers();
-
         targetNavigation = `poi_${newIndex}`;
         map.setView([pos.lat, pos.lng], 18);
         if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
-
         alert("📍 Punto salvato con successo e impostato sulla bussola!");
-    } else {
-        alert("Segnale GPS non ancora disponibile per marcare il punto.");
-    }
+    } else { alert("Segnale GPS non ancora disponibile per marcare il punto."); }
 }
+
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -232,20 +162,14 @@ function sharePoi(index) {
     if (poiList[index]) {
         const p = poiList[index];
         const msg = `📍 TARTUFAIA CONDIVISA\nNota: ${p.note}\nData: ${p.date}\nGoogle Maps: https://maps.google.com/?q=${p.lat},${p.lng}`;
-        if (navigator.share) {
-            navigator.share({ title: 'Tartufaia', text: msg }).catch(() => {});
-        } else {
-            window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`;
-        }
+        if (navigator.share) { navigator.share({ title: 'Tartufaia', text: msg }).catch(() => {}); }
+        else { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
     }
 }
 
 function deletePoi(index) {
     if (confirm("Vuoi davvero eliminare questo punto salvato?")) {
-        if (poiMapMarkers[index]) {
-            map.removeLayer(poiMapMarkers[index]);
-            delete poiMapMarkers[index];
-        }
+        if (poiMapMarkers[index]) { map.removeLayer(poiMapMarkers[index]); delete poiMapMarkers[index]; }
         poiList.splice(index, 1);
         localStorage.setItem('poi_list', JSON.stringify(poiList));
         renderAllPoiMarkers();
@@ -258,22 +182,18 @@ function triggerSOS() {
         const pos = userMarker.getLatLng();
         const msg = `EMERGENZA TARTUFAIA! Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
         window.location.href = `sms:?body=${encodeURIComponent(msg)}`;
-    } else {
-        alert("Impossibile rilevare le coordinate GPS.");
-    }
+    } else { alert("Impossibile rilevare le coordinate GPS."); }
 }
+// PARTE 5/12: Gestione apertura moduli principali (poilist, tesserino, pagopa)
 function openModule(moduleName, editMode = false) {
     toggleDrawer();
-    
     let activeView = document.getElementById('active-module-view');
     if (!activeView) {
         activeView = document.createElement('div');
         activeView.id = 'active-module-view';
         document.getElementById('app-container').appendChild(activeView);
     }
-
     let contentHTML = '';
-
     switch(moduleName) {
         case 'poilist':
             let poiHtml = '<h2>Elenco Punti & Tartufaie</h2><p>I tuoi punti di ricerca salvati con note:</p>';
@@ -296,7 +216,6 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = poiHtml;
             break;
-
         case 'tesserino':
             const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
             if (tData.nome && !editMode) {
@@ -363,11 +282,10 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
-
+// PARTE 6/12: Gestione dei moduli ricevute, storico e F24
         case 'ricevute':
             const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
             const defaultProtocollo = f24SavedData.protocollo || '';
-
             contentHTML = `
                 <h2>Ricevuta di Vendita Occasionale</h2>
                 <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
@@ -421,7 +339,6 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = storicoHtml;
             break;
-
         case 'f24':
             const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
             if (fData.protocollo && !editMode) {
@@ -450,7 +367,7 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             }
             break;
-
+// PARTE 7/12: Gestione dei moduli cani (diario) e polizze assicurative
         case 'canidiary':
             const dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
             let dogsHtml = `
@@ -527,23 +444,19 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = polizzeHtml;
             break;
-
+// PARTE 8/12: Gestione dei moduli libretto veterinario e registro giornaliero di raccolta
         case 'vet':
             const dogsListVet = JSON.parse(localStorage.getItem('dogs_list') || '[]');
             const cDataVet = JSON.parse(localStorage.getItem('cane_data') || '{}');
             const nomeCaneDefault = cDataVet.nome || (dogsListVet.length > 0 ? dogsListVet[0].nome : 'Il tuo cane');
             const vetHistory = JSON.parse(localStorage.getItem('vet_history_list') || '[]');
-
             let optionsHtml = '';
             if (dogsListVet.length > 0) {
                 dogsListVet.forEach(dog => {
                     const selected = dog.nome === nomeCaneDefault ? 'selected' : '';
                     optionsHtml += `<option value="${dog.nome}" ${selected}>${dog.nome} (${dog.razza})</option>`;
                 });
-            } else {
-                optionsHtml += `<option value="${nomeCaneDefault}">${nomeCaneDefault}</option>`;
-            }
-
+            } else { optionsHtml += `<option value="${nomeCaneDefault}">${nomeCaneDefault}</option>`; }
             let vetHtml = `
                 <h2>Libretto Sanitario & Profilassi</h2>
                 <p>Storico trattamenti, vaccini e visite per il cane:</p>
@@ -588,37 +501,21 @@ function openModule(moduleName, editMode = false) {
             const storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
             const filtroAnno = document.getElementById && document.getElementById('filtro-anno') ? document.getElementById('filtro-anno').value : 'tutti';
             const filtroSpecie = document.getElementById && document.getElementById('filtro-specie') ? document.getElementById('filtro-specie').value : 'tutte';
-
             let anniDisponibili = [...new Set(storicoRaccolta.map(item => item.data ? item.data.slice(0,4) : ''))].filter(Boolean);
             if(anniDisponibili.length === 0) anniDisponibili = [new Date().getFullYear().toString()];
-
             let opzioniAnniHtml = `<option value="tutti">Tutti gli anni</option>`;
-            anniDisponibili.forEach(a => {
-                opzioniAnniHtml += `<option value="${a}" ${filtroAnno === a ? 'selected' : ''}>${a}</option>`;
-            });
-
+            anniDisponibili.forEach(a => { opzioniAnniHtml += `<option value="${a}" ${filtroAnno === a ? 'selected' : ''}>${a}</option>`; });
             const listaSpecie9 = [
-                "Tuber magnatum Pico (Pregiato Bianco)",
-                "Tuber melanosporum Vitt. (Nero Pregiato)",
-                "Tuber aestivum Vitt. (Scorzone Estivo)",
-                "Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)",
-                "Tuber brumale Vitt. (Moscatuto / Invernale)",
-                "Tuber brumale var. moschatum De Ferry (Brumale moscato - Sottospecie)",
-                "Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)",
-                "Tuber macrosporum Vitt. (Nero Liscio)",
+                "Tuber magnatum Pico (Pregiato Bianco)", "Tuber melanosporum Vitt. (Nero Pregiato)",
+                "Tuber aestivum Vitt. (Scorzone Estivo)", "Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)",
+                "Tuber brumale Vitt. (Moscatuto / Invernale)", "Tuber brumale var. moschatum De Ferry (Brumale moscato - Sottospecie)",
+                "Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)", "Tuber macrosporum Vitt. (Nero Liscio)",
                 "Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)"
             ];
-
             let opzioniSpecieHtml = `<option value="tutte">Tutte le specie</option>`;
-            listaSpecie9.forEach(s => {
-                opzioniSpecieHtml += `<option value="${s}" ${filtroSpecie === s ? 'selected' : ''}>${s}</option>`;
-            });
-
+            listaSpecie9.forEach(s => { opzioniSpecieHtml += `<option value="${s}" ${filtroSpecie === s ? 'selected' : ''}>${s}</option>`; });
             let selectSpecieFormHtml = '';
-            listaSpecie9.forEach(s => {
-                selectSpecieFormHtml += `<option value="${s}">${s}</option>`;
-            });
-
+            listaSpecie9.forEach(s => { selectSpecieFormHtml += `<option value="${s}">${s}</option>`; });
             let registroHtml = `
                 <h2>Registro Giornaliero Ritrovamenti</h2>
                 <p>Registra i quantitativi raccolti e filtra per anno o specie</p>
@@ -637,24 +534,14 @@ function openModule(moduleName, editMode = false) {
                 <div class="module-card" style="margin-bottom: 15px; background: #0f172a; border: 1px solid #334155;">
                     <h3 style="font-size:0.85rem; color:#38bdf8; margin-bottom:8px;">🔍 Filtri Archivio</h3>
                     <div style="display: flex; gap: 10px;">
-                        <div style="flex:1;">
-                            <label style="font-size:0.75rem;">Anno:</label>
-                            <select id="filtro-anno" class="mod-input" onchange="openModule('registro_giornaliero')">${opzioniAnniHtml}</select>
-                        </div>
-                        <div style="flex:2;">
-                            <label style="font-size:0.75rem;">Specie:</label>
-                            <select id="filtro-specie" class="mod-input" onchange="openModule('registro_giornaliero')">${opzioniSpecieHtml}</select>
-                        </div>
+                        <div style="flex:1;"><label style="font-size:0.75rem;">Anno:</label><select id="filtro-anno" class="mod-input" onchange="openModule('registro_giornaliero')">${opzioniAnniHtml}</select></div>
+                        <div style="flex:2;"><label style="font-size:0.75rem;">Specie:</label><select id="filtro-specie" class="mod-input" onchange="openModule('registro_giornaliero')">${opzioniSpecieHtml}</select></div>
                     </div>
                 </div>`;
-
             let datiFiltrati = storicoRaccolta.filter(item => {
                 const annoItem = item.data ? item.data.slice(0,4) : '';
-                const matchAnno = (filtroAnno === 'tutti' || annoItem === filtroAnno);
-                const matchSpecie = (filtroSpecie === 'tutte' || item.specie === filtroSpecie);
-                return matchAnno && matchSpecie;
+                return (filtroAnno === 'tutti' || annoItem === filtroAnno) && (filtroSpecie === 'tutte' || item.specie === filtroSpecie);
             });
-
             if (datiFiltrati.length === 0) {
                 registroHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun ritrovamento trovato con i filtri selezionati.</p></div>`;
             } else {
@@ -673,7 +560,7 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = registroHtml;
             break;
-
+// PARTE 9/12: Gestione dei moduli bilancio, export dati ed emergenze veterinarie
         case 'bilancio':
             const venditeSalvate = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
             let totaleIncassato = venditeSalvate.reduce((acc, item) => acc + Number(item.importo), 0);
@@ -686,7 +573,6 @@ function openModule(moduleName, editMode = false) {
                     <p>Registrazioni di vendita effettuate: <strong>${venditeSalvate.length}</strong></p>
                 </div>`;
             break;
-
         case 'export':
             contentHTML = `
                 <h2>Report & Backup Dati</h2>
@@ -699,11 +585,9 @@ function openModule(moduleName, editMode = false) {
                     <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" onchange="importBackupData(event)">
                 </div>`;
             break;
-
         case 'emergency':
             window.location.href = "tel:112";
             return;
-
         case 'vet-emergency':
             const vetClinics = JSON.parse(localStorage.getItem('vet_clinics_list') || '[]');
             let clinicHtml = `
@@ -739,7 +623,6 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = clinicHtml;
             break;
-
         default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
     }
@@ -751,20 +634,18 @@ function openModule(moduleName, editMode = false) {
         <div class="module-body-content">${contentHTML}</div>
     `;
     activeView.style.display = 'flex';
-
     if (moduleName === 'pagopa' && pData.id && !editMode) {
         setTimeout(() => {
             const qrContainer = document.getElementById('qrcode-container');
             if (qrContainer && typeof QRCode !== 'undefined') {
                 qrContainer.innerHTML = "";
                 let qrString = `TARTUFO-REGIONE|ID:${pData.id}|DATA:${pData.data}`;
-                new QRCode(qrContainer, {
-                    text: qrString, width: 128, height: 128, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H
-                });
+                new QRCode(qrContainer, { text: qrString, width: 128, height: 128, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
             }
         }, 50);
     }
 }
+// PARTE 10/12: Funzioni di salvataggio dati anagrafici, tesserino, F24 e cani
 function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
@@ -817,15 +698,12 @@ function deleteDog(index) {
         let dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
         dogsList.splice(index, 1);
         localStorage.setItem('dogs_list', JSON.stringify(dogsList));
-        if (dogsList.length > 0) {
-            localStorage.setItem('cane_data', JSON.stringify(dogsList[dogsList.length - 1]));
-        } else {
-            localStorage.removeItem('cane_data');
-        }
+        if (dogsList.length > 0) { localStorage.setItem('cane_data', JSON.stringify(dogsList[dogsList.length - 1])); }
+        else { localStorage.removeItem('cane_data'); }
         openModule('canidiary');
     }
 }
-
+// PARTE 11/12: Salvataggio polizze, raccolte, vendite, visualizzazione ricevuta conforme e export
 function savePolizza() {
     const compagnia = document.getElementById('pol-compagnia').value.trim();
     const numero = document.getElementById('pol-numero').value.trim();
@@ -895,16 +773,37 @@ function visualizzaRicevutaSalvata(index) {
     if(!v) return;
     let activeView = document.getElementById('active-module-view');
     activeView.querySelector('.module-body-content').innerHTML = `
-        <h2>RICEVUTA N. ${index + 1}</h2>
-        <div class="module-card" style="background:#fff; color:#000; padding:15px;">
-            <p><strong>Venditore:</strong> ${v.venditoreNome} (CF: ${v.venditoreCf})</p>
-            <p><strong>Acquirente:</strong> ${v.acquirente}</p>
-            <p><strong>Specie:</strong> ${v.specie} (${v.peso}g)</p>
-            <p><strong>Importo:</strong> € ${v.importo}</p>
-            <p><strong>Comune:</strong> ${v.comune}</p>
+        <h2>RICEVUTA VENDITA OCCASIONALE N. ${index + 1}</h2>
+        <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
+        <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
+            <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati del Venditore (Cessionario occasionale)</h3>
+            <p><strong>Nome e Cognome:</strong> ${v.venditoreNome}</p>
+            <p><strong>Codice Fiscale:</strong> ${v.venditoreCf}</p>
+            <p><strong>Tesserino Raccolta N.:</strong> ${v.venditoreTesserino} (${v.venditoreRegione})</p>
+            <p><strong>Versamento F24 ELIDE (100€):</strong> Protocollo N. ${v.f24}</p>
+            <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati dell'Acquirente</h3>
+            <p><strong>Acquirente / Ristorante:</strong> ${v.acquirente}</p>
+            <p><strong>P.IVA / Codice Fiscale:</strong> ${v.acquirenteCf || 'Non inserito'}</p>
+            <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dettagli Prodotto & Tracciabilità</h3>
+            <p><strong>Specie di Tartufo:</strong> ${v.specie}</p>
+            <p><strong>Peso:</strong> ${v.peso} grammi</p>
+            <p><strong>Comune di Raccolta / Località:</strong> ${v.comune}</p>
+            <p><strong>Codice Lotto / Tracciabilità:</strong> ${v.lotto}</p>
+            <p><strong>Data Vendita:</strong> ${v.data}</p>
+            <p style="font-size: 1.1rem; margin-top: 10px;"><strong>Importo Totale:</strong> € ${v.importo}</p>
+            <div style="margin-top: 30px; display: flex; justify-content: space-between; page-break-inside: avoid;">
+                <div style="width: 45%; text-align: center;">
+                    <div style="border-bottom: 1px solid #000; height: 40px; margin-bottom: 5px;"></div>
+                    <p style="font-size: 0.85rem;">Firma dell'Acquirente</p>
+                </div>
+                <div style="width: 45%; text-align: center;">
+                    <div style="border-bottom: 1px solid #000; height: 40px; margin-bottom: 5px;"></div>
+                    <p style="font-size: 0.85rem;">Firma del Venditore (Cessionario)</p>
+                </div>
+            </div>
         </div>
-        <button class="overlay-btn" style="background:#2563eb; margin-top:10px;" onclick="window.print()">🖨️ Stampa</button>
-        <button class="overlay-btn" style="background:#475569; margin-top:10px;" onclick="openModule('storico_ricevute')">← Torna all'Archivio</button>
+        <button class="overlay-btn" style="background:#2563eb; margin-top:15px; width:100%;" onclick="window.print()">🖨️ Stampa / Salva PDF Conforme</button>
+        <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="openModule('storico_ricevute')">← Torna all'Archivio</button>
     `;
 }
 
@@ -943,7 +842,7 @@ function importBackupData(event) {
     };
     reader.readAsText(file);
 }
-
+// PARTE 12/12: Utility di interfaccia, gestione drawer, centro mappa e cliniche veterinarie
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
