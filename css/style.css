@@ -68,7 +68,7 @@ html, body.no-scroll-body {
     position: relative;
     display: flex;
     flex-direction: column;
-    min-height: 0; /* Fondamentale per far funzionare i figli flex in altezza */
+    min-height: 300px; /* Aggiunto un'altezza minima di sicurezza */
     overflow: hidden;
 }
 
