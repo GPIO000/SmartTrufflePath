@@ -294,7 +294,7 @@ html, body.no-scroll-body {
 .mod-input {
     width: 100%;
     padding: 10px;
-    margin-top: 5px5px;
+    margin-top: 5px; /* Errore corretto qui */
     margin-bottom: 12px;
     background-color: #0f172a;
     border: 1px solid #475569;
