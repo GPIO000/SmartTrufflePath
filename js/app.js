@@ -664,6 +664,7 @@ function openModule(moduleName, editMode = false) {
         default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
     }
+}
     activeView.innerHTML = `
         <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
