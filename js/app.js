@@ -664,7 +664,6 @@ function openModule(moduleName, editMode = false) {
         default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
     }
-}
     activeView.innerHTML = `
         <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
@@ -674,26 +673,16 @@ function openModule(moduleName, editMode = false) {
     `;
     activeView.style.display = 'flex';
     if (moduleName === 'pagopa' && pData.id && !editMode) {
-        const attemptGeneration = (retries = 5) => {
+        setTimeout(() => {
             const qrContainer = document.getElementById('qrcode-container');
             if (qrContainer && typeof QRCode !== 'undefined') {
                 qrContainer.innerHTML = "";
                 let qrString = `TARTUFO-REGIONE|ID:${pData.id}|DATA:${pData.data}`;
-                new QRCode(qrContainer, { 
-                    text: qrString, 
-                    width: 128, 
-                    height: 128, 
-                    colorDark : "#000000", 
-                    colorLight : "#ffffff", 
-                    correctLevel : QRCode.CorrectLevel.H 
-                });
-            } else if (retries > 0) {
-                setTimeout(() => attemptGeneration(retries - 1), 100);
+                new QRCode(qrContainer, { text: qrString, width: 128, height: 128, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
             }
-        };
-        setTimeout(attemptGeneration, 100);
-        }
-
+        }, 50);
+    }
+}
 function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
@@ -1184,4 +1173,3 @@ function shareAppUrl() {
     if (navigator.share) { navigator.share({ title: 'Truffle App', url: appUrl }).catch(() => {}); }
     else { navigator.clipboard.writeText(appUrl).then(() => alert("Link copiato!")); }
 }
-
