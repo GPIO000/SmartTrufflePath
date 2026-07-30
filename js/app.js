@@ -1,3 +1,8 @@
+// All'inizio del file app.js, dopo const map = L.map(...)
+setTimeout(() => {
+    map.invalidateSize();
+}, 200);
+
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
