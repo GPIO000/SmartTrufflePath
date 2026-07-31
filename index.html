@@ -35,7 +35,7 @@
             <button onclick="centerOnUser()" class="overlay-btn" style="background: #475569;">📍 Centra GPS</button>
         </div>
 
-        <!-- Menu a scomparsa (Drawer) aggiornato -->
+        <!-- Menu a scomparsa (Drawer) corretto e aggiornato -->
         <div id="app-drawer" class="drawer">
             <div class="drawer-header">
                 <h2>Menu</h2>
@@ -44,6 +44,13 @@
             <div class="drawer-content">
                 
                 <div class="drawer-section">
+                    <h3>Mappa & Raccolta</h3>
+                    <button onclick="openModule('poilist')">📍 Elenco Punti & Tartufaie</button>
+                    <button onclick="openModule('registro_giornaliero')">📖 Registro Giornaliero Ritrovamenti</button>
+                </div>
+
+                <div class="drawer-section">
+                    <h3>Amministrazione & Contabilità</h3>
                     <button onclick="openModule('pagopa')">💳 Ricevuta PagoPA (Tassa)</button>
                     <button onclick="openModule('f24')">📄 F24 ELIDE (Imposta 100€)</button>
                     <button onclick="openModule('ricevute')">📝 Emetti Ricevuta Vendita</button>
