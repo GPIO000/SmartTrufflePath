@@ -1,3 +1,4 @@
+// Inizializzazione Mappa corretta (ordine invertito per evitare ReferenceError)
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
@@ -78,7 +79,6 @@ function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
         direction: directions[index]
     };
 }
-
 function updateCompass(currentLat, currentLng) {
     const compassText = document.getElementById('compass-box');
     if (!compassText) return;
@@ -118,7 +118,6 @@ function deleteCarPosition() {
         }
     } else { alert("Nessuna posizione dell'auto attualmente salvata."); }
 }
-
 function returnToCar() {
     if (carCoordinates) {
         targetNavigation = 'car';
@@ -157,7 +156,6 @@ function navigateToPoi(index) {
         alert(`🧭 Destinazione impostata sulla bussola: ${poiList[index].note}`);
     }
 }
-
 function sharePoi(index) {
     if (poiList[index]) {
         const p = poiList[index];
@@ -194,10 +192,6 @@ function openModule(moduleName, editMode = false) {
     }
     let contentHTML = '';
     switch(moduleName) {
-        case 'pagopa':
-        case 'f24':
-            renderModuloPagamento(moduleName);
-            return;
         case 'poilist':
             let poiHtml = '<h2>Elenco Punti & Tartufaie</h2><p>I tuoi punti di ricerca salvati con note:</p>';
             if (poiList.length === 0) {
@@ -257,53 +251,29 @@ function openModule(moduleName, editMode = false) {
             const pData = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
             if (pData.id && !editMode) {
                 contentHTML = `
-                    <h2>Ricevuta PagoPA & QR Code</h2>
+                    <h2>Ricevuta PagoPA & PDF</h2>
                     <div class="module-card" style="border-left: 4px solid #22c55e;">
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ Quietanza Attiva</p>
                         <p><strong>ID Transazione:</strong> ${pData.id}</p>
                         <p><strong>Data Pagamento:</strong> ${pData.data}</p>
-                        <div style="background:#fff; color:#000; padding:15px; text-align:center; margin:15px 0; border-radius:6px; display: flex; flex-direction: column; align-items: center;">
-                            <div id="qrcode-container" style="margin-bottom: 10px; display: inline-block;"></div>
-                            <strong style="font-size:0.85rem;">[ QR CODE ATTIVO PER CONTROLLO FORESTALE ]</strong><br>
-                            <span style="font-size:0.75rem; color:#555;">Verifica immediata tesserino in regola</span>
-                        </div>
-                        <div style="display:flex; gap:10px;">
+                        <p><strong>File PDF:</strong> ${pData.nomeFile || 'Caricato'}</p>
+                        <div style="display:flex; gap:10px; margin-top:15px;">
                             <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('pagopa', true)">✏️ Modifica</button>
                             <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('pagopa_data', 'pagopa')">🗑️ Elimina</button>
                         </div>
                     </div>`;
-                
-                // Avvia la generazione del QR in modo asincrono sicuro dopo il rendering del DOM
-                setTimeout(() => {
-                    const qrContainer = document.getElementById('qrcode-container');
-                    if (qrContainer) {
-                        qrContainer.innerHTML = ""; // Pulisci eventuali residui
-                        if (typeof QRCode !== 'undefined') {
-                            let qrString = `TARTUFO-REGIONE|ID:${pData.id}|DATA:${pData.data}`;
-                            new QRCode(qrContainer, { 
-                                text: qrString, 
-                                width: 180, 
-                                height: 180, 
-                                colorDark: "#000000", 
-                                colorLight: "#ffffff", 
-                                correctLevel: QRCode.CorrectLevel.H 
-                            });
-                        } else {
-                            qrContainer.innerHTML = "<span style='color:red; font-size:0.8rem;'>Libreria QR non caricata</span>";
-                        }
-                    }
-                }, 150);
-
             } else {
                 contentHTML = `
-                    <h2>Ricevuta PagoPA & QR Code</h2>
+                    <h2>Ricevuta PagoPA & PDF</h2>
                     <p>Quietanza versamento tassa regionale annuale.</p>
                     <div class="module-card">
                         <label>ID Transazione / Codice Avviso:</label>
                         <input type="text" id="p-id" class="mod-input" value="${pData.id || ''}" placeholder="Es. PPA-992837465">
                         <label>Data Pagamento:</label>
                         <input type="date" id="p-data" class="mod-input" value="${pData.data || ''}">
-                        <button class="overlay-btn" style="width:100%; margin-top:10px;" onclick="savePagoPA()">Salva Quietanza PagoPA</button>
+                        <label>Carica Ricevuta PDF:</label>
+                        <input type="file" id="p-file" accept="application/pdf" class="mod-input" style="padding:8px;">
+                        <button class="overlay-btn" style="width:100%; margin-top:10px;" onclick="savePagoPAWithFile()">Salva Quietanza e PDF</button>
                     </div>`;
             }
             break;
@@ -693,7 +663,6 @@ function openModule(moduleName, editMode = false) {
         default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
     }
-
     activeView.innerHTML = `
         <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
@@ -702,29 +671,6 @@ function openModule(moduleName, editMode = false) {
         <div class="module-body-content">${contentHTML}</div>
     `;
     activeView.style.display = 'flex';
-
-    if (moduleName === 'pagopa' && pData.id && !editMode) {
-        const generaQRCodeSafe = () => {
-            const qrContainer = document.getElementById('qrcode-container');
-            if (qrContainer) {
-                if (typeof QRCode !== 'undefined') {
-                    qrContainer.innerHTML = "";
-                    let qrString = `TARTUFO-REGIONE|ID:${pData.id}|DATA:${pData.data}`;
-                    new QRCode(qrContainer, { 
-                        text: qrString, 
-                        width: 180, 
-                        height: 180, 
-                        colorDark: "#000000", 
-                        colorLight: "#ffffff", 
-                        correctLevel: QRCode.CorrectLevel.H 
-                    });
-                } else {
-                    setTimeout(generaQRCodeSafe, 100);
-                }
-            }
-        };
-        setTimeout(generaQRCodeSafe, 50);
-    }
 }
 function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
@@ -750,14 +696,54 @@ function saveTesserino() {
     openModule('tesserino');
 }
 
-function savePagoPA() {
-    const data = { 
-        id: document.getElementById('p-id').value.trim(), 
-        data: document.getElementById('p-data').value 
-    };
-    localStorage.setItem('pagopa_data', JSON.stringify(data));
-    alert("Quietanza PagoPA salvata!");
-    openModule('pagopa');
+function savePagoPAWithFile() {
+    const idVal = document.getElementById('p-id').value.trim();
+    const dataVal = document.getElementById('p-data').value;
+    const fileInput = document.getElementById('p-file');
+    const file = fileInput ? fileInput.files[0] : null;
+
+    if (!idVal || !dataVal) {
+        alert("Inserisci ID transazione e data.");
+        return;
+    }
+
+    const pDataExisting = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
+
+    if (!file && !pDataExisting.contenutoBase64) {
+        alert("Si prega di selezionare il file PDF della ricevuta originale.");
+        return;
+    }
+
+    if (file) {
+        if (file.type !== 'application/pdf') {
+            alert("Il file deve essere in formato PDF.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = { 
+                id: idVal, 
+                data: dataVal,
+                nomeFile: file.name,
+                contenutoBase64: e.target.result
+            };
+            localStorage.setItem('pagopa_data', JSON.stringify(data));
+            alert("Quietanza PagoPA e PDF archiviati con successo!");
+            openModule('pagopa');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        const data = { 
+            id: idVal, 
+            data: dataVal,
+            nomeFile: pDataExisting.nomeFile,
+            contenutoBase64: pDataExisting.contenutoBase64
+        };
+        localStorage.setItem('pagopa_data', JSON.stringify(data));
+        alert("Quietanza PagoPA aggiornata!");
+        openModule('pagopa');
+    }
 }
 
 function saveF24() {
@@ -769,7 +755,6 @@ function saveF24() {
     alert("Protocollo F24 ELIDE salvato correttamente!");
     openModule('f24');
 }
-
 function saveNewCane() {
     const nome = document.getElementById('c-nome').value.trim();
     const razza = document.getElementById('c-razza').value.trim();
@@ -783,7 +768,6 @@ function saveNewCane() {
     alert("Cane aggiunto con successo!");
     openModule('canidiary');
 }
-
 function deleteDog(index) {
     if (confirm("Vuoi davvero rimuovere questo cane?")) {
         let dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
@@ -794,6 +778,7 @@ function deleteDog(index) {
         openModule('canidiary');
     }
 }
+
 function deleteCliente(index) {
     if (confirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
         let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
@@ -825,7 +810,6 @@ function deletePolizza(index) {
         openModule('polizze');
     }
 }
-
 function saveRaccoltaGiornaliera() {
     const data = document.getElementById('reg-data').value;
     const specie = document.getElementById('reg-specie').value;
@@ -985,6 +969,7 @@ function eliminaRicevutaConDoppiaConferma(index) {
         }
     }
 }
+
 function modificaRicevuta(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const v = storico[index];
@@ -1022,7 +1007,6 @@ function modificaRicevuta(index) {
         }
     }, 50);
 }
-
 function salvaModificaRicevuta(index) {
     let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
@@ -1056,7 +1040,6 @@ function salvaModificaRicevuta(index) {
     alert("Ricevuta aggiornata con successo!");
     openModule('storico_ricevute');
 }
-
 async function condividiRicevuta(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const v = storico[index];
@@ -1113,7 +1096,6 @@ async function condividiRicevuta(index) {
 function chiudiDettaglioRicevuta() {
     openModule('storico_ricevute');
 }
-
 function esportaDatiCSV() {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     if(storico.length === 0) { alert("Nessuna vendita registrata."); return; }
@@ -1149,6 +1131,7 @@ function importBackupData(event) {
     };
     reader.readAsText(file);
 }
+
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
@@ -1213,154 +1196,4 @@ function shareAppUrl() {
     const appUrl = window.location.href;
     if (navigator.share) { navigator.share({ title: 'Truffle App', url: appUrl }).catch(() => {}); }
     else { navigator.clipboard.writeText(appUrl).then(() => alert("Link copiato!")); }
-}
-// ==========================================
-// MODULO GESTIONE RICEVUTE PAGAMENTO (pagoPA / F24)
-// ==========================================
-
-// 1. Funzione principale per la generazione del PDF ufficiale
-function generaRicevutaPagamentoPDF(datiPagamento) {
-    if (!window.jspdf) {
-        alert("L libreria jsPDF non è ancora caricata. Ricarica la pagina.");
-        return;
-    }
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-    });
-
-    const primaryColor = [0, 102, 204]; // Blu istituzionale
-    const darkColor = [33, 37, 41];
-
-    // Intestazione grafica
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(0, 0, 210, 30, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("ATTESTAZIONE DI PAGAMENTO", 105, 18, { align: "center" });
-
-    // Tipo pagamento
-    doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-    doc.setFontSize(14);
-    doc.text(`Ricevuta Ufficiale - ${datiPagamento.tipo.toUpperCase()}`, 15, 45);
-
-    // Box Contenitore Dettagli
-    doc.setDrawColor(200, 200, 200);
-    doc.setFillColor(248, 249, 250);
-    doc.roundedRect(15, 52, 180, 80, 3, 3, 'FD');
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("Dettagli della Transazione:", 22, 65);
-
-    doc.setFont("helvetica", "normal");
-    let y = 75;
-    const lineHeight = 10;
-
-    const righeDati = [
-        ["Codice Riferimento (IUV / Modello):", datiPagamento.codice],
-        ["Ente Creditore / Beneficiario:", datiPagamento.ente || "Regione Competente"],
-        ["Causale:", datiPagamento.causale],
-        ["Data Pagamento:", datiPagamento.data],
-        ["Importo Versato:", `EUR ${datiPagamento.importo}`]
-    ];
-
-    righeDati.forEach(riga => {
-        doc.setFont("helvetica", "bold");
-        doc.text(riga[0], 22, y);
-        doc.setFont("helvetica", "normal");
-        doc.text(riga[1], 90, y);
-        y += lineHeight;
-    });
-
-    // Note legali e conformità
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text("Il presente documento attesta l'avvenuto pagamento elettronico conforme alle normative vigenti.", 15, 145);
-    doc.text("Conservare la presente ricevuta per eventuali controlli da parte degli organi di vigilanza.", 15, 151);
-
-    // Piè di pagina
-    doc.setFontSize(10);
-    doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-    doc.text("Documento generato digitalmente tramite Truffle App", 105, 275, { align: "center" });
-
-    // Download automatico del PDF
-    doc.save(`Ricevuta_${datiPagamento.tipo}_${datiPagamento.codice}.pdf`);
-}
-
-// 2. Funzione per salvare nel localStorage e generare la ricevuta
-function salvaEGeneraPDF(tipoPagamento, event) {
-    event.preventDefault();
-
-    const codice = document.getElementById(`input_codice_${tipoPagamento}`).value;
-    const ente = document.getElementById(`input_ente_${tipoPagamento}`).value;
-    const importo = document.getElementById(`input_importo_${tipoPagamento}`).value;
-    const data = document.getElementById(`input_data_${tipoPagamento}`).value;
-    const causale = document.getElementById(`input_causale_${tipoPagamento}`).value;
-
-    const datiPagamento = {
-        tipo: tipoPagamento,
-        codice: codice,
-        ente: ente,
-        importo: importo,
-        data: data,
-        causale: causale
-    };
-
-    // Salvataggio nello storage locale dell'app
-    let archivioPagamenti = JSON.parse(localStorage.getItem('truffle_pagamenti')) || [];
-    archivioPagamenti.push(datiPagamento);
-    localStorage.setItem('truffle_pagamenti', JSON.stringify(archivioPagamenti));
-
-    // Generazione ed export immediato del PDF
-    generaRicevutaPagamentoPDF(datiPagamento);
-    alert("Pagamento salvato e PDF generato con successo!");
-}
-
-// 3. Renderer delle viste dei moduli all'interno di openModule()
-// (Integra questa logica all'interno del tuo gestore di moduli esistente)
-function renderModuloPagamento(tipo) {
-    const container = document.getElementById('active-module-view');
-    if (!container) return;
-
-    const titolo = tipo === 'pagopa' ? 'Ricevuta PagoPA (Tassa Regionale)' : 'F24 ELIDE (Imposta Sostitutiva)';
-    const causaleDefault = tipo === 'pagopa' ? 'Tassa annuale raccolta tartufi' : 'Imposta erariale / regionale F24';
-
-    container.innerHTML = `
-        <div class="module-header" style="background:#1e293b; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
-            <h2>${titolo}</h2>
-            <button onclick="document.getElementById('active-module-view').innerHTML=''" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;">✕</button>
-        </div>
-        <div class="module-body" style="padding: 20px; background:#f8fafc; height: calc(100vh - 70px); overflow-y:auto;">
-            <form onsubmit="salvaEGeneraPDF('${tipo}', event)" style="background:white; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                <div style="margin-bottom: 15px;">
-                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Codice IUV / Modello F24:</label>
-                    <input type="text" id="input_codice_${tipo}" required placeholder="Es. IUV123456789 o Modello" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Ente / Beneficiario:</label>
-                    <input type="text" id="input_ente_${tipo}" required value="Regione Competente / Tesoreria" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Importo (€):</label>
-                    <input type="number" step="0.01" id="input_importo_${tipo}" required placeholder="50.00" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Data Pagamento:</label>
-                    <input type="date" id="input_data_${tipo}" required value="${new Date().toISOString().split('T')[0]}" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
-                </div>
-                <div style="margin-bottom: 20px;">
-                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Causale:</label>
-                    <input type="text" id="input_causale_${tipo}" required value="${causaleDefault}" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
-                </div>
-                <button type="submit" style="background:#0284c7; color:white; border:none; padding:12px 20px; font-size:16px; border-radius:4px; cursor:pointer; width:100%;">💾 Salva e Scarica PDF Ufficiale</button>
-            </form>
-        </div>
-    `;
-    container.style.display = 'block';
 }
