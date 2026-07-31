@@ -259,7 +259,7 @@ function openModule(moduleName, editMode = false) {
                         <p><strong>ID Transazione:</strong> ${pData.id}</p>
                         <p><strong>Data Pagamento:</strong> ${pData.data}</p>
                         <div style="background:#fff; color:#000; padding:15px; text-align:center; margin:15px 0; border-radius:6px; display: flex; flex-direction: column; align-items: center;">
-                            <div id="qrcode-container" style="margin-bottom: 10px;"></div>
+                            <div id="qrcode-container" style="margin-bottom: 10px; display: inline-block;"></div>
                             <strong style="font-size:0.85rem;">[ QR CODE ATTIVO PER CONTROLLO FORESTALE ]</strong><br>
                             <span style="font-size:0.75rem; color:#555;">Verifica immediata tesserino in regola</span>
                         </div>
@@ -268,6 +268,28 @@ function openModule(moduleName, editMode = false) {
                             <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('pagopa_data', 'pagopa')">🗑️ Elimina</button>
                         </div>
                     </div>`;
+                
+                // Avvia la generazione del QR in modo asincrono sicuro dopo il rendering del DOM
+                setTimeout(() => {
+                    const qrContainer = document.getElementById('qrcode-container');
+                    if (qrContainer) {
+                        qrContainer.innerHTML = ""; // Pulisci eventuali residui
+                        if (typeof QRCode !== 'undefined') {
+                            let qrString = `TARTUFO-REGIONE|ID:${pData.id}|DATA:${pData.data}`;
+                            new QRCode(qrContainer, { 
+                                text: qrString, 
+                                width: 180, 
+                                height: 180, 
+                                colorDark: "#000000", 
+                                colorLight: "#ffffff", 
+                                correctLevel: QRCode.CorrectLevel.H 
+                            });
+                        } else {
+                            qrContainer.innerHTML = "<span style='color:red; font-size:0.8rem;'>Libreria QR non caricata</span>";
+                        }
+                    }
+                }, 150);
+
             } else {
                 contentHTML = `
                     <h2>Ricevuta PagoPA & QR Code</h2>
