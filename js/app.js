@@ -383,6 +383,7 @@ function openModule(moduleName, editMode = false) {
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ F24 Registrato</p>
                         <p><strong>Anno Fiscale:</strong> ${fData.anno}</p>
                         <p><strong>Protocollo:</strong> ${fData.protocollo}</p>
+                        <p><strong>File PDF:</strong> ${fData.nomeFile || 'Nessun file caricato'}</p>
                         <div style="display:flex; gap:10px; margin-top:15px;">
                             <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('f24', true)">✏️ Modifica</button>
                             <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('f24_data', 'f24')">🗑️ Elimina</button>
@@ -398,7 +399,9 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="f-anno" class="mod-input" value="${fData.anno || '2026'}">
                         <label>Numero Protocollo F24 Quietanzato:</label>
                         <input type="text" id="f-protocollo" class="mod-input" value="${fData.protocollo || ''}" placeholder="Es. 000123456789">
-                        <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="saveF24()">Salva Protocollo F24</button>
+                        <label>Carica Ricevuta PDF:</label>
+                        <input type="file" id="f-file" accept="application/pdf" class="mod-input" style="padding:8px;">
+                        <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="saveF24WithFile()">Salva Protocollo e PDF F24</button>
                     </div>`;
             }
             break;
@@ -741,15 +744,54 @@ function savePagoPAWithFile() {
         openModule('pagopa');
     }
 }
+function saveF24WithFile() {
+    const annoVal = document.getElementById('f-anno').value.trim();
+    const protocolloVal = document.getElementById('f-protocollo').value.trim();
+    const fileInput = document.getElementById('f-file');
+    const file = fileInput ? fileInput.files[0] : null;
 
-function saveF24() {
-    const data = { 
-        anno: document.getElementById('f-anno').value.trim(), 
-        protocollo: document.getElementById('f-protocollo').value.trim() 
-    };
-    localStorage.setItem('f24_data', JSON.stringify(data));
-    alert("Protocollo F24 ELIDE salvato correttamente!");
-    openModule('f24');
+    if (!annoVal || !protocolloVal) {
+        alert("Inserisci l'anno fiscale e il numero di protocollo.");
+        return;
+    }
+
+    const fDataExisting = JSON.parse(localStorage.getItem('f24_data') || '{}');
+
+    if (!file && !fDataExisting.contenutoBase64) {
+        alert("Si prega di selezionare il file PDF della ricevuta F24 originale.");
+        return;
+    }
+
+    if (file) {
+        if (file.type !== 'application/pdf') {
+            alert("Il file deve essere in formato PDF.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = { 
+                anno: annoVal, 
+                protocollo: protocolloVal,
+                nomeFile: file.name,
+                contenutoBase64: e.target.result
+            };
+            localStorage.setItem('f24_data', JSON.stringify(data));
+            alert("F24 ELIDE e ricevuta PDF archiviati con successo!");
+            openModule('f24');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        const data = { 
+            anno: annoVal, 
+            protocollo: protocolloVal,
+            nomeFile: fDataExisting.nomeFile,
+            contenutoBase64: fDataExisting.contenutoBase64
+        };
+        localStorage.setItem('f24_data', JSON.stringify(data));
+        alert("F24 ELIDE aggiornato!");
+        openModule('f24');
+    }
 }
 function saveNewCane() {
     const nome = document.getElementById('c-nome').value.trim();
@@ -774,7 +816,6 @@ function deleteDog(index) {
         openModule('canidiary');
     }
 }
-
 function deleteCliente(index) {
     if (confirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
         let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
