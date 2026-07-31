@@ -680,7 +680,6 @@ function clearData(storageKey, moduleName) {
         openModule(moduleName);
     }
 }
-
 function saveTesserino() {
     const data = { 
         nome: document.getElementById('t-nome').value.trim(), 
