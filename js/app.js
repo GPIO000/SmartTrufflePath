@@ -13,7 +13,6 @@ let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
 let poiList = JSON.parse(localStorage.getItem('poi_list') || '[]');
 let poiMapMarkers = {}; 
 let targetNavigation = null;
-
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const lat = position.coords.latitude;
@@ -58,7 +57,6 @@ function renderAllPoiMarkers() {
         poiMapMarkers[index] = marker;
     });
 }
-
 function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
@@ -172,7 +170,6 @@ function deletePoi(index) {
         openModule('poilist');
     }
 }
-
 function triggerSOS() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -262,13 +259,24 @@ function openModule(moduleName, editMode = false) {
         case 'pagopa':
             const pData = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
             if (pData.id && !editMode) {
+                let filePreviewHTML = '';
+                if (pData.contenutoBase64) {
+                    if (pData.tipoFile && pData.tipoFile.startsWith('image/')) {
+                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${pData.nomeFile || 'Immagine'}</p><img src="${pData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Quietanza PagoPA"></div>`;
+                    } else {
+                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${pData.nomeFile || 'File PDF'}</p>`;
+                    }
+                } else {
+                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                }
+
                 contentHTML = `
                     <h2>Ricevuta PagoPA & PDF</h2>
                     <div class="module-card" style="border-left: 4px solid #22c55e;">
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ Quietanza Attiva</p>
                         <p><strong>ID Transazione:</strong> ${pData.id}</p>
                         <p><strong>Data Pagamento:</strong> ${pData.data}</p>
-                        <p><strong>File PDF:</strong> ${pData.nomeFile || 'Caricato'}</p>
+                        ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px;">
                             <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('pagopa', true)">✏️ Modifica</button>
                             <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('pagopa_data', 'pagopa')">🗑️ Elimina</button>
@@ -283,9 +291,9 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="p-id" class="mod-input" value="${pData.id || ''}" placeholder="Es. PPA-992837465">
                         <label>Data Pagamento:</label>
                         <input type="date" id="p-data" class="mod-input" value="${pData.data || ''}">
-                        <label>Carica Ricevuta PDF:</label>
-                        <input type="file" id="p-file" accept="application/pdf" class="mod-input" style="padding:8px;">
-                        <button class="overlay-btn" style="width:100%; margin-top:10px;" onclick="savePagoPAWithFile()">Salva Quietanza e PDF</button>
+                        <label>Carica Ricevuta (Immagine o PDF):</label>
+                        <input type="file" id="p-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
+                        <button class="overlay-btn" style="width:100%; margin-top:10px;" onclick="savePagoPAWithFile()">Salva Quietanza e File</button>
                     </div>`;
             }
             break;
@@ -296,6 +304,12 @@ function openModule(moduleName, editMode = false) {
                 <h2>Ricevuta di Vendita Occasionale</h2>
                 <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
                 <div class="module-card">
+                    <label>Regime Fiscale / Modalità di Assoggettamento:</label>
+                    <select id="r-regime" class="mod-input" onchange="toggleRegimeFiscaleFields()">
+                        <option value="sostitutiva">Imposta Sostitutiva (F24 ELIDE - 100€ annui, esonero ritenuta)</option>
+                        <option value="ritenuta">Ritenuta d'Acconto (23% operata dal sostituto d'imposta)</option>
+                    </select>
+
                     <label>Acquirente (Privato o Ristorante / Ragione Sociale):</label>
                     <input type="text" id="r-acquirente" class="mod-input" placeholder="Nome o Ristorante">
                     
@@ -326,8 +340,16 @@ function openModule(moduleName, editMode = false) {
                     <label>Prezzo al kg (€):</label>
                     <input type="number" id="prezzoKg" class="mod-input" placeholder="Es. 1500.00" oninput="calcolaTotale()">
 
-                    <label>Importo Totale (€):</label>
-                    <input type="number" id="importoTotale" class="mod-input" placeholder="Es. 200.00">
+                    <label>Importo Complessivo / Corrispettivo (€):</label>
+                    <input type="number" id="importoTotale" class="mod-input" placeholder="Es. 200.00" oninput="calcolaRitenutaAcconto()">
+
+                    <div id="container-ritenuta" style="display:none; background:#0f172a; padding:10px; border-radius:6px; margin:10px 0; border:1px solid #334155;">
+                        <p style="font-size:0.85rem; color:#38bdf8; margin-bottom:6px;"><b>Calcolo Ritenuta d'Acconto (23%):</b></p>
+                        <label>Importo Ritenuta d'Acconto (€):</label>
+                        <input type="number" id="r-importo-ritenuta" class="mod-input" readonly style="background:#1e293b; color:#22c55e; font-weight:bold;">
+                        <label style="margin-top:6px;">Netto a Pagare percepito dal raccoglitore (€):</label>
+                        <input type="number" id="r-netto-pagare" class="mod-input" readonly style="background:#1e293b; color:#22c55e; font-weight:bold;">
+                    </div>
 
                     <label>Comune di Raccolta / Località:</label>
                     <input type="text" id="r-comune" class="mod-input" placeholder="Comune di ritrovamento">
@@ -335,11 +357,14 @@ function openModule(moduleName, editMode = false) {
                     <label>Codice Lotto / Tracciabilità:</label>
                     <input type="text" id="r-lotto" class="mod-input" value="LOTTO-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-01" placeholder="Codice lotto">
                     
-                    <label>N. Protocollo F24 ELIDE collegato:</label>
-                    <input type="text" id="r-f24" class="mod-input" value="${defaultProtocollo}" placeholder="Protocollo F24">
+                    <div id="container-f24-field">
+                        <label>N. Protocollo F24 ELIDE collegato:</label>
+                        <input type="text" id="r-f24" class="mod-input" value="${defaultProtocollo}" placeholder="Protocollo F24">
+                    </div>
                     
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVenditaConPrezzoKg()">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
+            setTimeout(toggleRegimeFiscaleFields, 50);
             break;
         case 'clienti':
             const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
@@ -372,9 +397,10 @@ function openModule(moduleName, editMode = false) {
             } else {
                 storicoVendite.slice().reverse().forEach((item, index) => {
                     const originalIndex = storicoVendite.length - 1 - index;
+                    const regimeLabel = item.regime === 'ritenuta' ? '<span style="color:#38bdf8; font-size:0.75rem;">[Ritenuta d\'Acconto]</span>' : '<span style="color:#22c55e; font-size:0.75rem;">[Imposta Sostitutiva]</span>';
                     storicoHtml += `
                         <div class="module-card" style="margin-bottom:12px; border-left: 4px solid #3b82f6;">
-                            <strong style="color:#60a5fa; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${item.data}</strong>
+                            <strong style="color:#60a5fa; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${item.data} ${regimeLabel}</strong>
                             <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${item.acquirente}</b></p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${item.specie} (${item.peso}g)</p>
                             <p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">Importo: € ${item.importo}</p>
@@ -391,13 +417,24 @@ function openModule(moduleName, editMode = false) {
         case 'f24':
             const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
             if (fData.protocollo && !editMode) {
+                let filePreviewHTML = '';
+                if (fData.contenutoBase64) {
+                    if (fData.tipoFile && fData.tipoFile.startsWith('image/')) {
+                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${fData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
+                    } else {
+                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
+                    }
+                } else {
+                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                }
+
                 contentHTML = `
                     <h2>F24 ELIDE - Imposta Sostitutiva</h2>
                     <div class="module-card" style="border-left: 4px solid #22c55e;">
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ F24 Registrato</p>
                         <p><strong>Anno Fiscale:</strong> ${fData.anno}</p>
                         <p><strong>Protocollo:</strong> ${fData.protocollo}</p>
-                        <p><strong>File PDF:</strong> ${fData.nomeFile || 'Nessun file caricato'}</p>
+                        ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px;">
                             <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('f24', true)">✏️ Modifica</button>
                             <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('f24_data', 'f24')">🗑️ Elimina</button>
@@ -413,8 +450,8 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="f-anno" class="mod-input" value="${fData.anno || '2026'}">
                         <label>Numero Protocollo F24 Quietanzato:</label>
                         <input type="text" id="f-protocollo" class="mod-input" value="${fData.protocollo || ''}" placeholder="Es. 000123456789">
-                        <label>Carica Ricevuta PDF:</label>
-                        <input type="file" id="f-file" accept="application/pdf" class="mod-input" style="padding:8px;">
+                        <label>Carica Ricevuta (PDF o Immagine):</label>
+                        <input type="file" id="f-file" accept="application/pdf,image/*" class="mod-input" style="padding:8px;">
                         <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="saveF24WithFile()">Salva Protocollo e PDF F24</button>
                     </div>`;
             }
@@ -464,14 +501,15 @@ function openModule(moduleName, editMode = false) {
                     <input type="text" id="pol-compagnia" class="mod-input" placeholder="Es. Unipol / Generali">
                     <label>Numero Polizza:</label>
                     <input type="text" id="pol-numero" class="mod-input" placeholder="Es. IT-99887766">
-<label>Tipologia Copertura:</label>
-<select id="pol-tipo" class="mod-input">
-    <option value="🐕 RC Cane da Tartufo / Terzi">RC Cane da Tartufo / Terzi</option>
-    <option value="🌲 Polizza Completa Tartufaio (RCT + Infortuni)">Polizza Completa Tartufaio (RCT + Infortuni)</option>
-    <option value="🐾 Cane da Tartufo - Base (Morte e Vet)">Cane da Tartufo - Base (Morte e Vet)</option>
-    <option value="⭐ Cane da Tartufo - Super (Massimali Alti)">Cane da Tartufo - Super (Massimali Alti)</option>
-    <option value="⚖️ Tutela Legale Tartufaio">Tutela Legale Tartufaio</option>
-</select>
+                    <label>Tipologia Copertura:</label>
+                    <select id="pol-tipo" class="mod-input">
+                        <option value="🌐 Tutte le Coperture (RCT + Cane + Infortuni + Tutela Legale)">🌐 Tutte le Coperture (RCT + Cane + Infortuni + Tutela Legale)</option>
+                        <option value="🐕 RC Cane da Tartufo / Terzi">RC Cane da Tartufo / Terzi</option>
+                        <option value="🌲 Polizza Completa Tartufaio (RCT + Infortuni)">Polizza Completa Tartufaio (RCT + Infortuni)</option>
+                        <option value="🐾 Cane da Tartufo - Base (Morte e Vet)">Cane da Tartufo - Base (Morte e Vet)</option>
+                        <option value="⭐ Cane da Tartufo - Super (Massimali Alti)">Cane da Tartufo - Super (Massimali Alti)</option>
+                        <option value="⚖️ Tutela Legale Tartufaio">Tutela Legale Tartufaio</option>
+                    </select>
                     <label>Data Scadenza:</label>
                     <input type="date" id="pol-scadenza" class="mod-input">
                     <label>Note / Massimali / Contatto:</label>
@@ -482,13 +520,38 @@ function openModule(moduleName, editMode = false) {
                 polizzeHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna polizza registrata.</p></div>`;
             } else {
                 polizzeHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Le tue polizze attive:</h3>`;
+                
+                const oggi = new Date();
+                
                 polizzeList.forEach((pol, idx) => {
+                    let statoScadenza = '';
+                    let bordoColore = '#3b82f6';
+                    
+                    if (pol.scadenza) {
+                        const dataScad = new Date(pol.scadenza);
+                        const diffTime = dataScad - oggi;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        if (diffDays < 0) {
+                            statoScadenza = `<p style="font-size:0.8rem; color:#ef4444; font-weight:bold; margin: 2px 0;">⚠️ SCADUTA (${pol.scadenza})</p>`;
+                            bordoColore = '#ef4444';
+                        } else if (diffDays <= 30) {
+                            statoScadenza = `<p style="font-size:0.8rem; color:#f59e0b; font-weight:bold; margin: 2px 0;">⚠️ In scadenza tra ${diffDays} giorni (${pol.scadenza})</p>`;
+                            bordoColore = '#f59e0b';
+                        } else {
+                            statoScadenza = `<p style="font-size:0.8rem; color:#22c55e; margin: 2px 0;">⏳ Scadenza: ${pol.scadenza}</p>`;
+                            bordoColore = '#22c55e';
+                        }
+                    } else {
+                        statoScadenza = `<p style="font-size:0.8rem; color:#94a3b8; margin: 2px 0;">⏳ Scadenza: Non specificata</p>`;
+                    }
+
                     polizzeHtml += `
-                        <div class="module-card" style="border-left: 4px solid #3b82f6; margin-bottom: 12px;">
+                        <div class="module-card" style="border-left: 4px solid ${bordoColore}; margin-bottom: 12px;">
                             <strong style="color:#f8fafc; font-size:1rem;">🛡️ ${pol.compagnia}</strong>
                             <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">Tipo: ${pol.tipo}</p>
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📋 N. ${pol.numero}</p>
-                            <p style="font-size:0.8rem; color:#f59e0b; margin: 2px 0;">⏳ Scadenza: ${pol.scadenza || 'Non specificata'}</p>
+                            ${statoScadenza}
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${pol.note || 'Nessuna nota'}</p>
                             <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deletePolizza(${idx})">🗑️ Elimina</button>
                         </div>`;
@@ -759,26 +822,22 @@ function savePagoPAWithFile() {
     const pDataExisting = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
 
     if (!file && !pDataExisting.contenutoBase64) {
-        alert("Si prega di selezionare il file PDF della ricevuta originale.");
+        alert("Si prega di selezionare un file (PDF o Immagine) della ricevuta originale.");
         return;
     }
 
     if (file) {
-        if (file.type !== 'application/pdf') {
-            alert("Il file deve essere in formato PDF.");
-            return;
-        }
-
         const reader = new FileReader();
         reader.onload = function(e) {
             const data = { 
                 id: idVal, 
                 data: dataVal,
                 nomeFile: file.name,
+                tipoFile: file.type,
                 contenutoBase64: e.target.result
             };
             localStorage.setItem('pagopa_data', JSON.stringify(data));
-            alert("Quietanza PagoPA e PDF archiviati con successo!");
+            alert("Quietanza PagoPA e file archiviati con successo!");
             openModule('pagopa');
         };
         reader.readAsDataURL(file);
@@ -787,6 +846,7 @@ function savePagoPAWithFile() {
             id: idVal, 
             data: dataVal,
             nomeFile: pDataExisting.nomeFile,
+            tipoFile: pDataExisting.tipoFile,
             contenutoBase64: pDataExisting.contenutoBase64
         };
         localStorage.setItem('pagopa_data', JSON.stringify(data));
@@ -813,8 +873,8 @@ function saveF24WithFile() {
     }
 
     if (file) {
-        if (file.type !== 'application/pdf') {
-            alert("Il file deve essere in formato PDF.");
+        if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
+            alert("Il file deve essere in formato PDF o Immagine.");
             return;
         }
 
@@ -824,10 +884,11 @@ function saveF24WithFile() {
                 anno: annoVal, 
                 protocollo: protocolloVal,
                 nomeFile: file.name,
+                tipoFile: file.type,
                 contenutoBase64: e.target.result
             };
             localStorage.setItem('f24_data', JSON.stringify(data));
-            alert("F24 ELIDE e ricevuta PDF archiviati con successo!");
+            alert("F24 ELIDE e ricevuta archiviati con successo!");
             openModule('f24');
         };
         reader.readAsDataURL(file);
@@ -835,8 +896,9 @@ function saveF24WithFile() {
         const data = { 
             anno: annoVal, 
             protocollo: protocolloVal,
-            nomeFile: fDataExisting.nomeFile,
-            contenutoBase64: fDataExisting.contenutoBase64
+            nomeFile: fDataExisting.nomeFile || null,
+            tipoFile: fDataExisting.tipoFile || null,
+            contenutoBase64: fDataExisting.contenutoBase64 || null
         };
         localStorage.setItem('f24_data', JSON.stringify(data));
         alert("F24 ELIDE aggiornato!");
@@ -925,8 +987,40 @@ function calcolaTotale() {
     if (grammi > 0 && prezzoKg > 0) {
         const totale = (grammi / 1000) * prezzoKg;
         document.getElementById('importoTotale').value = totale.toFixed(2);
+        calcolaRitenutaAcconto();
     }
 }
+
+function toggleRegimeFiscaleFields() {
+    const regime = document.getElementById('r-regime').value;
+    const containerF24 = document.getElementById('container-f24-field');
+    const containerRitenuta = document.getElementById('container-ritenuta');
+    
+    if (regime === 'ritenuta') {
+        if (containerF24) containerF24.style.display = 'none';
+        if (containerRitenuta) containerRitenuta.style.display = 'block';
+        calcolaRitenutaAcconto();
+    } else {
+        if (containerF24) containerF24.style.display = 'block';
+        if (containerRitenuta) containerRitenuta.style.display = 'none';
+    }
+}
+
+function calcolaRitenutaAcconto() {
+    const regime = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
+    if (regime !== 'ritenuta') return;
+    
+    const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const ritenuta = importoTotale * 0.23;
+    const netto = importoTotale - ritenuta;
+    
+    const elRitenuta = document.getElementById('r-importo-ritenuta');
+    const elNetto = document.getElementById('r-netto-pagare');
+    
+    if (elRitenuta) elRitenuta.value = ritenuta.toFixed(2);
+    if (elNetto) elNetto.value = netto.toFixed(2);
+}
+
 function registraVenditaConPrezzoKg() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     if (!tData.nome || !tData.cf) {
@@ -935,14 +1029,15 @@ function registraVenditaConPrezzoKg() {
         return;
     }
 
+    let regimeScelto = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
-    const f24InputVal = document.getElementById('r-f24').value.trim();
+    const f24InputVal = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
     const protocolloF24 = f24InputVal || f24SavedData.protocollo;
 
-    if (!protocolloF24) {
-        alert("Attenzione: Impossibile procedere. Manca il numero di protocollo F24 ELIDE per l'imposta sostitutiva.");
-        openModule('f24');
-        return;
+    // CONTROLLO AUTOMATICO: SE L'F24 NON È PRESENTE, SI PROCEDE CON LA RITENUTA D'ACCONTO
+    if (regimeScelto === 'sostitutiva' && !protocolloF24) {
+        regimeScelto = 'ritenuta';
+        alert("ℹ️ Ricevuta F24 non rilevata:\nIl sistema ha automaticamente convertito la scelta sul regime a 'Ritenuta d'Acconto (23%)'.");
     }
 
     const acquirenteNome = document.getElementById('r-acquirente').value.trim();
@@ -970,8 +1065,10 @@ function registraVenditaConPrezzoKg() {
 
     const pesoGrammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
     const qualitaScelta = document.getElementById('r-qualita').value;
-    const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
     const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
+    
+    const importoRitenuta = regimeScelto === 'ritenuta' ? (importoTotale * 0.23).toFixed(2) : '0.00';
+    const importoNetto = regimeScelto === 'ritenuta' ? (importoTotale * 0.77).toFixed(2) : importoTotale.toFixed(2);
 
     let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const vendita = {
@@ -985,21 +1082,37 @@ function registraVenditaConPrezzoKg() {
         qualita: qualitaScelta,
         peso: pesoGrammi, 
         importo: importoTotale.toFixed(2),
+        regime: regimeScelto,
+        ritenuta: importoRitenuta,
+        netto: importoNetto,
         comune: document.getElementById('r-comune').value.trim(), 
         lotto: document.getElementById('r-lotto').value.trim(), 
-        f24: protocolloF24, 
+        f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto)', 
         data: new Date().toLocaleDateString()
     };
     
     storico.push(vendita);
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
-    alert("Ricevuta registrata e cliente salvato in rubrica con successo!");
+    alert("✔ Ricevuta registrata correttamente con il regime applicabile!");
     openModule('storico_ricevute');
 }
 function visualizzaRicevutaSalvata(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const v = storico[index];
     if(!v) return;
+
+    const isRitenuta = v.regime === 'ritenuta';
+    const dettagliFiscoHtml = isRitenuta ? `
+        <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (operata dal sostituto d'imposta)</p>
+        <p><strong>Compenso Lordo:</strong> € ${v.importo}</p>
+        <p><strong>Ritenuta d'Acconto (23%):</strong> € ${v.ritenuta || (v.importo * 0.23).toFixed(2)}</p>
+        <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Netto a Pagare / Percepito:</strong> € ${v.netto || (v.importo * 0.77).toFixed(2)}</p>
+    ` : `
+        <p><strong>Regime Fiscale:</strong> Imposta Sostitutiva (Legge 145/2018)</p>
+        <p><strong>Versamento F24 ELIDE (100€):</strong> Protocollo N. ${v.f24}</p>
+        <p style="font-size: 1.1rem; margin-top: 10px;"><strong>Importo Totale:</strong> € ${v.importo}</p>
+    `;
+
     let activeView = document.getElementById('active-module-view');
     activeView.querySelector('.module-body-content').innerHTML = `
         <h2>RICEVUTA VENDITA OCCASIONALE N. ${index + 1}</h2>
@@ -1007,13 +1120,13 @@ function visualizzaRicevutaSalvata(index) {
         <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
             <p style="font-size: 0.72rem; color: #444; text-align: justify; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 8px; line-height: 1.3;">
                 <strong>DICHIARAZIONE DI CESSIONE OCCASIONALE E TRACCIABILITÀ:</strong> 
-                Operazione effettuata nell'ambito della raccolta hobbistica/occasionale dei tartufi, esonerata dall'obbligo di emissione di fattura elettronica e di certificazione fiscale ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 e s.m.i., nonché in conformità alle disposizioni di cui alla Legge 30 dicembre 2018, n. 145 (commi 110-112). Si attesta inoltre la piena tracciabilità del prodotto alimentare ai sensi degli artt. 18 e 19 del Regolamento (CE) n. 178/2002 del Parlamento Europeo e del Consiglio, e del Regolamento di esecuzione (UE) n. 931/2011, garantendo il rispetto delle norme igienico-sanitarie e di sicurezza alimentare.
+                Operazione effettuata nell'ambito della raccolta hobbistica/occasionale dei tartufi, esonerata dall'obbligo di emissione di fattura elettronica e di certificazione fiscale ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 e s.m.i., nonché in conformità alle disposizioni di cui alla Legge 30 dicembre 2018, n. 145. Si attesta inoltre la piena tracciabilità del prodotto alimentare ai sensi degli artt. 18 e 19 del Regolamento (CE) n. 178/2002.
             </p>
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati del Venditore (Cessionario occasionale)</h3>
             <p><strong>Nome e Cognome:</strong> ${v.venditoreNome}</p>
             <p><strong>Codice Fiscale:</strong> ${v.venditoreCf}</p>
             <p><strong>Tesserino Raccolta N.:</strong> ${v.venditoreTesserino} (${v.venditoreRegione})</p>
-            <p><strong>Versamento F24 ELIDE (100€):</strong> Protocollo N. ${v.f24}</p>
+            ${dettagliFiscoHtml}
             <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati dell'Acquirente</h3>
             <p><strong>Acquirente / Ristorante:</strong> ${v.acquirente}</p>
             <p><strong>P.IVA / Codice Fiscale:</strong> ${v.acquirenteCf || 'Non inserito'}</p>
@@ -1024,7 +1137,6 @@ function visualizzaRicevutaSalvata(index) {
             <p><strong>Comune di Raccolta / Località:</strong> ${v.comune}</p>
             <p><strong>Codice Lotto / Tracciabilità:</strong> ${v.lotto}</p>
             <p><strong>Data Vendita:</strong> ${v.data}</p>
-            <p style="font-size: 1.1rem; margin-top: 10px;"><strong>Importo Totale:</strong> € ${v.importo}</p>
             <div style="margin-top: 30px; display: flex; justify-content: space-between; page-break-inside: avoid;">
                 <div style="width: 45%; text-align: center;">
                     <div style="border-bottom: 1px solid #000; height: 40px; margin-bottom: 5px;"></div>
@@ -1063,6 +1175,7 @@ function modificaRicevuta(index) {
     openModule('ricevute');
 
     setTimeout(() => {
+        const elRegime = document.getElementById('r-regime');
         const elAcquirente = document.getElementById('r-acquirente');
         const elCf = document.getElementById('r-cf-acquirente');
         const elSpecie = document.getElementById('r-specie');
@@ -1074,12 +1187,13 @@ function modificaRicevuta(index) {
         const elLotto = document.getElementById('r-lotto');
         const elF24 = document.getElementById('r-f24');
 
+        if (elRegime) { elRegime.value = v.regime || 'sostitutiva'; toggleRegimeFiscaleFields(); }
         if (elAcquirente) elAcquirente.value = v.acquirente || '';
         if (elCf) elCf.value = v.acquirenteCf || '';
         if (elSpecie) elSpecie.value = v.specie || '';
         if (elQualita) elQualita.value = v.qualita || 'Prima Scelta';
         if (elPeso) elPeso.value = v.peso || '';
-        if (elImporto) elImporto.value = v.importo || '';
+        if (elImporto) { elImporto.value = v.importo || ''; calcolaRitenutaAcconto(); }
         if (elComune) elComune.value = v.comune || '';
         if (elLotto) elLotto.value = v.lotto || '';
         if (elF24) elF24.value = v.f24 || '';
@@ -1095,6 +1209,7 @@ function modificaRicevuta(index) {
 function salvaModificaRicevuta(index) {
     let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
     
     const acquirenteNome = document.getElementById('r-acquirente').value.trim();
     if (!acquirenteNome) {
@@ -1102,7 +1217,17 @@ function salvaModificaRicevuta(index) {
         return;
     }
 
+    let regimeScelto = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
+    const f24InputVal = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
+    const protocolloF24 = f24InputVal || f24SavedData.protocollo;
+
+    if (regimeScelto === 'sostitutiva' && !protocolloF24) {
+        regimeScelto = 'ritenuta';
+    }
+
     const importoCorrente = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const importoRitenuta = regimeScelto === 'ritenuta' ? (importoCorrente * 0.23).toFixed(2) : '0.00';
+    const importoNetto = regimeScelto === 'ritenuta' ? (importoCorrente * 0.77).toFixed(2) : importoCorrente.toFixed(2);
 
     storico[index] = {
         venditoreNome: tData.nome || storico[index].venditoreNome, 
@@ -1115,9 +1240,12 @@ function salvaModificaRicevuta(index) {
         qualita: document.getElementById('r-qualita').value,
         peso: document.getElementById('pesoGrammi').value, 
         importo: importoCorrente.toFixed(2),
+        regime: regimeScelto,
+        ritenuta: importoRitenuta,
+        netto: importoNetto,
         comune: document.getElementById('r-comune').value.trim(), 
         lotto: document.getElementById('r-lotto').value.trim(), 
-        f24: document.getElementById('r-f24').value.trim(), 
+        f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto)', 
         data: storico[index].data
     };
 
@@ -1194,7 +1322,17 @@ function esportaDatiCSV() {
 }
 
 function esportaBackupJSON() {
-    const backupData = { tesserino: localStorage.getItem('tesserino_data'), storicoVendite: localStorage.getItem('storico_vendite'), poiList: localStorage.getItem('poi_list') };
+    const backupData = { 
+        tesserino: localStorage.getItem('tesserino_data'), 
+        pagopa: localStorage.getItem('pagopa_data'),
+        f24: localStorage.getItem('f24_data'),
+        storicoVendite: localStorage.getItem('storico_vendite'), 
+        poiList: localStorage.getItem('poi_list'),
+        dogsList: localStorage.getItem('dogs_list'),
+        polizzeList: localStorage.getItem('polizze_list'),
+        storicoRaccolta: localStorage.getItem('storico_raccolta_giornaliera'),
+        rubricaClienti: localStorage.getItem('rubrica_clienti')
+    };
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr); downloadAnchor.setAttribute("download", "backup_truffle.json");
@@ -1209,13 +1347,20 @@ function importBackupData(event) {
         try {
             const data = JSON.parse(e.target.result);
             if(data.tesserino) localStorage.setItem('tesserino_data', data.tesserino);
+            if(data.pagopa) localStorage.setItem('pagopa_data', data.pagopa);
+            if(data.f24) localStorage.setItem('f24_data', data.f24);
             if(data.storicoVendite) localStorage.setItem('storico_vendite', data.storicoVendite);
             if(data.poiList) localStorage.setItem('poi_list', data.poiList);
-            alert("Backup ripristinato!"); location.reload();
-        } catch(err) { alert("Errore file backup."); }
+            if(data.dogsList) localStorage.setItem('dogs_list', data.dogsList);
+            if(data.polizzeList) localStorage.setItem('polizze_list', data.polizzeList);
+            if(data.storicoRaccolta) localStorage.setItem('storico_raccolta_giornaliera', data.storicoRaccolta);
+            if(data.rubricaClienti) localStorage.setItem('rubrica_clienti', data.rubricaClienti);
+            alert("Backup ripristinato con successo!"); location.reload();
+        } catch(err) { alert("Errore durante la lettura del file di backup."); }
     };
     reader.readAsText(file);
 }
+
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
