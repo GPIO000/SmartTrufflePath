@@ -194,6 +194,10 @@ function openModule(moduleName, editMode = false) {
     }
     let contentHTML = '';
     switch(moduleName) {
+        case 'pagopa':
+        case 'f24':
+            renderModuloPagamento(moduleName);
+            return;
         case 'poilist':
             let poiHtml = '<h2>Elenco Punti & Tartufaie</h2><p>I tuoi punti di ricerca salvati con note:</p>';
             if (poiList.length === 0) {
@@ -1209,4 +1213,154 @@ function shareAppUrl() {
     const appUrl = window.location.href;
     if (navigator.share) { navigator.share({ title: 'Truffle App', url: appUrl }).catch(() => {}); }
     else { navigator.clipboard.writeText(appUrl).then(() => alert("Link copiato!")); }
+}
+// ==========================================
+// MODULO GESTIONE RICEVUTE PAGAMENTO (pagoPA / F24)
+// ==========================================
+
+// 1. Funzione principale per la generazione del PDF ufficiale
+function generaRicevutaPagamentoPDF(datiPagamento) {
+    if (!window.jspdf) {
+        alert("L libreria jsPDF non è ancora caricata. Ricarica la pagina.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+    });
+
+    const primaryColor = [0, 102, 204]; // Blu istituzionale
+    const darkColor = [33, 37, 41];
+
+    // Intestazione grafica
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, 210, 30, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("ATTESTAZIONE DI PAGAMENTO", 105, 18, { align: "center" });
+
+    // Tipo pagamento
+    doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
+    doc.setFontSize(14);
+    doc.text(`Ricevuta Ufficiale - ${datiPagamento.tipo.toUpperCase()}`, 15, 45);
+
+    // Box Contenitore Dettagli
+    doc.setDrawColor(200, 200, 200);
+    doc.setFillColor(248, 249, 250);
+    doc.roundedRect(15, 52, 180, 80, 3, 3, 'FD');
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Dettagli della Transazione:", 22, 65);
+
+    doc.setFont("helvetica", "normal");
+    let y = 75;
+    const lineHeight = 10;
+
+    const righeDati = [
+        ["Codice Riferimento (IUV / Modello):", datiPagamento.codice],
+        ["Ente Creditore / Beneficiario:", datiPagamento.ente || "Regione Competente"],
+        ["Causale:", datiPagamento.causale],
+        ["Data Pagamento:", datiPagamento.data],
+        ["Importo Versato:", `EUR ${datiPagamento.importo}`]
+    ];
+
+    righeDati.forEach(riga => {
+        doc.setFont("helvetica", "bold");
+        doc.text(riga[0], 22, y);
+        doc.setFont("helvetica", "normal");
+        doc.text(riga[1], 90, y);
+        y += lineHeight;
+    });
+
+    // Note legali e conformità
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Il presente documento attesta l'avvenuto pagamento elettronico conforme alle normative vigenti.", 15, 145);
+    doc.text("Conservare la presente ricevuta per eventuali controlli da parte degli organi di vigilanza.", 15, 151);
+
+    // Piè di pagina
+    doc.setFontSize(10);
+    doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
+    doc.text("Documento generato digitalmente tramite Truffle App", 105, 275, { align: "center" });
+
+    // Download automatico del PDF
+    doc.save(`Ricevuta_${datiPagamento.tipo}_${datiPagamento.codice}.pdf`);
+}
+
+// 2. Funzione per salvare nel localStorage e generare la ricevuta
+function salvaEGeneraPDF(tipoPagamento, event) {
+    event.preventDefault();
+
+    const codice = document.getElementById(`input_codice_${tipoPagamento}`).value;
+    const ente = document.getElementById(`input_ente_${tipoPagamento}`).value;
+    const importo = document.getElementById(`input_importo_${tipoPagamento}`).value;
+    const data = document.getElementById(`input_data_${tipoPagamento}`).value;
+    const causale = document.getElementById(`input_causale_${tipoPagamento}`).value;
+
+    const datiPagamento = {
+        tipo: tipoPagamento,
+        codice: codice,
+        ente: ente,
+        importo: importo,
+        data: data,
+        causale: causale
+    };
+
+    // Salvataggio nello storage locale dell'app
+    let archivioPagamenti = JSON.parse(localStorage.getItem('truffle_pagamenti')) || [];
+    archivioPagamenti.push(datiPagamento);
+    localStorage.setItem('truffle_pagamenti', JSON.stringify(archivioPagamenti));
+
+    // Generazione ed export immediato del PDF
+    generaRicevutaPagamentoPDF(datiPagamento);
+    alert("Pagamento salvato e PDF generato con successo!");
+}
+
+// 3. Renderer delle viste dei moduli all'interno di openModule()
+// (Integra questa logica all'interno del tuo gestore di moduli esistente)
+function renderModuloPagamento(tipo) {
+    const container = document.getElementById('active-module-view');
+    if (!container) return;
+
+    const titolo = tipo === 'pagopa' ? 'Ricevuta PagoPA (Tassa Regionale)' : 'F24 ELIDE (Imposta Sostitutiva)';
+    const causaleDefault = tipo === 'pagopa' ? 'Tassa annuale raccolta tartufi' : 'Imposta erariale / regionale F24';
+
+    container.innerHTML = `
+        <div class="module-header" style="background:#1e293b; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
+            <h2>${titolo}</h2>
+            <button onclick="document.getElementById('active-module-view').innerHTML=''" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;">✕</button>
+        </div>
+        <div class="module-body" style="padding: 20px; background:#f8fafc; height: calc(100vh - 70px); overflow-y:auto;">
+            <form onsubmit="salvaEGeneraPDF('${tipo}', event)" style="background:white; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Codice IUV / Modello F24:</label>
+                    <input type="text" id="input_codice_${tipo}" required placeholder="Es. IUV123456789 o Modello" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Ente / Beneficiario:</label>
+                    <input type="text" id="input_ente_${tipo}" required value="Regione Competente / Tesoreria" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Importo (€):</label>
+                    <input type="number" step="0.01" id="input_importo_${tipo}" required placeholder="50.00" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Data Pagamento:</label>
+                    <input type="date" id="input_data_${tipo}" required value="${new Date().toISOString().split('T')[0]}" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Causale:</label>
+                    <input type="text" id="input_causale_${tipo}" required value="${causaleDefault}" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <button type="submit" style="background:#0284c7; color:white; border:none; padding:12px 20px; font-size:16px; border-radius:4px; cursor:pointer; width:100%;">💾 Salva e Scarica PDF Ufficiale</button>
+            </form>
+        </div>
+    `;
+    container.style.display = 'block';
 }
