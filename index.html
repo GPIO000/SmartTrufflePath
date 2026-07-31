@@ -35,27 +35,39 @@
             <button onclick="centerOnUser()" class="overlay-btn" style="background: #475569;">📍 Centra GPS</button>
         </div>
 
-        <!-- Menu a scomparsa (Drawer) -->
+        <!-- Menu a scomparsa (Drawer) aggiornato -->
         <div id="app-drawer" class="drawer">
-            <h2>Menu Principale</h2>
-            <ul>
-                <li><a href="#" onclick="openModule('tesserino')">📋 Anagrafica & Tesserino</a></li>
-                <li><a href="#" onclick="openModule('pagopa')">💳 Ricevuta PagoPA</a></li>
-                <li><a href="#" onclick="openModule('ricevute')">📄 Emissione Ricevuta</a></li>
-                <li><a href="#" onclick="openModule('storico_ricevute')">📁 Archivio Ricevute</a></li>
-                <li><a href="#" onclick="openModule('clienti')">👤 Rubrica Clienti</a></li>
-                <li><a href="#" onclick="openModule('poilist')">📍 Elenco Punti & Tartufaie</a></li>
-                <li><a href="#" onclick="openModule('registro_giornaliero')">📊 Registro Giornaliero</a></li>
-                <li><a href="#" onclick="openModule('canidiary')">🐕 Profilo Cani</a></li>
-                <li><a href="#" onclick="openModule('vet')">🩺 Libretto Sanitario</a></li>
-                <li><a href="#" onclick="openModule('f24')">📄 F24 ELIDE</a></li>
-                <li><a href="#" onclick="openModule('bilancio')">💰 Contabilità & Bilancio</a></li>
-                <li><a href="#" onclick="openModule('export')">💾 Backup & Export</a></li>
-                <li><a href="#" onclick="openModule('vet-emergency')">🚨 Pronto Soccorso Vet</a></li>
-                <li><a href="#" onclick="openModule('polizze')">🛡️ Polizze Assicurative</a></li>
-                <li><a href="tel:113" style="color: #60a5fa;">👮 Chiama Polizia (113)</a></li>
-                <li><a href="#" onclick="triggerSOS()" style="color: #ef4444;">🚨 SOS Emergenza</a></li>
-            </ul>
+            <div class="drawer-header">
+                <h2>Menu</h2>
+                <button onclick="toggleDrawer()" style="background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer;">✕</button>
+            </div>
+            <div class="drawer-content">
+                
+                <div class="drawer-section">
+                    <button onclick="openModule('pagopa')">💳 Ricevuta PagoPA (Tassa)</button>
+                    <button onclick="openModule('f24')">📄 F24 ELIDE (Imposta 100€)</button>
+                    <button onclick="openModule('ricevute')">📝 Emetti Ricevuta Vendita</button>
+                    <button onclick="openModule('clienti')">👥 Rubrica Clienti</button>
+                    <button onclick="openModule('storico_ricevute')">📁 Archivio Ricevute</button>
+                    <button onclick="openModule('bilancio')">📊 Bilancio & Contabilità</button>
+                </div>
+
+                <div class="drawer-section">
+                    <h3>Cane & Sicurezza</h3>
+                    <button onclick="openModule('canidiary')">🐕 Profilo Cane</button>
+                    <button onclick="openModule('vet')">💉 Libretto Sanitario</button>
+                    <button onclick="openModule('vet-emergency')">⚠️ Pronto Soccorso H24</button>
+                    <button onclick="openModule('polizze')">🛡️ Polizze & Assicurazioni</button>
+                    <button onclick="window.location.href='tel:112'">📞 Chiama 112</button>
+                </div>
+
+                <div class="drawer-section">
+                    <h3>Sistema</h3>
+                    <button onclick="openModule('export')">💾 Backup & Report CSV</button>
+                    <button onclick="shareAppUrl()">📦 Condividi App</button>
+                </div>
+
+            </div>
         </div>
         <div id="drawer-backdrop" class="backdrop" onclick="toggleDrawer()"></div>
 
