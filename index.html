@@ -26,13 +26,13 @@
         <!-- Contenitore Mappa -->
         <div id="map" style="width: 100%; height: 100%;"></div>
 
-        <!-- Bottoni di controllo rapidi sulla mappa -->
-        <div style="position: absolute; bottom: 30px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px;">
-            <button onclick="toggleDrawer()" class="overlay-btn" style="background: #1e293b;">☰ Menu</button>
-            <button onclick="saveCarPosition()" class="overlay-btn" style="background: #2563eb;">🚗 Auto</button>
-            <button onclick="returnToCar()" class="overlay-btn" style="background: #16a34a;">🧭 Vai all'Auto</button>
-            <button onclick="savePoiPosition()" class="overlay-btn" style="background: #d97706;">📍 Punto</button>
-            <button onclick="centerOnUser()" class="overlay-btn" style="background: #475569;">📍 Centra GPS</button>
+        <!-- Bottoni di controllo rapidi sulla mappa (Posizionati in sicurezza) -->
+        <div style="position: absolute; bottom: 80px; right: 15px; z-index: 1000; display: flex; flex-direction: column; gap: 6px;">
+            <button onclick="toggleDrawer()" class="overlay-btn" style="background: #1e293b; padding: 8px 14px; border-radius: 6px; color: white; border: none; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.4); font-size: 0.9rem;">☰ Menu</button>
+            <button onclick="saveCarPosition()" class="overlay-btn" style="background: #2563eb; padding: 8px 14px; border-radius: 6px; color: white; border: none; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.4); font-size: 0.9rem;">🚗 Auto</button>
+            <button onclick="returnToCar()" class="overlay-btn" style="background: #16a34a; padding: 8px 14px; border-radius: 6px; color: white; border: none; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.4); font-size: 0.9rem;">🧭 Vai all'Auto</button>
+            <button onclick="savePoiPosition()" class="overlay-btn" style="background: #d97706; padding: 8px 14px; border-radius: 6px; color: white; border: none; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.4); font-size: 0.9rem;">📍 Punto</button>
+            <button onclick="centerOnUser()" class="overlay-btn" style="background: #475569; padding: 8px 14px; border-radius: 6px; color: white; border: none; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.4); font-size: 0.9rem;">📍 Centra GPS</button>
         </div>
 
         <!-- Menu a scomparsa (Drawer) corretto e aggiornato -->
@@ -51,7 +51,7 @@
 
                 <div class="drawer-section">
                     <h3>Amministrazione & Contabilità</h3>
-                    <!-- Pulsante Tesserino aggiunto correttamente -->
+                    <!-- Pulsante Tesserino incluso -->
                     <button onclick="openModule('tesserino')">🪪 Anagrafica & Tesserino</button>
                     <button onclick="openModule('pagopa')">💳 Ricevuta PagoPA (Tassa)</button>
                     <button onclick="openModule('f24')">📄 F24 ELIDE (Imposta 100€)</button>
