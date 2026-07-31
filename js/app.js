@@ -1,4 +1,3 @@
-// Inizializzazione Mappa corretta (ordine invertito per evitare ReferenceError)
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
@@ -13,6 +12,7 @@ let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
 let poiList = JSON.parse(localStorage.getItem('poi_list') || '[]');
 let poiMapMarkers = {}; 
 let targetNavigation = null;
+
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const lat = position.coords.latitude;
@@ -78,6 +78,7 @@ function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
         direction: directions[index]
     };
 }
+
 function updateCompass(currentLat, currentLng) {
     const compassText = document.getElementById('compass-box');
     if (!compassText) return;
@@ -105,6 +106,7 @@ function saveCarPosition() {
         alert("🚗 Posizione dell'auto salvata con successo!");
     } else { alert("Segnale GPS non ancora disponibile per marcare l'auto."); }
 }
+
 function deleteCarPosition() {
     if (carCoordinates) {
         if (confirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
@@ -145,6 +147,7 @@ function savePoiPosition() {
         alert("📍 Punto salvato con successo e impostato sulla bussola!");
     } else { alert("Segnale GPS non ancora disponibile per marcare il punto."); }
 }
+
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -303,7 +306,7 @@ function openModule(moduleName, editMode = false) {
                         <option value="Tuber macrosporum Vitt. (Nero Liscio)">Tuber macrosporum Vitt. (Nero Liscio)</option>
                         <option value="Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)">Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)</option>
                     </select>
-                 <label>Classificazione Qualità:</label>
+                    <label>Classificazione Qualità:</label>
                     <select id="r-qualita" class="mod-input">
                         <option value="Prima Scelta">Prima Scelta</option>
                         <option value="Seconda Scelta">Seconda Scelta</option>
@@ -664,6 +667,7 @@ function openModule(moduleName, editMode = false) {
         default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
     }
+
     activeView.innerHTML = `
         <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
@@ -672,15 +676,28 @@ function openModule(moduleName, editMode = false) {
         <div class="module-body-content">${contentHTML}</div>
     `;
     activeView.style.display = 'flex';
+
     if (moduleName === 'pagopa' && pData.id && !editMode) {
-        setTimeout(() => {
+        const generaQRCodeSafe = () => {
             const qrContainer = document.getElementById('qrcode-container');
-            if (qrContainer && typeof QRCode !== 'undefined') {
-                qrContainer.innerHTML = "";
-                let qrString = `TARTUFO-REGIONE|ID:${pData.id}|DATA:${pData.data}`;
-                new QRCode(qrContainer, { text: qrString, width: 128, height: 128, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
+            if (qrContainer) {
+                if (typeof QRCode !== 'undefined') {
+                    qrContainer.innerHTML = "";
+                    let qrString = `TARTUFO-REGIONE|ID:${pData.id}|DATA:${pData.data}`;
+                    new QRCode(qrContainer, { 
+                        text: qrString, 
+                        width: 180, 
+                        height: 180, 
+                        colorDark: "#000000", 
+                        colorLight: "#ffffff", 
+                        correctLevel: QRCode.CorrectLevel.H 
+                    });
+                } else {
+                    setTimeout(generaQRCodeSafe, 100);
+                }
             }
-        }, 50);
+        };
+        setTimeout(generaQRCodeSafe, 50);
     }
 }
 function closeActiveModule() {
@@ -726,6 +743,7 @@ function saveF24() {
     alert("Protocollo F24 ELIDE salvato correttamente!");
     openModule('f24');
 }
+
 function saveNewCane() {
     const nome = document.getElementById('c-nome').value.trim();
     const razza = document.getElementById('c-razza').value.trim();
@@ -750,7 +768,6 @@ function deleteDog(index) {
         openModule('canidiary');
     }
 }
-
 function deleteCliente(index) {
     if (confirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
         let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
@@ -782,6 +799,7 @@ function deletePolizza(index) {
         openModule('polizze');
     }
 }
+
 function saveRaccoltaGiornaliera() {
     const data = document.getElementById('reg-data').value;
     const specie = document.getElementById('reg-specie').value;
@@ -803,7 +821,6 @@ function deleteRaccoltaGiornaliera(index) {
         openModule('registro_giornaliero');
     }
 }
-
 function calcolaTotale() {
     const grammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
     const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
@@ -942,7 +959,6 @@ function eliminaRicevutaConDoppiaConferma(index) {
         }
     }
 }
-
 function modificaRicevuta(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const v = storico[index];
@@ -1107,7 +1123,6 @@ function importBackupData(event) {
     };
     reader.readAsText(file);
 }
-
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
