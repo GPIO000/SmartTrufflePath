@@ -1,4 +1,4 @@
-const CACHE_NAME = 'truffle-mobile-first-v14';
+const CACHE_NAME = 'truffle-mobile-first-v15';
 const ASSETS = [
   './',
   './index.html',
