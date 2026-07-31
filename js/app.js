@@ -464,13 +464,14 @@ function openModule(moduleName, editMode = false) {
                     <input type="text" id="pol-compagnia" class="mod-input" placeholder="Es. Unipol / Generali">
                     <label>Numero Polizza:</label>
                     <input type="text" id="pol-numero" class="mod-input" placeholder="Es. IT-99887766">
-                    <label>Tipologia Copertura:</label>
-                    <select id="pol-tipo" class="mod-input">
-                        <option value="🐕 RC Cane / Danni a Terzi">RC Cane / Danni a Terzi</option>
-                        <option value="🌲 Responsabilità Civile Raccolta Tartufi">RC Raccolta Tartufi</option>
-                        <option value="🏥 Infortuni Personali">Infortuni Personali</option>
-                        <option value="⚖️ Tutela Legale">Tutela Legale</option>
-                    </select>
+<label>Tipologia Copertura:</label>
+<select id="pol-tipo" class="mod-input">
+    <option value="🐕 RC Cane da Tartufo / Terzi">RC Cane da Tartufo / Terzi</option>
+    <option value="🌲 Polizza Completa Tartufaio (RCT + Infortuni)">Polizza Completa Tartufaio (RCT + Infortuni)</option>
+    <option value="🐾 Cane da Tartufo - Base (Morte e Vet)">Cane da Tartufo - Base (Morte e Vet)</option>
+    <option value="⭐ Cane da Tartufo - Super (Massimali Alti)">Cane da Tartufo - Super (Massimali Alti)</option>
+    <option value="⚖️ Tutela Legale Tartufaio">Tutela Legale Tartufaio</option>
+</select>
                     <label>Data Scadenza:</label>
                     <input type="date" id="pol-scadenza" class="mod-input">
                     <label>Note / Massimali / Contatto:</label>
