@@ -214,6 +214,17 @@ function openModule(moduleName, editMode = false) {
         case 'tesserino':
             const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
             if (tData.nome && !editMode) {
+                let filePreviewHTML = '';
+                if (tData.contenutoBase64) {
+                    if (tData.tipoFile && tData.tipoFile.startsWith('image/')) {
+                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${tData.nomeFile || 'Immagine'}</p><img src="${tData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Tesserino"></div>`;
+                    } else {
+                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${tData.nomeFile || 'File PDF'}</p>`;
+                    }
+                } else {
+                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                }
+
                 contentHTML = `
                     <h2>Anagrafica & Tesserino Digitale</h2>
                     <p><strong>Normativa:</strong> Legge 145/2018</p>
@@ -223,6 +234,7 @@ function openModule(moduleName, editMode = false) {
                         <p><strong>Codice Fiscale:</strong> ${tData.cf}</p>
                         <p><strong>Regione / Prov:</strong> ${tData.regione}</p>
                         <p><strong>N. Tesserino:</strong> ${tData.num}</p>
+                        ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px;">
                             <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('tesserino', true)">✏️ Modifica</button>
                             <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('tesserino_data', 'tesserino')">🗑️ Elimina</button>
@@ -241,6 +253,8 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="t-regione" class="mod-input" value="${tData.regione || ''}" placeholder="Es. Molise / Campobasso">
                         <label>Numero Tesserino / Autorizzazione:</label>
                         <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Es. TR-2026-001">
+                        <label>Carica Tesserino (Immagine o PDF):</label>
+                        <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
                         <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="saveTesserino()">Salva Dati Tesserino</button>
                     </div>`;
             }
@@ -684,17 +698,52 @@ function clearData(storageKey, moduleName) {
     }
 }
 function saveTesserino() {
-    const data = { 
-        nome: document.getElementById('t-nome').value.trim(), 
-        cf: document.getElementById('t-cf').value.trim().toUpperCase(), 
-        regione: document.getElementById('t-regione').value.trim(), 
-        num: document.getElementById('t-num').value.trim() 
-    };
-    localStorage.setItem('tesserino_data', JSON.stringify(data));
-    alert("Dati tesserino salvati con successo!");
-    openModule('tesserino');
-}
+    const nomeVal = document.getElementById('t-nome').value.trim();
+    const cfVal = document.getElementById('t-cf').value.trim().toUpperCase();
+    const regioneVal = document.getElementById('t-regione').value.trim();
+    const numVal = document.getElementById('t-num').value.trim();
+    const fileInput = document.getElementById('t-file');
+    const file = fileInput ? fileInput.files[0] : null;
 
+    if (!nomeVal || !cfVal) {
+        alert("Inserisci almeno Nome e Codice Fiscale.");
+        return;
+    }
+
+    const tDataExisting = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = { 
+                nome: nomeVal, 
+                cf: cfVal, 
+                regione: regioneVal, 
+                num: numVal,
+                nomeFile: file.name,
+                tipoFile: file.type,
+                contenutoBase64: e.target.result
+            };
+            localStorage.setItem('tesserino_data', JSON.stringify(data));
+            alert("Dati tesserino e documento salvati con successo!");
+            openModule('tesserino');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        const data = { 
+            nome: nomeVal, 
+            cf: cfVal, 
+            regione: regioneVal, 
+            num: numVal,
+            nomeFile: tDataExisting.nomeFile || null,
+            tipoFile: tDataExisting.tipoFile || null,
+            contenutoBase64: tDataExisting.contenutoBase64 || null
+        };
+        localStorage.setItem('tesserino_data', JSON.stringify(data));
+        alert("Dati tesserino salvati con successo!");
+        openModule('tesserino');
+    }
+}
 function savePagoPAWithFile() {
     const idVal = document.getElementById('p-id').value.trim();
     const dataVal = document.getElementById('p-data').value;
