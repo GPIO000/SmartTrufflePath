@@ -125,7 +125,6 @@ function returnToCar() {
         if (carMarker) carMarker.openPopup();
     } else { alert("Nessun parcheggio salvato. Clicca prima su 'Auto'."); }
 }
-
 function savePoiPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -838,7 +837,6 @@ function calcolaTotale() {
         document.getElementById('importoTotale').value = totale.toFixed(2);
     }
 }
-
 function registraVenditaConPrezzoKg() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     if (!tData.nome || !tData.cf) {
@@ -953,7 +951,6 @@ function visualizzaRicevutaSalvata(index) {
         <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
     `;
 }
-
 function eliminaRicevutaConDoppiaConferma(index) {
     const primaConferma = confirm("Sei sicuro di voler eliminare questa ricevuta dallo storico?");
     if (primaConferma) {
