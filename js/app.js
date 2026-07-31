@@ -146,7 +146,6 @@ function savePoiPosition() {
         alert("📍 Punto salvato con successo e impostato sulla bussola!");
     } else { alert("Segnale GPS non ancora disponibile per marcare il punto."); }
 }
-
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -676,7 +675,6 @@ function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
 }
-
 function clearData(storageKey, moduleName) {
     if (confirm("Vuoi davvero eliminare questi dati?")) {
         localStorage.removeItem(storageKey);
@@ -1131,7 +1129,6 @@ function importBackupData(event) {
     };
     reader.readAsText(file);
 }
-
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
