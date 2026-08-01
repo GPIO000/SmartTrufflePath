@@ -821,8 +821,9 @@ function savePagoPAWithFile() {
 
     const pDataExisting = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
 
+    // Il file è obbligatorio se non ne esiste già uno precedentemente salvato
     if (!file && !pDataExisting.contenutoBase64) {
-        alert("Si prega di selezionare un file (PDF o Immagine) della ricevuta originale.");
+        alert("Il caricamento della ricevuta (Immagine o PDF) è obbligatorio.");
         return;
     }
 
@@ -842,6 +843,7 @@ function savePagoPAWithFile() {
         };
         reader.readAsDataURL(file);
     } else {
+        // Mantiene il file esistente se l'utente aggiorna solo i dati testuali
         const data = { 
             id: idVal, 
             data: dataVal,
@@ -850,7 +852,7 @@ function savePagoPAWithFile() {
             contenutoBase64: pDataExisting.contenutoBase64
         };
         localStorage.setItem('pagopa_data', JSON.stringify(data));
-        alert("Quietanza PagoPA aggiornata!");
+        alert("Quietanza PagoPA aggiornata con successo!");
         openModule('pagopa');
     }
 }
@@ -867,8 +869,9 @@ function saveF24WithFile() {
 
     const fDataExisting = JSON.parse(localStorage.getItem('f24_data') || '{}');
 
+    // Il file è obbligatorio se non ne esiste già uno precedentemente salvato
     if (!file && !fDataExisting.contenutoBase64) {
-        alert("Si prega di selezionare il file PDF della ricevuta F24 originale.");
+        alert("Il caricamento della ricevuta F24 (PDF o Immagine) è obbligatorio.");
         return;
     }
 
@@ -893,6 +896,7 @@ function saveF24WithFile() {
         };
         reader.readAsDataURL(file);
     } else {
+        // Mantiene il file esistente se l'utente aggiorna solo i dati testuali
         const data = { 
             anno: annoVal, 
             protocollo: protocolloVal,
@@ -901,7 +905,7 @@ function saveF24WithFile() {
             contenutoBase64: fDataExisting.contenutoBase64 || null
         };
         localStorage.setItem('f24_data', JSON.stringify(data));
-        alert("F24 ELIDE aggiornato!");
+        alert("F24 ELIDE aggiornato con successo!");
         openModule('f24');
     }
 }
