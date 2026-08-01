@@ -212,9 +212,11 @@ function openModule(moduleName, editMode = false) {
             const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
             if (tData.nome && !editMode) {
                 let filePreviewHTML = '';
+                let visualizzaBtnHTML = '';
                 if (tData.contenutoBase64) {
                     if (tData.tipoFile && tData.tipoFile.startsWith('image/')) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${tData.nomeFile || 'Immagine'}</p><img src="${tData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Tesserino"></div>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${tData.contenutoBase64}', 'Tesserino Digitale', 'tesserino')">👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${tData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -232,7 +234,8 @@ function openModule(moduleName, editMode = false) {
                         <p><strong>Regione / Prov:</strong> ${tData.regione}</p>
                         <p><strong>N. Tesserino:</strong> ${tData.num}</p>
                         ${filePreviewHTML}
-                        <div style="display:flex; gap:10px; margin-top:15px;">
+                        <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                            ${visualizzaBtnHTML}
                             <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('tesserino', true)">✏️ Modifica</button>
                             <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('tesserino_data', 'tesserino')">🗑️ Elimina</button>
                         </div>
@@ -240,19 +243,19 @@ function openModule(moduleName, editMode = false) {
             } else {
                 contentHTML = `
                     <h2>Anagrafica & Tesserino Digitale</h2>
-                    <p><strong>Normativa:</strong> Legge 145/2018</p>
+                    <p>Inserisci i dati del tuo tesserino regionale per la raccolta dei tartufi:</p>
                     <div class="module-card">
                         <label>Nome e Cognome:</label>
                         <input type="text" id="t-nome" class="mod-input" value="${tData.nome || ''}" placeholder="Es. Mario Rossi">
                         <label>Codice Fiscale:</label>
-                        <input type="text" id="t-cf" class="mod-input" value="${tData.cf || ''}" placeholder="RSSMRA...">
+                        <input type="text" id="t-cf" class="mod-input" value="${tData.cf || ''}" placeholder="Es. RSSMRA80A01H501W">
                         <label>Regione / Provincia di Rilascio:</label>
-                        <input type="text" id="t-regione" class="mod-input" value="${tData.regione || ''}" placeholder="Es. Molise / Campobasso">
-                        <label>Numero Tesserino / Autorizzazione:</label>
-                        <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Es. TR-2026-001">
-                        <label>Carica Tesserino (Immagine o PDF):</label>
+                        <input type="text" id="t-regione" class="mod-input" value="${tData.regione || ''}" placeholder="Es. Molise / Abruzzo">
+                        <label>Numero Tesserino:</label>
+                        <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Numero autorizzazione">
+                        <label>Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
                         <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
-                        <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="saveTesserino()">Salva Dati Tesserino</button>
+                        <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="saveTesserino()">Salva Tesserino</button>
                     </div>`;
             }
             break;
@@ -260,9 +263,11 @@ function openModule(moduleName, editMode = false) {
             const pData = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
             if (pData.id && !editMode) {
                 let filePreviewHTML = '';
+                let visualizzaBtnHTML = '';
                 if (pData.contenutoBase64) {
                     if (pData.tipoFile && pData.tipoFile.startsWith('image/')) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${pData.nomeFile || 'Immagine'}</p><img src="${pData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Quietanza PagoPA"></div>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${pData.contenutoBase64}', 'Quietanza PagoPA', 'pagopa')">👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${pData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -277,7 +282,8 @@ function openModule(moduleName, editMode = false) {
                         <p><strong>ID Transazione:</strong> ${pData.id}</p>
                         <p><strong>Data Pagamento:</strong> ${pData.data}</p>
                         ${filePreviewHTML}
-                        <div style="display:flex; gap:10px; margin-top:15px;">
+                        <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                            ${visualizzaBtnHTML}
                             <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('pagopa', true)">✏️ Modifica</button>
                             <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('pagopa_data', 'pagopa')">🗑️ Elimina</button>
                         </div>
@@ -285,15 +291,15 @@ function openModule(moduleName, editMode = false) {
             } else {
                 contentHTML = `
                     <h2>Ricevuta PagoPA & PDF</h2>
-                    <p>Quietanza versamento tassa regionale annuale.</p>
+                    <p>Registra la quietanza di pagamento della tassa regionale:</p>
                     <div class="module-card">
                         <label>ID Transazione / Codice Avviso:</label>
-                        <input type="text" id="p-id" class="mod-input" value="${pData.id || ''}" placeholder="Es. PPA-992837465">
+                        <input type="text" id="p-id" class="mod-input" value="${pData.id || ''}" placeholder="Es. TRN123456789">
                         <label>Data Pagamento:</label>
-                        <input type="date" id="p-data" class="mod-input" value="${pData.data || ''}">
-                        <label>Carica Ricevuta (Immagine o PDF):</label>
+                        <input type="date" id="p-data" class="mod-input" value="${pData.data || new Date().toISOString().slice(0,10)}">
+                        <label>Carica Ricevuta (Immagine o PDF - Obbligatorio):</label>
                         <input type="file" id="p-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
-                        <button class="overlay-btn" style="width:100%; margin-top:10px;" onclick="savePagoPAWithFile()">Salva Quietanza e File</button>
+                        <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="savePagoPAWithFile()">Archivia Ricevuta PagoPA</button>
                     </div>`;
             }
             break;
@@ -418,9 +424,11 @@ function openModule(moduleName, editMode = false) {
             const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
             if (fData.protocollo && !editMode) {
                 let filePreviewHTML = '';
+                let visualizzaBtnHTML = '';
                 if (fData.contenutoBase64) {
                     if (fData.tipoFile && fData.tipoFile.startsWith('image/')) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${fData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${fData.contenutoBase64}', 'F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -435,7 +443,8 @@ function openModule(moduleName, editMode = false) {
                         <p><strong>Anno Fiscale:</strong> ${fData.anno}</p>
                         <p><strong>Protocollo:</strong> ${fData.protocollo}</p>
                         ${filePreviewHTML}
-                        <div style="display:flex; gap:10px; margin-top:15px;">
+                        <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                            ${visualizzaBtnHTML}
                             <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('f24', true)">✏️ Modifica</button>
                             <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('f24_data', 'f24')">🗑️ Elimina</button>
                         </div>
@@ -443,16 +452,15 @@ function openModule(moduleName, editMode = false) {
             } else {
                 contentHTML = `
                     <h2>F24 ELIDE - Imposta Sostitutiva</h2>
-                    <p>Legge 145/2018 (Codice Tributo: 1853)</p>
+                    <p>Registra il versamento dell'imposta sostitutiva (100€ annui - Legge 145/2018):</p>
                     <div class="module-card">
-                        <p>Versamento annuo di 100€ per l'esonero dalla ritenuta d'acconto del 23%.</p>
-                        <label>Anno Fiscale:</label>
-                        <input type="text" id="f-anno" class="mod-input" value="${fData.anno || '2026'}">
-                        <label>Numero Protocollo F24 Quietanzato:</label>
-                        <input type="text" id="f-protocollo" class="mod-input" value="${fData.protocollo || ''}" placeholder="Es. 000123456789">
-                        <label>Carica Ricevuta (PDF o Immagine):</label>
-                        <input type="file" id="f-file" accept="application/pdf,image/*" class="mod-input" style="padding:8px;">
-                        <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="saveF24WithFile()">Salva Protocollo e PDF F24</button>
+                        <label>Anno Fiscale di Riferimento:</label>
+                        <input type="text" id="f-anno" class="mod-input" value="${fData.anno || new Date().getFullYear()}" placeholder="Es. 2026">
+                        <label>Numero di Protocollo Telematico:</label>
+                        <input type="text" id="f-protocollo" class="mod-input" value="${fData.protocollo || ''}" placeholder="Es. 24010112345678901">
+                        <label>Carica Quietanza F24 (PDF o Immagine - Obbligatorio):</label>
+                        <input type="file" id="f-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
+                        <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="saveF24WithFile()">Archivia F24 ELIDE</button>
                     </div>`;
             }
             break;
@@ -1453,4 +1461,29 @@ function shareAppUrl() {
     const appUrl = window.location.href;
     if (navigator.share) { navigator.share({ title: 'Truffle App', url: appUrl }).catch(() => {}); }
     else { navigator.clipboard.writeText(appUrl).then(() => alert("Link copiato!")); }
+}
+function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tesserino') {
+    if (!base64Data) return;
+    
+    let activeView = document.getElementById('active-module-view');
+    if (!activeView) return;
+
+    let contentHTML = `
+        <h2>Visualizzazione Documento</h2>
+        <p><strong>${titolo || 'Allegato'}</strong></p>
+        <div class="module-card" style="text-align: center; background: #fff; padding: 15px; border-radius: 8px;">
+            <img src="${base64Data}" style="max-width: 100%; height: auto; border-radius: 6px;" alt="Documento Salvato">
+        </div>
+        <button class="overlay-btn" style="background:#475569; margin-top:15px; width:100%;" onclick="openModule('${moduloProvenienza}')">← Torna Indietro</button>
+    `;
+    
+    activeView.querySelector('.module-body-content').innerHTML = contentHTML;
+}
+function chiudiVisualizzazioneImmagine(moduloProvenienza = 'tesserino') {
+    const overlayImmagine = document.getElementById('image-overlay-container');
+    if (overlayImmagine) {
+        overlayImmagine.style.display = 'none';
+    } else {
+        openModule(moduloProvenienza);
+    }
 }
