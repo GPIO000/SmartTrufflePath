@@ -1041,13 +1041,19 @@ function toggleRegimeFiscaleFields() {
         if (containerRitenuta) containerRitenuta.style.display = 'none';
     }
 }
-
 function calcolaRitenutaAcconto() {
     const regime = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
+    
+    // Se il regime non è a ritenuta, esce
     if (regime !== 'ritenuta') return;
     
     const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
-    const ritenuta = importoTotale * 0.23;
+    
+    // Calcolo basato sul 78% dell'importo inserito
+    const baseImponibileRitenuta = importoTotale * 0.78; 
+    
+    // Applicazione della ritenuta d'acconto (es. 23%) sul 78% dell'imponibile
+    const ritenuta = baseImponibileRitenuta * 0.23; 
     const netto = importoTotale - ritenuta;
     
     const elRitenuta = document.getElementById('r-importo-ritenuta');
@@ -1056,7 +1062,6 @@ function calcolaRitenutaAcconto() {
     if (elRitenuta) elRitenuta.value = ritenuta.toFixed(2);
     if (elNetto) elNetto.value = netto.toFixed(2);
 }
-
 function registraVenditaConPrezzoKg() {
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     if (!tData.nome || !tData.cf) {
@@ -1486,4 +1491,71 @@ function chiudiVisualizzazioneImmagine(moduloProvenienza = 'tesserino') {
     } else {
         openModule(moduloProvenienza);
     }
+}
+/**
+ * Valida i requisiti per l'emissione della ricevuta basandosi sui dati reali salvati nell'applicazione.
+ */
+function validaRequisitiEmissioneRicevuta() {
+    try {
+        // Recupera i dati reali salvati nello storage dall'applicazione
+        const f24 = JSON.parse(localStorage.getItem('f24_data') || 'null');
+        const pagoPa = JSON.parse(localStorage.getItem('pagopa_data') || 'null');
+        
+        // Verifica se almeno uno dei due metodi di versamento è stato configurato/inserito
+        const haF24Valid = f24 && (f24.anno || f24.protocollo);
+        const haPagoPAValid = pagoPa && (pagoPa.data || pagoPa.importo);
+
+        if (!haF24Valid && !haPagoPAValid) {
+            console.warn("Validazione fallita: Nessun dato F24 o PagoPA valido trovato.");
+            return false;
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Errore durante la validazione dei requisiti:", error);
+        return false;
+    }
+}
+
+/**
+ * Genera l'HTML di stampa della ricevuta utilizzando la struttura dati effettiva dell'applicazione.
+ * @param {Object} v - Oggetto ricevuta/vendita preso dallo storico o dai dati correnti.
+ */
+function generaHTMLStampaRicevuta(v) {
+    // Gestione dei campi con fallback sui nomi chiave standard usati nell'app
+    const venditore = v.venditoreNome || v.cedente || "Dato non disponibile";
+    const acquirente = v.acquirente || "Dato non disponibile";
+    const specie = v.specie || v.prodotto || "-";
+    const peso = v.peso || v.quantita || "0";
+    const importo = v.importoTotale || v.totale || "0.00";
+    const data = v.data || v.dataVendita || new Date().toLocaleDateString();
+
+    return `
+        <div class="ricevuta-stampa" style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto;">
+            <h2>Ricevuta di Vendita / Transazione</h2>
+            <hr>
+            <p><strong>Data:</strong> ${data}</p>
+            <p><strong>Venditore / Cedente:</strong> ${venditore}</p>
+            <p><strong>Acquirente:</strong> ${acquirente}</p>
+            <hr>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                <thead>
+                    <tr style="background-color: #f2f2f2; text-align: left;">
+                        <th style="padding: 8px; border: 1px solid #ddd;">Specie / Prodotto</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">Peso / Quantità</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">Importo Totale (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${specie}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${peso}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${importo}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <hr style="margin-top: 20px;">
+            <p style="text-align: center; font-size: 0.9em; color: #555;">Documento generato automaticamente dal sistema.</p>
+        </div>
+    `;
 }
