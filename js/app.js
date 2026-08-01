@@ -1161,7 +1161,7 @@ function visualizzaRicevutaSalvata(index) {
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati del Venditore (Cessionario occasionale)</h3>
             <p><strong>Nome e Cognome:</strong> ${v.venditoreNome}</p>
             <p><strong>Codice Fiscale:</strong> ${v.venditoreCf}</p>
-            <p><strong>Tesserino Raccolta N.:</strong> ${v.venditoreTesserino} - <p><strong> Rilasciato dalla Regione: ${v.venditoreRegione}</p>
+            <p><strong>Tesserino Raccolta N.:</strong> ${v.venditoreTesserino} - <p><strong> Rilasciato dalla Regione:</strong> ${v.venditoreRegione}</p>
             ${dettagliFiscoHtml}
             <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati dell'Acquirente</h3>
             <p><strong>Acquirente / Ristorante:</strong> ${v.acquirente}</p>
