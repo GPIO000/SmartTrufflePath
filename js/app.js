@@ -776,36 +776,43 @@ function saveTesserino() {
 
     const tDataExisting = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
 
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const data = { 
-                nome: nomeVal, 
-                cf: cfVal, 
-                regione: regioneVal, 
-                num: numVal,
-                nomeFile: file.name,
-                tipoFile: file.type,
-                contenutoBase64: e.target.result
-            };
-            localStorage.setItem('tesserino_data', JSON.stringify(data));
-            alert("Dati tesserino e documento salvati con successo!");
-            openModule('tesserino');
-        };
-        reader.readAsDataURL(file);
-    } else {
+    // Funzione helper per il salvataggio sicuro
+    const saveData = (base64Content, fileName, fileType) => {
         const data = { 
             nome: nomeVal, 
             cf: cfVal, 
             regione: regioneVal, 
             num: numVal,
-            nomeFile: tDataExisting.nomeFile || null,
-            tipoFile: tDataExisting.tipoFile || null,
-            contenutoBase64: tDataExisting.contenutoBase64 || null
+            nomeFile: fileName !== undefined ? fileName : (tDataExisting.nomeFile || null),
+            tipoFile: fileType !== undefined ? fileType : (tDataExisting.tipoFile || null),
+            contenutoBase64: base64Content !== undefined ? base64Content : (tDataExisting.contenutoBase64 || null)
         };
-        localStorage.setItem('tesserino_data', JSON.stringify(data));
-        alert("Dati tesserino salvati con successo!");
-        openModule('tesserino');
+        
+        try {
+            localStorage.setItem('tesserino_data', JSON.stringify(data));
+            alert("Dati tesserino salvati con successo!");
+            openModule('tesserino');
+        } catch (e) {
+            alert("Errore: Spazio di archiviazione esaurito! Prova a caricare un'immagine o PDF più piccolo (max 1.5MB).");
+            console.error(e);
+        }
+    };
+
+    if (file) {
+        // Controllo della dimensione del file
+        if (file.size > 1.5 * 1024 * 1024) {
+            alert("Il file è troppo grande. Carica un documento inferiore a 1.5 MB.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            saveData(e.target.result, file.name, file.type);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        // Salva mantenendo il file pre-esistente
+        saveData();
     }
 }
 function savePagoPAWithFile() {
@@ -827,33 +834,41 @@ function savePagoPAWithFile() {
         return;
     }
 
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const data = { 
-                id: idVal, 
-                data: dataVal,
-                nomeFile: file.name,
-                tipoFile: file.type,
-                contenutoBase64: e.target.result
-            };
-            localStorage.setItem('pagopa_data', JSON.stringify(data));
-            alert("Quietanza PagoPA e file archiviati con successo!");
-            openModule('pagopa');
-        };
-        reader.readAsDataURL(file);
-    } else {
-        // Mantiene il file esistente se l'utente aggiorna solo i dati testuali
+    // Funzione helper per il salvataggio sicuro
+    const saveData = (base64Content, fileName, fileType) => {
         const data = { 
             id: idVal, 
             data: dataVal,
-            nomeFile: pDataExisting.nomeFile,
-            tipoFile: pDataExisting.tipoFile,
-            contenutoBase64: pDataExisting.contenutoBase64
+            nomeFile: fileName !== undefined ? fileName : (pDataExisting.nomeFile || null),
+            tipoFile: fileType !== undefined ? fileType : (pDataExisting.tipoFile || null),
+            contenutoBase64: base64Content !== undefined ? base64Content : (pDataExisting.contenutoBase64 || null)
         };
-        localStorage.setItem('pagopa_data', JSON.stringify(data));
-        alert("Quietanza PagoPA aggiornata con successo!");
-        openModule('pagopa');
+        
+        try {
+            localStorage.setItem('pagopa_data', JSON.stringify(data));
+            alert("Quietanza PagoPA archiviata con successo!");
+            openModule('pagopa');
+        } catch (e) {
+            alert("Errore: Spazio di archiviazione esaurito! Prova a caricare un'immagine o PDF più piccolo (max 1.5MB).");
+            console.error(e);
+        }
+    };
+
+    if (file) {
+        // Controllo della dimensione del file
+        if (file.size > 1.5 * 1024 * 1024) {
+            alert("Il file è troppo grande. Carica un documento inferiore a 1.5 MB.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            saveData(e.target.result, file.name, file.type);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        // Salva mantenendo il file pre-esistente
+        saveData();
     }
 }
 function saveF24WithFile() {
@@ -875,38 +890,47 @@ function saveF24WithFile() {
         return;
     }
 
+    // Funzione helper per il salvataggio sicuro
+    const saveData = (base64Content, fileName, fileType) => {
+        const data = { 
+            anno: annoVal, 
+            protocollo: protocolloVal,
+            nomeFile: fileName !== undefined ? fileName : (fDataExisting.nomeFile || null),
+            tipoFile: fileType !== undefined ? fileType : (fDataExisting.tipoFile || null),
+            contenutoBase64: base64Content !== undefined ? base64Content : (fDataExisting.contenutoBase64 || null)
+        };
+        
+        try {
+            localStorage.setItem('f24_data', JSON.stringify(data));
+            alert("F24 ELIDE archiviato con successo!");
+            openModule('f24');
+        } catch (e) {
+            alert("Errore: Spazio di archiviazione esaurito! Prova a caricare un'immagine o PDF più piccolo (max 1.5MB).");
+            console.error(e);
+        }
+    };
+
     if (file) {
+        // Verifica estensione/tipo file
         if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
             alert("Il file deve essere in formato PDF o Immagine.");
+            return;
+        }
+        
+        // Controllo della dimensione del file
+        if (file.size > 1.5 * 1024 * 1024) {
+            alert("Il file è troppo grande. Carica un documento inferiore a 1.5 MB.");
             return;
         }
 
         const reader = new FileReader();
         reader.onload = function(e) {
-            const data = { 
-                anno: annoVal, 
-                protocollo: protocolloVal,
-                nomeFile: file.name,
-                tipoFile: file.type,
-                contenutoBase64: e.target.result
-            };
-            localStorage.setItem('f24_data', JSON.stringify(data));
-            alert("F24 ELIDE e ricevuta archiviati con successo!");
-            openModule('f24');
+            saveData(e.target.result, file.name, file.type);
         };
         reader.readAsDataURL(file);
     } else {
-        // Mantiene il file esistente se l'utente aggiorna solo i dati testuali
-        const data = { 
-            anno: annoVal, 
-            protocollo: protocolloVal,
-            nomeFile: fDataExisting.nomeFile || null,
-            tipoFile: fDataExisting.tipoFile || null,
-            contenutoBase64: fDataExisting.contenutoBase64 || null
-        };
-        localStorage.setItem('f24_data', JSON.stringify(data));
-        alert("F24 ELIDE aggiornato con successo!");
-        openModule('f24');
+        // Salva mantenendo il file pre-esistente
+        saveData();
     }
 }
 function saveNewCane() {
