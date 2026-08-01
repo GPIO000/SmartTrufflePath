@@ -1139,7 +1139,7 @@ function visualizzaRicevutaSalvata(index) {
 
     const isRitenuta = v.regime === 'ritenuta';
     const dettagliFiscoHtml = isRitenuta ? `
-        <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (operata dal sostituto d'imposta)</p>
+        <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (esonerata dall'imposta sostitutiva)</p>
         <p><strong>Compenso Lordo:</strong> € ${v.importo}</p>
         <p><strong>Ritenuta d'Acconto (23%):</strong> € ${v.ritenuta || (v.importo * 0.23).toFixed(2)}</p>
         <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Netto a Pagare / Percepito:</strong> € ${v.netto || (v.importo * 0.77).toFixed(2)}</p>
@@ -1161,7 +1161,7 @@ function visualizzaRicevutaSalvata(index) {
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati del Venditore (Cessionario occasionale)</h3>
             <p><strong>Nome e Cognome:</strong> ${v.venditoreNome}</p>
             <p><strong>Codice Fiscale:</strong> ${v.venditoreCf}</p>
-            <p><strong>Tesserino Raccolta N.:</strong> ${v.venditoreTesserino} - Rilasciato da: ${v.venditoreRegione}</p>
+            <p><strong>Tesserino Raccolta N.:</strong> ${v.venditoreTesserino} - Rilasciato dala Regione: ${v.venditoreRegione}</p>
             ${dettagliFiscoHtml}
             <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati dell'Acquirente</h3>
             <p><strong>Acquirente / Ristorante:</strong> ${v.acquirente}</p>
