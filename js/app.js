@@ -1101,10 +1101,9 @@ function calcolaRitenutaAcconto() {
 function registraVenditaConPrezzoKg() {
     // Limite fisso massimo per singola ricevuta
     const LIMITE_BLOCCO_RICEVUTA = 7000;
-    // Limite massimo complessivo per anno solare (es. limite forfettario / attività occasionale)
+    // Limite massimo complessivo per anno solare
     const LIMITE_ANNUALE_TOTALE = 7000;
 
-    let regime = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
     const acquirente = document.getElementById('r-acquirente') ? document.getElementById('r-acquirente').value.trim() : '';
     const acquirenteCf = document.getElementById('r-cf-acquirente') ? document.getElementById('r-cf-acquirente').value.trim() : '';
     const specie = document.getElementById('r-specie') ? document.getElementById('r-specie').value : '';
@@ -1122,13 +1121,12 @@ function registraVenditaConPrezzoKg() {
         return;
     }
 
-    // 2. Controllo del totale complessivo per anno solare (indipendentemente dal regime: sostitutiva o ritenuta)
+    // 2. Controllo del totale complessivo per anno solare
     const annoCorrente = new Date().getFullYear();
     let storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     
     let totaleAnnoSolare = 0;
     storicoVendite.forEach(vendita => {
-        // Estrae l'anno dalla stringa della data salvata (formato "DD/MM/YYYY HH:MM" o compatibile)
         if (vendita.data) {
             let partiData = vendita.data.split(' ')[0].split('/');
             if (partiData.length === 3) {
@@ -1140,7 +1138,6 @@ function registraVenditaConPrezzoKg() {
         }
     });
 
-    // Aggiunge l'importo della vendita corrente al calcolo complessivo dell'anno solare
     if ((totaleAnnoSolare + importoTotale) > LIMITE_ANNUALE_TOTALE) {
         let residuo = LIMITE_ANNUALE_TOTALE - totaleAnnoSolare;
         if (residuo < 0) residuo = 0;
@@ -1148,7 +1145,7 @@ function registraVenditaConPrezzoKg() {
         return;
     }
 
-    // Controllo preliminare sui dati del venditore
+    // 3. Controllo preliminare sui dati anagrafici del venditore
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
     const venditoreNome = tData.nome ? tData.nome.trim() : '';
     const venditoreCf = tData.cf ? tData.cf.trim() : '';
@@ -1160,38 +1157,42 @@ function registraVenditaConPrezzoKg() {
         return;
     }
 
-    // Verifica della data di versamento dell'F24 per regime sostitutiva
-    if (regime === 'sostitutiva') {
-        let f24DataValid = false;
-        try {
-            const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
-            if (fData.dataVersamento) {
-                const dataVersamento = new Date(fData.dataVersamento);
-                const annoVersamento = dataVersamento.getFullYear();
-                const meseVersamento = dataVersamento.getMonth();
-                const giornoVersamento = dataVersamento.getDate();
-
-                if (annoVersamento === annoCorrente && meseVersamento === 0 && giornoVersamento >= 1 && giornoVersamento <= 16) {
-                    f24DataValid = true;
-                }
+    // 4. Controllo separato: Verifica validità PagoPA (Tassa Regionale Tesserino - obbligatorio per vendere)
+    let pagopaValido = false;
+    try {
+        const pData = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
+        if (pData.contenutoBase64 && pData.data) {
+            const annoPagoPa = new Date(pData.data).getFullYear();
+            if (annoPagoPa === annoCorrente) {
+                pagopaValido = true;
             }
-        } catch (e) {
-            f24DataValid = false;
         }
-
-        if (!f24 || !f24DataValid) {
-            const conferma = confirm(
-                "⚠️ Attenzione: F24 ELIDE non valido o data di versamento non compresa tra il 1 e il 16 gennaio dell'anno corrente.\n\n" +
-                "L'imposta sostitutiva richiede un F24 valido in questa finestra temporale. " +
-                "Vuoi procedere convertendo automaticamente la ricevuta in regime con ritenuta (23% del 78% dell'imponibile)?"
-            );
-            
-            if (!conferma) {
-                return;
-            }
-            regime = 'ritenuta';
-        }
+    } catch (e) {
+        pagopaValido = false;
     }
+
+    if (!pagopaValido) {
+        alert(`❌ Tesserino non in regola: Manca la ricevuta PagoPA della tassa regionale di concessione valida per l'anno ${annoCorrente}. Impossibile effettuare vendite.`);
+        return;
+    }
+
+    // 5. Commutazione automatica del regime fiscale basata unicamente sull'F24 ELIDE
+    let f24Valido = false;
+    try {
+        const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+        if (fData.dataVersamento) {
+            const dataVersamento = new Date(fData.dataVersamento);
+            const annoVersamento = dataVersamento.getFullYear();
+            if (annoVersamento === annoCorrente && dataVersamento >= new Date(annoCorrente, 0, 1)) {
+                f24Valido = true;
+            }
+        }
+    } catch (e) {
+        f24Valido = false;
+    }
+
+    // Se l'F24 è presente e valido -> Imposta Sostitutiva, altrimenti -> Ritenuta d'Acconto
+    const regime = f24Valido ? 'sostitutiva' : 'ritenuta';
 
     if (!acquirente) {
         alert("Inserisci il nome dell'acquirente o del ristorante.");
@@ -1250,7 +1251,8 @@ function registraVenditaConPrezzoKg() {
     }
     localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
 
-    alert("✅ Ricevuta registrata correttamente. Totale cumulato aggiornato per l'anno " + annoCorrente + ".");
+    const nomeRegimeDisplay = regime === 'sostitutiva' ? "Imposta Sostitutiva" : "Ritenuta d'Acconto";
+    alert(`✅ Ricevuta registrata correttamente in regime di ${nomeRegimeDisplay}. Totale cumulato aggiornato per l'anno ${annoCorrente}.`);
     visualizzaRicevutaSalvata(storicoVendite.length - 1);
 }
 function visualizzaRicevutaSalvata(index) {
