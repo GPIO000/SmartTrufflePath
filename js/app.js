@@ -1645,13 +1645,10 @@ function chiudiVisualizzazioneImmagine(moduloProvenienza = 'tesserino') {
         openModule(moduloProvenienza);
     }
 }
-// Funzione per mostrare il Disclaimer Legale all'avvio
+// Funzione per mostrare il Disclaimer Legale ad OGNI apertura dell'app
 function mostraDisclaimerIniziale() {
-    // Se vuoi che compaia SOLO al primo avvio, lascia questa riga. 
-    // Se vuoi che compaia ad *ogni* avvio, rimuovi o commenta la riga sotto.
-    if (localStorage.getItem('disclaimer_letto') === 'true') return; 
-
     let modalOverlay = document.getElementById('disclaimer-overlay');
+    
     if (!modalOverlay) {
         modalOverlay = document.createElement('div');
         modalOverlay.id = 'disclaimer-overlay';
@@ -1682,21 +1679,18 @@ function mostraDisclaimerIniziale() {
         `;
         document.body.appendChild(modalOverlay);
 
-        // Azione per il tasto "Accetta e Continua"
+        // Azione per il tasto "Accetta e Continua" (chiude semplicemente la finestra senza salvarla)
         document.getElementById('btn-accetta-disclaimer').addEventListener('click', () => {
-            localStorage.setItem('disclaimer_letto', 'true'); // Memorizza il consenso
             modalOverlay.style.display = 'none';
         });
 
         // Azione per il tasto "Abbandona"
         document.getElementById('btn-abbandona-app').addEventListener('click', () => {
-            // Tenta di chiudere la finestra o reindirizzare a una pagina vuota/esterna
             try {
                 window.close();
             } catch (e) {
                 console.log(e);
             }
-            // Se il browser blocca window.close(), reindirizza fuori o mostra una schermata di uscita
             window.location.href = "about:blank";
         });
     } else {
