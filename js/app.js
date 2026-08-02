@@ -399,64 +399,58 @@ function openModule(moduleName, editMode = false) {
             const storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
             let storicoHtml = '<h2>Archivio Storico Ricevute</h2><p>Elenco cronologico delle ricevute di vendita emesse:</p>';
             if (storicoVendite.length === 0) {
-                storicoHtml += '<div class="module-card"><p>Nessuna ricevuta emessa finora.</p></div>';
-            } else {
-                storicoVendite.slice().reverse().forEach((item, index) => {
-                    const originalIndex = storicoVendite.length - 1 - index;
-                    const regimeLabel = item.regime === 'ritenuta' ? '<span style="color:#38bdf8; font-size:0.75rem;">[Ritenuta d\'Acconto]</span>' : '<span style="color:#22c55e; font-size:0.75rem;">[Imposta Sostitutiva]</span>';
-                    
-                    // Calcolo visivo per il netto se il regime è a ritenuta
-                    let importoVisualizzatoHtml = `<p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">Importo: € ${item.importo}</p>`;
-                    if (item.regime === 'ritenuta') {
-                        const lordoNum = Number(item.importo) || 0;
-                        const nettoVal = item.netto || (lordoNum * 0.77).toFixed(2);
-                        const ritenutaVal = item.ritenuta || (lordoNum * 0.23).toFixed(2);
-                        importoVisualizzatoHtml = `
-                            <p style="font-size:0.85rem; color:#f8fafc; margin-top:4px;">Importo Lordo: € ${lordoNum.toFixed(2)}</p>
-                            <p style="font-size:0.9rem; color:#4ade80; font-weight:bold; margin:2px 0;">Netto a Pagare: € ${nettoVal} <small style="color:#94a3b8; font-weight:normal;">(Ritenuta 23%: € ${ritenutaVal})</small></p>
-                        `;
-                    }
-
-                    storicoHtml += `
-                        <div class="module-card" style="margin-bottom:12px; border-left: 4px solid #3b82f6;">
-                            <strong style="color:#60a5fa; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${item.data} ${regimeLabel}</strong>
-                            <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${item.acquirente}</b></p>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${item.specie} (${item.peso}g)</p>
-                            ${importoVisualizzatoHtml}
-                            <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
-                                <button class="overlay-btn" style="background:#2563eb; padding:6px 10px; font-size:0.75rem;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza</button>
-                                <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="modificaRicevuta(${originalIndex})">✏️ Modifica</button>
-                                <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="eliminaRicevutaConDoppiaConferma(${originalIndex})">🗑️ Elimina</button>
-                            </div>
-                        </div>`;
-                });
+            storicoHtml += '<div class="module-card"><p>Nessuna ricevuta emessa finora.</p></div>';
+    } else {
+        storicoVendite.slice().reverse().forEach((item, index) => {
+            const originalIndex = storicoVendite.length - 1 - index;
+            const regimeLabel = item.regime === 'ritenuta' ? '<span style="color:#38bdf8; font-size:0.75rem;">[Ritenuta d\'Acconto]</span>' : '<span style="color:#22c55e; font-size:0.75rem;">[Imposta Sostitutiva]</span>';
+            
+            // Calcolo dinamico o lettura del netto/ritenuta salvati
+            let dettaglioImporto = `Importo: € ${item.importo}`;
+            if (item.regime === 'ritenuta') {
+                const nettoVisibile = item.netto ? item.netto : (item.importo * 0.77).toFixed(2);
+                dettaglioImporto = `Lordo: € ${item.importo} | <span style="color:#38bdf8;">Netto: € ${nettoVisibile}</span>`;
             }
-            contentHTML = storicoHtml;
-            break;
+
+            storicoHtml += `
+                <div class="module-card" style="margin-bottom:12px; border-left: 4px solid #3b82f6;">
+                    <strong style="color:#60a5fa; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${item.data} ${regimeLabel}</strong>
+                    <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${item.acquirente}</b></p>
+                    <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${item.specie} (${item.peso}g)</p>
+                    <p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">${dettaglioImporto}</p>
+                    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+                        <button class="overlay-btn" style="background:#2563eb; padding:6px 10px; font-size:0.75rem;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza</button>
+                        <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="modificaRicevuta(${originalIndex})">✏️ Modifica</button>
+                        <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="eliminaRicevutaConDoppiaConferma(${originalIndex})">🗑️ Elimina</button>
+                    </div>
+                </div>`;
+        });
+    }
+    contentHTML = storicoHtml;
+    break;
         case 'f24':
             const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
-            let filePreviewHTML = '';
-            let visualizzaBtnHTML = '';
-            
-            if (fData.contenutoBase64) {
-                if (fData.tipoFile && fData.tipoFile.startsWith('image/')) {
-                    filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${fData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
-                    visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${fData.contenutoBase64}', 'Quietanza F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
-                } else {
-                    filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
-                }
-            } else {
-                filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
-            }
-
             if (fData.protocollo && !editMode) {
+                let filePreviewHTML = '';
+                let visualizzaBtnHTML = '';
+                if (fData.contenutoBase64) {
+                    if (fData.tipoFile && fData.tipoFile.startsWith('image/')) {
+                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${fData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${fData.contenutoBase64}', 'F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
+                    } else {
+                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
+                    }
+                } else {
+                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                }
+
                 contentHTML = `
                     <h2>F24 ELIDE - Imposta Sostitutiva</h2>
                     <div class="module-card" style="border-left: 4px solid #22c55e;">
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ F24 Registrato</p>
                         <p><strong>Anno Fiscale:</strong> ${fData.anno}</p>
                         <p><strong>Protocollo:</strong> ${fData.protocollo}</p>
-                        <p><strong>Data Versamento:</strong> ${fData.dataVersamento || 'Non specificata'}</p>
+                        <p><strong>Data Versamento:</strong> ${fData.dataPagamento || 'Non specificata'}</p>
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
@@ -475,8 +469,8 @@ function openModule(moduleName, editMode = false) {
                         <label>Numero di Protocollo Telematico:</label>
                         <input type="text" id="f-protocollo" class="mod-input" value="${fData.protocollo || ''}" placeholder="Es. 24010112345678901">
                         
-                        <label>Data di Versamento (fondamentale per la validità 1-16 Gennaio):</label>
-                        <input type="date" id="f-data-versamento" class="mod-input" value="${fData.dataVersamento || ''}">
+                        <label>Data di Versamento:</label>
+                        <input type="date" id="f-data-pagamento" class="mod-input" value="${fData.dataPagamento || new Date().toISOString().slice(0,10)}">
                         
                         <label>Carica Quietanza F24 (PDF o Immagine - Obbligatorio):</label>
                         <input type="file" id="f-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
@@ -707,15 +701,93 @@ function openModule(moduleName, editMode = false) {
             contentHTML = registroHtml;
             break;
         case 'bilancio':
-            const venditeSalvate = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-            let totaleIncassato = venditeSalvate.reduce((acc, item) => acc + Number(item.importo), 0);
+            const venditeSalvateBilancio = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+            const annoCorrenteBilancio = new Date().getFullYear();
+            
+            // Variabili per i due blocchi separati
+            let lordoSostitutiva = 0;
+            let nettoSostitutiva = 0;
+            let countSostitutiva = 0;
+
+            let lordoRitenuta = 0;
+            let nettoRitenuta = 0;
+            let totaleRitenuteSubite = 0;
+            let countRitenuta = 0;
+
+            venditeSalvateBilancio.forEach(item => {
+                const dataVendita = item.data ? new Date(item.data.split('/').reverse().join('-')) : new Date();
+                if (dataVendita.getFullYear() === annoCorrenteBilancio) {
+                    const lordo = parseFloat(item.importo) || 0;
+                    const regime = item.regime || 'sostitutiva';
+
+                    if (regime === 'ritenuta') {
+                        const ritenuta = item.ritenuta ? parseFloat(item.ritenuta) : (lordo * 0.23);
+                        const netto = item.netto !== undefined ? parseFloat(item.netto) : (lordo - ritenuta);
+                        
+                        lordoRitenuta += lordo;
+                        nettoRitenuta += netto;
+                        totaleRitenuteSubite += ritenuta;
+                        countRitenuta++;
+                    } else {
+                        // Imposta sostitutiva (il netto coincide con il lordo percepito)
+                        lordoSostitutiva += lordo;
+                        nettoSostitutiva += lordo;
+                        countSostitutiva++;
+                    }
+                }
+            });
+
+            // Somma dei guadagni percepiti (NETTI) per il bilancio/guadagno effettivo in tasca
+            const sommaTotaleNettiPercepiti = nettoSostitutiva + nettoRitenuta;
+
+            // Il controllo del limite normativo rimane basato sul totale dei LORDI
+            const sommaTotaleLordi = lordoSostitutiva + lordoRitenuta;
+            const sogliaLimiteBilancio = 7000.00;
+            const differenzaSoglia = sogliaLimiteBilancio - sommaTotaleLordi;
+            const isSuperato = sommaTotaleLordi > sogliaLimiteBilancio;
+
             contentHTML = `
-                <h2>Contabilità & Bilancio Annuo</h2>
-                <div class="module-card">
-                    <p>Entrate Totali Vendite: <strong style="color:#22c55e;">€ ${totaleIncassato.toFixed(2)}</strong></p>
-                    <p>Imposta Sostitutiva F24: <strong>€ 100,00</strong></p>
-                    <hr style="border-color:#334155; margin:15px 0;">
-                    <p>Registrazioni di vendita effettuate: <strong>${venditeSalvate.length}</strong></p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">Contabilità & Bilancio Annuo (${annoCorrenteBilancio})</h2>
+                    <button onclick="window.print()" style="background-color: #3b82f6; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
+                        🖨️ Stampa
+                    </button>
+                </div>
+                
+                <!-- Blocco 1: Imposta Sostitutiva -->
+                <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 15px;">
+                    <h3 style="font-size:0.95rem; color:#22c55e; margin-bottom:8px;">🟢 Regime Imposta Sostitutiva (F24)</h3>
+                    <p>Ricevute emesse: <strong>${countSostitutiva}</strong></p>
+                    <p>Totale Lordo / Netto: <strong style="color:#22c55e;">€ ${nettoSostitutiva.toFixed(2)}</strong></p>
+                    <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">Imposta Sostitutiva F24 (Fissa): € 100,00</p>
+                </div>
+
+                <!-- Blocco 2: Ritenuta d'Acconto -->
+                <div class="module-card" style="border-left: 4px solid #38bdf8; margin-bottom: 15px;">
+                    <h3 style="font-size:0.95rem; color:#38bdf8; margin-bottom:8px;">🔵 Regime Ritenuta d'Acconto (23%)</h3>
+                    <p>Ricevute emesse: <strong>${countRitenuta}</strong></p>
+                    <p>Totale Lordo: € ${lordoRitenuta.toFixed(2)}</p>
+                    <p>Totale Ritenute Subite: <span style="color:#f87171;">€ ${totaleRitenuteSubite.toFixed(2)}</span></p>
+                    <p>Totale Netto Percepito: <strong style="color:#38bdf8;">€ ${nettoRitenuta.toFixed(2)}</strong></p>
+                </div>
+
+                <!-- Blocco Riepilogo Complessivo e Differenza Limite -->
+                <div class="module-card" style="background: #0f172a; border: 1px solid #334155; text-align: center; padding: 15px;">
+                    <p style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Somma Totale Guadagni Percepiti (Netto): Ricevute Sostitutiva + Ritenuta d'Acconto</p>
+                    <p style="font-size: 1.5rem; color: #22c55e; font-weight: bold; margin: 8px 0 15px 0;">€ ${sommaTotaleNettiPercepiti.toFixed(2)}</p>
+                    
+                    <hr style="border-color:#334155; margin:12px 0;">
+                    
+                    <p style="font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Controllo Soglia di Blocco (sul Lordo): € ${sommaTotaleLordi.toFixed(2)} / € 7.000,00</p>
+                    <p style="font-size: 1.8rem; font-weight: 900; margin-top: 8px; color: #ef4444;">
+                        ${isSuperato 
+                            ? `SUPERATO di € ${Math.abs(differenzaSoglia).toFixed(2)}` 
+                            : `Disponibile: € ${differenzaSoglia.toFixed(2)}`
+                        }
+                    </p>
+                    <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 6px;">
+                        ${isSuperato ? 'Attenzione: È stata superata la soglia di occasionalità.' : 'Entro i limiti previsti dalla normativa.'}
+                    </p>
                 </div>`;
             break;
         case 'export':
@@ -844,30 +916,69 @@ function saveTesserino() {
         saveData();
     }
 }
+function saveF24WithFile() {
+    const annoVal = document.getElementById('f-anno').value.trim();
+    const protocolloVal = document.getElementById('f-protocollo').value.trim();
+    const dataPagamentoVal = document.getElementById('f-data-pagamento').value; // <--- Legge la data inserita
+    const fileInput = document.getElementById('f-file');
+    const file = fileInput ? fileInput.files[0] : null;
+    
+    if (!annoVal || !protocolloVal || !dataPagamentoVal) {
+        alert("Compila tutti i campi obbligatori (Anno, Protocollo e Data di Versamento).");
+        return;
+    }
+
+    const f24DataExisting = JSON.parse(localStorage.getItem('f24_data') || '{}');
+
+    const saveData = (base64Content, fileName, fileType) => {
+        const data = { 
+            anno: annoVal, 
+            protocollo: protocolloVal,
+            dataPagamento: dataPagamentoVal, // <--- Salva la data nel localStorage
+            nomeFile: fileName !== undefined ? fileName : (f24DataExisting.nomeFile || null),
+            tipoFile: fileType !== undefined ? fileType : (f24DataExisting.tipoFile || null),
+            contenutoBase64: base64Content !== undefined ? base64Content : (f24DataExisting.contenutoBase64 || null)
+        };
+        
+        try {
+            localStorage.setItem('f24_data', JSON.stringify(data));
+            alert("Dati F24 ELIDE salvati con successo!");
+            openModule('f24');
+        } catch (e) {
+            alert("Errore: Spazio di archiviazione esaurito! Carica un file più piccolo.");
+            console.error(e);
+        }
+    };
+
+    if (file) {
+        if (file.size > 1.5 * 1024 * 1024) {
+            alert("Il file è troppo grande. Massimo 1.5 MB.");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            saveData(e.target.result, file.name, file.type);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        saveData(f24DataExisting.contenutoBase64, f24DataExisting.nomeFile, f24DataExisting.tipoFile);
+    }
+}
 function savePagoPAWithFile() {
     const idVal = document.getElementById('p-id').value.trim();
-    const dataVal = document.getElementById('p-data').value;
+    const dataVal = document.getElementById('p-data').value.trim();
     const fileInput = document.getElementById('p-file');
     const file = fileInput ? fileInput.files[0] : null;
-
-    if (!idVal || !dataVal) {
-        alert("Inserisci ID transazione e data.");
-        return;
-    }
-
+    
+    const annoCorrente = new Date().getFullYear(); // <--- Anno di riferimento
     const pDataExisting = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
 
-    // Il file è obbligatorio se non ne esiste già uno precedentemente salvato
-    if (!file && !pDataExisting.contenutoBase64) {
-        alert("Il caricamento della ricevuta (Immagine o PDF) è obbligatorio.");
-        return;
-    }
-
-    // Funzione helper per il salvataggio sicuro
     const saveData = (base64Content, fileName, fileType) => {
         const data = { 
             id: idVal, 
             data: dataVal,
+            effettuato: true,                 // <--- Fondamentale per sbloccare il controllo
+            anno: annoCorrente,               // <--- Salva l'anno corrente per il confronto
             nomeFile: fileName !== undefined ? fileName : (pDataExisting.nomeFile || null),
             tipoFile: fileType !== undefined ? fileType : (pDataExisting.tipoFile || null),
             contenutoBase64: base64Content !== undefined ? base64Content : (pDataExisting.contenutoBase64 || null)
@@ -875,105 +986,29 @@ function savePagoPAWithFile() {
         
         try {
             localStorage.setItem('pagopa_data', JSON.stringify(data));
-            alert("Quietanza PagoPA archiviata con successo!");
+            alert("Dati PagoPA salvati con successo!");
             openModule('pagopa');
         } catch (e) {
-            alert("Errore: Spazio di archiviazione esaurito! Prova a caricare un'immagine o PDF più piccolo (max 1.5MB).");
+            alert("Errore: Spazio di archiviazione esaurito! Carica un file più piccolo.");
             console.error(e);
         }
     };
 
     if (file) {
-        // Controllo della dimensione del file
         if (file.size > 1.5 * 1024 * 1024) {
-            alert("Il file è troppo grande. Carica un documento inferiore a 1.5 MB.");
+            alert("Il file è troppo grande. Massimo 1.5 MB.");
             return;
         }
-
         const reader = new FileReader();
         reader.onload = function(e) {
             saveData(e.target.result, file.name, file.type);
         };
         reader.readAsDataURL(file);
     } else {
-        // Salva mantenendo il file pre-esistente
-        saveData();
+        saveData(pDataExisting.contenutoBase64, pDataExisting.nomeFile, pDataExisting.tipoFile);
     }
 }
-function saveF24WithFile() {
-    const annoVal = document.getElementById('f-anno').value.trim();
-    const protocolloVal = document.getElementById('f-protocollo').value.trim();
-    const dataVersamentoVal = document.getElementById('f-data-versamento').value;
-    
-    const fileInput = document.getElementById('f-file');
-    const file = fileInput ? fileInput.files[0] : null;
 
-    if (!annoVal || !protocolloVal) {
-        alert("Inserisci l'anno fiscale e il numero di protocollo.");
-        return;
-    }
-
-    if (!dataVersamentoVal) {
-        alert("Inserisci la data di versamento.");
-        return;
-    }
-
-    // Lettura sicura dei dati esistenti
-    let fDataExisting = {};
-    try {
-        const rawData = localStorage.getItem('f24_data');
-        if (rawData) {
-            fDataExisting = JSON.parse(rawData);
-        }
-    } catch (err) {
-        console.warn("Dati F24 esistenti non validi, reset della chiave.", err);
-        localStorage.removeItem('f24_data');
-    }
-
-    // Controllo obbligatorietà file se non esiste già un allegato precedente
-    if (!file && !fDataExisting.contenutoBase64) {
-        alert("Il caricamento della quietanza F24 (Immagine o PDF) è obbligatorio.");
-        return;
-    }
-
-    // Funzione interna per il salvataggio unificato su localStorage
-    const executeStorageSave = (base64Content, fileName, fileType) => {
-        const data = { 
-            anno: annoVal, 
-            protocollo: protocolloVal,
-            dataVersamento: dataVersamentoVal,
-            nomeFile: fileName !== undefined ? fileName : (fDataExisting.nomeFile || null),
-            tipoFile: fileType !== undefined ? fileType : (fDataExisting.tipoFile || null),
-            contenutoBase64: base64Content !== undefined ? base64Content : (fDataExisting.contenutoBase64 || null)
-        };
-        
-        try {
-            localStorage.setItem('f24_data', JSON.stringify(data));
-            alert("F24 ELIDE archiviato con successo!");
-            openModule('f24');
-        } catch (e) {
-            console.error("Errore di quota localStorage:", e);
-            alert("Errore: Spazio di archiviazione esaurito! Prova a caricare un file più piccolo (max 1.5MB).");
-        }
-    };
-
-    // Gestione asincrona del file caricato
-    if (file) {
-        if (file.size > 1.5 * 1024 * 1024) {
-            alert("Il file è troppo grande. Carica un documento inferiore a 1.5 MB.");
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            executeStorageSave(e.target.result, file.name, file.type);
-        };
-        reader.readAsDataURL(file);
-    } else {
-        // Mantiene il file precedentemente salvato se non viene ricaricato un nuovo file
-        executeStorageSave();
-    }
-}
 function saveNewCane() {
     const nome = document.getElementById('c-nome').value.trim();
     const razza = document.getElementById('c-razza').value.trim();
@@ -1074,20 +1109,16 @@ function toggleRegimeFiscaleFields() {
         if (containerRitenuta) containerRitenuta.style.display = 'none';
     }
 }
+
 function calcolaRitenutaAcconto() {
     const regime = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
-    
     if (regime !== 'ritenuta') return;
     
     const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
     
-    // 1. Calcola correttamente la base imponibile (78% del lordo)
-    const baseImponibileRitenuta = importoTotale * 0.78; 
-    
-    // 2. Calcola il 23% ESCLUSIVAMENTE sulla base imponibile
-    const ritenuta = baseImponibileRitenuta * 0.23; 
-    
-    // 3. Calcola il netto sottraendo la ritenuta dal lordo
+    // Correzione: calcolo coerente con la ritenuta applicata sul 78% (17.94 su 100)
+    const baseImponibileRitenuta = importoTotale * 0.78;
+    const ritenuta = baseImponibileRitenuta * 0.23;
     const netto = importoTotale - ritenuta;
     
     const elRitenuta = document.getElementById('r-importo-ritenuta');
@@ -1096,188 +1127,179 @@ function calcolaRitenutaAcconto() {
     if (elRitenuta) elRitenuta.value = ritenuta.toFixed(2);
     if (elNetto) elNetto.value = netto.toFixed(2);
 }
-// Codice aggiornato con il calcolo complessivo per anno solare (sia per imposta sostitutiva che per ritenuta d'acconto)
 
 function registraVenditaConPrezzoKg() {
-    // Limite fisso massimo per singola ricevuta
-    const LIMITE_BLOCCO_RICEVUTA = 7000;
-    // Limite massimo complessivo per anno solare
-    const LIMITE_ANNUALE_TOTALE = 7000;
-
-    const acquirente = document.getElementById('r-acquirente') ? document.getElementById('r-acquirente').value.trim() : '';
-    const acquirenteCf = document.getElementById('r-cf-acquirente') ? document.getElementById('r-cf-acquirente').value.trim() : '';
-    const specie = document.getElementById('r-specie') ? document.getElementById('r-specie').value : '';
-    const qualita = document.getElementById('r-qualita') ? document.getElementById('r-qualita').value : '';
-    const peso = parseFloat(document.getElementById('pesoGrammi').value) || 0;
-    const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
-    const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
-    const comune = document.getElementById('r-comune') ? document.getElementById('r-comune').value.trim() : '';
-    const lotto = document.getElementById('r-lotto') ? document.getElementById('r-lotto').value.trim() : '';
-    const f24 = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
-
-    // 1. Controllo del limite per singola ricevuta
-    if (importoTotale > LIMITE_BLOCCO_RICEVUTA) {
-        alert(`❌ Blocco di sicurezza attivo: L'importo inserito (€ ${importoTotale.toFixed(2)}) supera il limite massimo consentito di € ${LIMITE_BLOCCO_RICEVUTA.toFixed(0)} per singola ricevuta.`);
-        return;
-    }
-
-    // 2. Controllo del totale complessivo per anno solare
-    const annoCorrente = new Date().getFullYear();
-    let storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-    
-    let totaleAnnoSolare = 0;
-    storicoVendite.forEach(vendita => {
-        if (vendita.data) {
-            let partiData = vendita.data.split(' ')[0].split('/');
-            if (partiData.length === 3) {
-                let annoVendita = parseInt(partiData[2], 10);
-                if (annoVendita === annoCorrente) {
-                    totaleAnnoSolare += parseFloat(vendita.importo) || 0;
-                }
-            }
-        }
-    });
-
-    if ((totaleAnnoSolare + importoTotale) > LIMITE_ANNUALE_TOTALE) {
-        let residuo = LIMITE_ANNUALE_TOTALE - totaleAnnoSolare;
-        if (residuo < 0) residuo = 0;
-        alert(`❌ Superamento limite annuo: Con questa transazione (€ ${importoTotale.toFixed(2)}), il totale cumulato per l'anno ${annoCorrente} raggiungerebbe € ${(totaleAnnoSolare + importoTotale).toFixed(2)}, superando il tetto massimo consentito di € ${LIMITE_ANNUALE_TOTALE.toFixed(0)}.\n\nMargine residuo disponibile per l'anno in corso: € ${residuo.toFixed(2)}.`);
-        return;
-    }
-
-    // 3. Controllo preliminare sui dati anagrafici del venditore
+    // 1. BLOCCO MANCANZA DATI TESSERINO
     const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
-    const venditoreNome = tData.nome ? tData.nome.trim() : '';
-    const venditoreCf = tData.cf ? tData.cf.trim() : '';
-    const venditoreTesserino = tData.num ? tData.num.trim() : '';
-    const venditoreRegione = tData.regione || 'Non specificata';
-
-    if (!venditoreNome || !venditoreCf || !venditoreTesserino || venditoreNome === 'Non specificato' || venditoreCf === 'Non specificato' || venditoreTesserino === 'Non specificato') {
-        alert("❌ Impossibile registrare la ricevuta: i dati del venditore (Nome, Codice Fiscale e Numero Tesserino) sono mancanti o incompleti. Configura prima il tesserino.");
+    if (!tData.nome || !tData.cf || !tData.num) {
+        alert("❌ Attenzione: Impossibile procedere.\nMancano i dati anagrafici, il codice fiscale o gli estremi del tesserino di raccolta.");
+        openModule('tesserino');
         return;
     }
 
-    // 4. Controllo separato: Verifica validità PagoPA (Tassa Regionale Tesserino - obbligatorio per vendere)
-    let pagopaValido = false;
-    try {
-        const pData = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
-        if (pData.contenutoBase64 && pData.data) {
-            const annoPagoPa = new Date(pData.data).getFullYear();
-            if (annoPagoPa === annoCorrente) {
-                pagopaValido = true;
-            }
-        }
-    } catch (e) {
-        pagopaValido = false;
-    }
-
-    if (!pagopaValido) {
-        alert(`❌ Tesserino non in regola: Manca la ricevuta PagoPA della tassa regionale di concessione valida per l'anno ${annoCorrente}. Impossibile effettuare vendite.`);
-        return;
-    }
-
-    // 5. Commutazione automatica del regime fiscale basata unicamente sull'F24 ELIDE
-    let f24Valido = false;
-    try {
-        const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
-        if (fData.dataVersamento) {
-            const dataVersamento = new Date(fData.dataVersamento);
-            const annoVersamento = dataVersamento.getFullYear();
-            if (annoVersamento === annoCorrente && dataVersamento >= new Date(annoCorrente, 0, 1)) {
-                f24Valido = true;
-            }
-        }
-    } catch (e) {
-        f24Valido = false;
-    }
-
-    // Se l'F24 è presente e valido -> Imposta Sostitutiva, altrimenti -> Ritenuta d'Acconto
-    const regime = f24Valido ? 'sostitutiva' : 'ritenuta';
-
-    if (!acquirente) {
-        alert("Inserisci il nome dell'acquirente o del ristorante.");
-        return;
-    }
-
-    if (importoTotale <= 0) {
-        alert("L'importo totale deve essere superiore a zero.");
-        return;
-    }
-
-    let importoRitenuta = 0;
-    let importoNetto = importoTotale;
+    // 2. CONTROLLO VALIDITÀ PAGOPA (Tassa regionale/annuale tesserino)
+    const pagoPaSaved = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
+    const annoCorrente = new Date().getFullYear();
     
-    if (regime === 'ritenuta') {
-        const baseImponibile = importoTotale * 0.78;
-        importoRitenuta = Number((baseImponibile * 0.23).toFixed(2));
-        importoNetto = Number((importoTotale - importoRitenuta).toFixed(2));
+    if (!pagoPaSaved.effettuato || parseInt(pagoPaSaved.anno) !== annoCorrente) {
+        alert("❌ Attenzione: Ricevuta PagoPA non valida o assente per l'anno in corso.\nÈ necessario regolarizzare il pagamento della tassa tesserino prima di registrare vendite.");
+        openModule('pagopa');
+        return;
     }
 
-    const nuovaVendita = {
-        data: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-        regime,
-        acquirente,
-        acquirenteCf,
-        specie,
-        qualita,
-        peso,
-        prezzoKg,
-        importo: importoTotale.toFixed(2),
-        ritenuta: importoRitenuta.toFixed(2),
-        netto: importoNetto.toFixed(2),
-        comune,
-        lotto,
-        f24: regime === 'sostitutiva' ? f24 : 'NON APPLICATO',
-        venditoreNome,
-        venditoreCf,
-        venditoreTesserino,
-        venditoreRegione
-    };
+    let regimeScelto = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
+    
+    // 3. CONTROLLO RICEVUTA F24 (Imposta sostitutiva 100€)
+    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+    const f24InputVal = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
+    const protocolloF24 = f24InputVal || f24SavedData.protocollo;
+    let dataPagamentoF24 = f24SavedData.dataPagamento ? new Date(f24SavedData.dataPagamento) : null;
 
-    storicoVendite.push(nuovaVendita);
-    localStorage.setItem('storico_vendite', JSON.stringify(storicoVendite));
+    let f24Valido = false;
+
+    if (protocolloF24 && dataPagamentoF24 && !isNaN(dataPagamentoF24.getTime())) {
+        const scadenzaF24 = new Date(annoCorrente, 1, 16, 23, 59, 59); // 1 = Febbraio
+        
+        if (dataPagamentoF24 <= scadenzaF24) {
+            f24Valido = true;
+        }
+    }
+
+    // 4. COMMUTAZIONE AUTOMATICA A REGIME RITENUTA D'ACCONTO
+    if (regimeScelto === 'sostitutiva' && !f24Valido) {
+        regimeScelto = 'ritenuta';
+        alert("ℹ️ Ricevuta F24 non rilevata, non valida o fuori termine:\nIl sistema ha automaticamente convertito la scelta sul regime a 'Ritenuta d'Acconto (23% sul 78%)'.");
+    }
+
+    // 5. GESTIONE ACQUIRENTE E RUBRICA
+    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
+    const acquirenteCf = document.getElementById('r-cf-acquirente').value.trim();
+    
+    if (!acquirenteNome) {
+        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
+        return;
+    }
 
     let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
-    const clienteEsistente = rubricaClienti.find(c => c.nome.toLowerCase() === acquirente.toLowerCase());
-    if (clienteEsistente) {
-        clienteEsistente.cf = acquirenteCf || clienteEsistente.cf;
-        clienteEsistente.dataUltimoAcquisto = new Date().toLocaleDateString();
-    } else {
+    const clienteEsistente = rubricaClienti.find(c => c.nome.toLowerCase() === acquirenteNome.toLowerCase());
+    
+    if (!clienteEsistente) {
         rubricaClienti.push({
-            nome: acquirente,
+            nome: acquirenteNome,
             cf: acquirenteCf,
             dataUltimoAcquisto: new Date().toLocaleDateString()
         });
+    } else {
+        clienteEsistente.dataUltimoAcquisto = new Date().toLocaleDateString();
+        if(acquirenteCf) clienteEsistente.cf = acquirenteCf;
     }
     localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
 
-    const nomeRegimeDisplay = regime === 'sostitutiva' ? "Imposta Sostitutiva" : "Ritenuta d'Acconto";
-    alert(`✅ Ricevuta registrata correttamente in regime di ${nomeRegimeDisplay}. Totale cumulato aggiornato per l'anno ${annoCorrente}.`);
-    visualizzaRicevutaSalvata(storicoVendite.length - 1);
+    // 6. CALCOLI FINANZIARI (Lordo inserito -> Ritenuta calcolata a scendere)
+    const pesoGrammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
+    const qualitaScelta = document.getElementById('r-qualita').value;
+    const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
+    
+    let importoRitenuta = '0.00';
+    let importoNetto = importoTotale.toFixed(2);
+
+    if (regimeScelto === 'ritenuta') {
+        const baseImponibileRitenuta = importoTotale * 0.78;
+        const calcoloRitenuta = baseImponibileRitenuta * 0.23;
+        importoRitenuta = calcoloRitenuta.toFixed(2);
+        importoNetto = (importoTotale - calcoloRitenuta).toFixed(2);
+    }
+
+    // 7. CALCOLO SOGLIA ANNUA (7000 €) BASATO SUL LORDO E VERIFICA BLOCCO
+    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    
+    let totaleVenditeAnno = storico.reduce((acc, v) => {
+        const dataVendita = v.data ? new Date(v.data.split('/').reverse().join('-')) : new Date();
+        const annoVendita = dataVendita.getFullYear();
+        if (annoVendita === annoCorrente) {
+            // Prende sempre l'importo totale (lordo) della ricevuta precedente
+            const valoreLordo = parseFloat(v.importo) || 0;
+            return acc + valoreLordo;
+        }
+        return acc;
+    }, 0);
+
+    const sogliaBlocco = 7000.00;
+    // Prende l'importo totale (lordo) della transazione corrente
+    const importoCorrenteLordo = importoTotale; 
+    const nuovoTotaleAnno = totaleVenditeAnno + importoCorrenteLordo;
+    const quantoManca = Math.max(0, sogliaBlocco - nuovoTotaleAnno);
+
+    if (nuovoTotaleAnno > sogliaBlocco) {
+        alert(`❌ ATTENZIONE: Soglia di blocco di € 7.000 superata!\nIl totale annuo delle vendite raggiungerebbe € ${nuovoTotaleAnno.toFixed(2)}. Registrazione bloccata per limiti normativi.`);
+        return;
+    }
+
+    // 8. MESSAGGIO DI RIEPILOGO CON PRESA VISIONE (SOLO RISULTATI €)
+    const tipoRicevutaTesto = regimeScelto === 'sostitutiva' 
+        ? "Imposta Sostitutiva (F24)" 
+        : "Ritenuta d'Acconto (23% sul 78%)";
+
+    const messaggioRiepilogo = 
+        `📋 RIEPILOGO NUOVA RICEVUTA\n` +
+        `----------------------------------------\n` +
+        `• Tipo Regime: ${tipoRicevutaTesto}\n` +
+        `• Importo Totale (Lordo): € ${importoTotale.toFixed(2)}\n` +
+        `• Ritenuta applicata: € ${importoRitenuta}\n` +
+        `• Importo Netto: € ${importoNetto}\n` +
+        `----------------------------------------\n` +
+        `• Totale vendite annue: € ${nuovoTotaleAnno.toFixed(2)} / € 7.000,00\n` +
+        `• Mancante alla soglia di blocco: € ${quantoManca.toFixed(2)}\n\n` +
+        `Premi OK per confermare la presa visione e registrare la vendita, oppure Annulla per interrompere.`;
+
+    const confermaPresaVisione = window.confirm(messaggioRiepilogo);
+    if (!confermaPresaVisione) {
+        return; 
+    }
+
+    // 9. REGISTRAZIONE NELLO STORICO VENDITE E MESSAGGIO FINALE
+    const vendita = {
+        venditoreNome: tData.nome, 
+        venditoreCf: tData.cf, 
+        venditoreTesserino: tData.num || 'N.D.', 
+        venditoreRegione: tData.regione || 'N.D.',
+        acquirente: acquirenteNome, 
+        acquirenteCf: acquirenteCf,
+        specie: document.getElementById('r-specie').value, 
+        qualita: qualitaScelta,
+        peso: pesoGrammi, 
+        importo: importoTotale.toFixed(2),
+        regime: regimeScelto,
+        ritenuta: importoRitenuta,
+        netto: importoNetto,
+        comune: document.getElementById('r-comune').value.trim(), 
+        lotto: document.getElementById('r-lotto').value.trim(), 
+        f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto 23% su 78%)', 
+        data: new Date().toLocaleDateString()
+    };
+    
+    storico.push(vendita);
+    localStorage.setItem('storico_vendite', JSON.stringify(storico));
+    
+    alert(`✔ Ricevuta registrata con successo!\n\nRiepilogo operazione:\n- Importo Lordo: € ${importoTotale.toFixed(2)}\n- Totale annuo progressivo: € ${nuovoTotaleAnno.toFixed(2)}`);
+    openModule('storico_ricevute');
 }
+
 function visualizzaRicevutaSalvata(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const v = storico[index];
     if(!v) return;
 
     const isRitenuta = v.regime === 'ritenuta';
-    const importoTotaleNum = Number(v.importo) || 0;
-    
-    // Calcoli allineati al 78% dell'imponibile
-    const baseImponibile = importoTotaleNum * 0.78;
-    const valoreRitenuta = v.ritenuta || (baseImponibile * 0.23).toFixed(2);
-    const valoreNetto = v.netto || (importoTotaleNum - valoreRitenuta).toFixed(2);
-
     const dettagliFiscoHtml = isRitenuta ? `
-        <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% sul 78% dell'imponibile (esonerata dall'imposta sostitutiva)</p>
-        <p><strong>Compenso Lordo:</strong> € ${importoTotaleNum.toFixed(2)}</p>
-        <p><strong>Base Imponibile (78%):</strong> € ${baseImponibile.toFixed(2)}</p>
-        <p><strong>Ritenuta d'Acconto (23%):</strong> € ${valoreRitenuta}</p>
-        <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Netto a Pagare / Percepito:</strong> € ${valoreNetto}</p>
+        <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (esonerata dall'imposta sostitutiva)</p>
+        <p><strong>Compenso Lordo:</strong> € ${v.importo}</p>
+        <p><strong>Ritenuta d'Acconto (23%):</strong> € ${v.ritenuta || (v.importo * 0.23).toFixed(2)}</p>
+        <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Netto a Pagare / Percepito:</strong> € ${v.netto || (v.importo * 0.77).toFixed(2)}</p>
     ` : `
         <p><strong>Regime Fiscale:</strong> Imposta Sostitutiva (Legge 145/2018)</p>
         <p><strong>Versamento F24 ELIDE (100€):</strong> Protocollo N. ${v.f24}</p>
-        <p style="font-size: 1.1rem; margin-top: 10px;"><strong>Importo Totale:</strong> € ${importoTotaleNum.toFixed(2)}</p>
+        <p style="font-size: 1.1rem; margin-top: 10px;"><strong>Importo Totale:</strong> € ${v.importo}</p>
     `;
 
     let activeView = document.getElementById('active-module-view');
@@ -1373,85 +1395,52 @@ function modificaRicevuta(index) {
         }
     }, 50);
 }
-function salvaModificaRicevuta(idRicevuta) {
-    // 1. Recupero dei valori dai selettori corretti del DOM (presenti nel modulo ricevute)
-    const elRegime = document.getElementById('r-regime');
-    const elAcquirente = document.getElementById('r-acquirente');
-    const elCfAcquirente = document.getElementById('r-cf-acquirente');
-    const elSpecie = document.getElementById('r-specie');
-    const elQualita = document.getElementById('r-qualita');
-    const elPeso = document.getElementById('pesoGrammi');
-    const elPrezzoKg = document.getElementById('prezzoKg');
-    const elImportoTotale = document.getElementById('importoTotale');
-    const elComune = document.getElementById('r-comune');
-    const elLotto = document.getElementById('r-lotto');
-    const elF24 = document.getElementById('r-f24');
-
-    const regimeScelto = elRegime ? elRegime.value : 'sostitutiva';
-    const acquirente = elAcquirente ? elAcquirente.value.trim() : '';
-    const acquirenteCf = elCfAcquirente ? elCfAcquirente.value.trim() : '';
-    const specie = elSpecie ? elSpecie.value : '';
-    const qualita = elQualita ? elQualita.value : '';
-    const peso = parseFloat(elPeso ? elPeso.value : 0) || 0;
-    const prezzoKg = parseFloat(elPrezzoKg ? elPrezzoKg.value : 0) || 0;
-    const importoTotale = parseFloat(elImportoTotale ? elImportoTotale.value : 0) || 0;
-    const comune = elComune ? elComune.value.trim() : '';
-    const lotto = elLotto ? elLotto.value.trim() : '';
-    const f24 = elF24 ? elF24.value.trim() : '';
-
-    if (!acquirente) {
-        alert("Inserisci il nome dell'acquirente o del ristorante.");
-        return;
-    }
-
-    if (importoTotale <= 0) {
-        alert("L'importo totale deve essere superiore a zero.");
-        return;
-    }
-
-    // 2. Calcolo fiscale coerente (Ritenuta 23% sul 78% dell'imponibile se applicabile)
-    let importoRitenuta = 0;
-    let importoNetto = importoTotale;
-
-    if (regimeScelto === 'ritenuta') {
-        const baseImponibileRitenuta = importoTotale * 0.78;
-        importoRitenuta = Number((baseImponibileRitenuta * 0.23).toFixed(2));
-        importoNetto = Number((importoTotale - importoRitenuta).toFixed(2));
-    }
-
-    // 3. Recupero dello storico dal localStorage
-    let storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+function salvaModificaRicevuta(index) {
+    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
     
-    if (!storicoVendite[idRicevuta]) {
-        alert("Errore: Impossibile trovare la ricevuta da modificare.");
+    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
+    if (!acquirenteNome) {
+        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
         return;
     }
 
-    // 4. Aggiornamento dei dati della ricevuta mantenendo data e dati del venditore originali
-    storicoVendite[idRicevuta] = {
-        ...storicoVendite[idRicevuta],
+    let regimeScelto = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
+    const f24InputVal = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
+    const protocolloF24 = f24InputVal || f24SavedData.protocollo;
+
+    if (regimeScelto === 'sostitutiva' && !protocolloF24) {
+        regimeScelto = 'ritenuta';
+    }
+
+    const importoCorrente = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const importoRitenuta = regimeScelto === 'ritenuta' ? (importoCorrente * 0.23).toFixed(2) : '0.00';
+    const importoNetto = regimeScelto === 'ritenuta' ? (importoCorrente * 0.77).toFixed(2) : importoCorrente.toFixed(2);
+
+    storico[index] = {
+        venditoreNome: tData.nome || storico[index].venditoreNome, 
+        venditoreCf: tData.cf || storico[index].venditoreCf, 
+        venditoreTesserino: tData.num || storico[index].venditoreTesserino, 
+        venditoreRegione: tData.regione || storico[index].venditoreRegione,
+        acquirente: acquirenteNome, 
+        acquirenteCf: document.getElementById('r-cf-acquirente').value.trim(),
+        specie: document.getElementById('r-specie').value, 
+        qualita: document.getElementById('r-qualita').value,
+        peso: document.getElementById('pesoGrammi').value, 
+        importo: importoCorrente.toFixed(2),
         regime: regimeScelto,
-        acquirente,
-        acquirenteCf,
-        specie,
-        qualita,
-        peso,
-        prezzoKg,
-        importo: importoTotale.toFixed(2),
-        ritenuta: importoRitenuta.toFixed(2),
-        netto: importoNetto.toFixed(2),
-        comune,
-        lotto,
-        f24: regimeScelto === 'sostitutiva' ? f24 : 'NON APPLICATO'
+        ritenuta: importoRitenuta,
+        netto: importoNetto,
+        comune: document.getElementById('r-comune').value.trim(), 
+        lotto: document.getElementById('r-lotto').value.trim(), 
+        f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto)', 
+        data: storico[index].data
     };
 
-    // 5. Salvataggio nel localStorage
-    localStorage.setItem('storico_vendite', JSON.stringify(storicoVendite));
-
-    alert("✅ Ricevuta aggiornata con successo!");
-
-    // 6. Ritorno alla visualizzazione della ricevuta aggiornata o allo storico
-    visualizzaRicevutaSalvata(idRicevuta);
+    localStorage.setItem('storico_vendite', JSON.stringify(storico));
+    alert("Ricevuta aggiornata con successo!");
+    openModule('storico_ricevute');
 }
 async function condividiRicevuta(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
@@ -1650,135 +1639,4 @@ function chiudiVisualizzazioneImmagine(moduloProvenienza = 'tesserino') {
     } else {
         openModule(moduloProvenienza);
     }
-}
-/**
- * Valida i requisiti per l'emissione della ricevuta basandosi sui dati reali salvati nell'applicazione.
- */
-function validaRequisitiEmissioneRicevuta() {
-    try {
-        const annoCorrente = new Date().getFullYear();
-        
-        // Recupero dei dati dal localStorage in modo sicuro
-        let f24 = null;
-        let pagoPa = null;
-        
-        try {
-            f24 = JSON.parse(localStorage.getItem('f24_data'));
-        } catch(e) { f24 = null; }
-
-        try {
-            pagoPa = JSON.parse(localStorage.getItem('pagopa_data'));
-        } catch(e) { pagoPa = null; }
-        
-        let pagoPaValido = false;
-        let f24Valido = false;
-
-        // Controllo PagoPA: verifica della presenza del file e data nell'anno solare in corso
-        if (pagoPa && pagoPa.contenutoBase64 && pagoPa.data) {
-            const annoPagoPa = new Date(pagoPa.data).getFullYear();
-            if (annoPagoPa === annoCorrente) {
-                pagoPaValido = true;
-            }
-        }
-
-        // Controllo F24: verifica della presenza del file e versamento tra 1 e 16 gennaio dell'anno in corso
-        if (f24 && f24.contenutoBase64 && f24.dataVersamento) {
-            const dataVersamento = new Date(f24.dataVersamento);
-            const annoVersamento = dataVersamento.getFullYear();
-            const meseVersamento = dataVersamento.getMonth(); // 0 = Gennaio
-            const giornoVersamento = dataVersamento.getDate();
-
-            const eGennaio = (meseVersamento === 0);
-            const eTra1E16 = (giornoVersamento >= 1 && giornoVersamento <= 16);
-
-            if (annoVersamento === annoCorrente && eGennaio && eTra1E16) {
-                f24Valido = true;
-            }
-        }
-
-        const requisitiSoddisfatti = pagoPaValido || f24Valido;
-
-        if (!requisitiSoddisfatti) {
-            console.warn("Requisiti di emissione ricevuta non soddisfatti (controllare vincoli temporali PagoPA o F24 ELIDE).");
-        }
-
-        return requisitiSoddisfatti;
-
-    } catch (error) {
-        console.error("Errore durante la validazione dei requisiti:", error);
-        return false;
-    }
-}
-/**
- * Genera l'HTML di stampa della ricevuta utilizzando la struttura dati effettiva dell'applicazione.
- * @param {Object} v - Oggetto ricevuta/vendita preso dallo storico o dai dati correnti.
- */
-function generaHTMLStampaRicevuta(v) {
-    const venditore = v.venditoreNome || v.cedente || "Dato non disponibile";
-    const acquirente = v.acquirente || "Dato non disponibile";
-    const specie = v.specie || v.prodotto || "-";
-    const peso = v.peso || v.quantita || "0";
-    const importo = v.importoTotale || v.totale || "0.00";
-    const data = v.data || v.dataVendita || new Date().toLocaleDateString();
-
-    return `
-        <div class="ricevuta-stampa" style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto;">
-            <h2>Ricevuta di Vendita / Transazione</h2>
-            <hr>
-            <p><strong>Data:</strong> ${data}</p>
-            <p><strong>Venditore / Cedente:</strong> ${venditore}</p>
-            <p><strong>Acquirente:</strong> ${acquirente}</p>
-            <hr>
-            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
-                <thead>
-                    <tr style="background-color: #f2f2f2; text-align: left;">
-                        <th style="padding: 8px; border: 1px solid #ddd;">Specie / Prodotto</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">Peso / Quantità</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">Importo Totale (€)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${specie}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${peso}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${importo}</td>
-                    </tr>
-                </tbody>
-            </table>
-            <hr style="margin-top: 20px;">
-            <p style="text-align: center; font-size: 0.9em; color: #555;">Documento generato automaticamente dal sistema.</p>
-        </div>
-    `;
-}
-
-function renderizzaCardRicevuta(ricevuta) {
-    const lordo = Number(ricevuta.importo) || ricevuta.valoreStimato || ricevuta.importoLordo || 0;
-    const isRitenuta = ricevuta.regime === 'ritenuta';
-    
-    // Calcolo coerente con il resto dell'app (Base imponibile 78% e ritenuta 23%)
-    const baseImponibile = lordo * 0.78;
-    const ritenuta = isRitenuta ? (baseImponibile * 0.23) : 0;
-    const netto = lordo - ritenuta;
-
-    return `
-        <div class="card-ricevuta" style="background: #1e293b; border: 1px solid #334155; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-            <div class="card-header" style="color: #60a5fa; font-weight: bold; margin-bottom: 6px;">
-                📄 Ricevuta #${ricevuta.id || 'N.D.'} - ${ricevuta.data || ''} 
-                <span class="badge" style="font-size: 0.75rem; color: ${isRitenuta ? '#38bdf8' : '#22c55e'};">
-                    [${isRitenuta ? "Ritenuta d'Acconto" : "Imposta Sostitutiva"}]
-                </span>
-            </div>
-            <div class="card-body" style="color: #f8fafc; font-size: 0.9rem;">
-                <p><strong>Acquirente:</strong> ${ricevuta.acquirente || 'Non specificato'}</p>
-                <p><strong>Specie:</strong> ${ricevuta.specie || '-'}</p>
-                <p class="importo-lordo"><strong>Importo Lordo:</strong> € ${lordo.toFixed(2)}</p>
-                ${isRitenuta ? `<p class="importo-netto" style="color: #4ade80;"><strong>Netto a Pagare:</strong> € ${netto.toFixed(2)} <small style="color: #94a3b8;">(Ritenuta 23%: € ${ritenuta.toFixed(2)})</small></p>` : ''}
-            </div>
-            <div class="card-actions" style="display: flex; gap: 6px; margin-top: 10px;">
-                <button class="overlay-btn" style="background:#2563eb; padding:6px 10px; font-size:0.75rem;">Visualizza</button>
-                <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;">Modifica</button>
-                <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;">Elimina</button>
-            </div>
-        </div>
-    `;
 }
