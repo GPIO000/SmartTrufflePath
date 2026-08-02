@@ -404,12 +404,25 @@ function openModule(moduleName, editMode = false) {
                 storicoVendite.slice().reverse().forEach((item, index) => {
                     const originalIndex = storicoVendite.length - 1 - index;
                     const regimeLabel = item.regime === 'ritenuta' ? '<span style="color:#38bdf8; font-size:0.75rem;">[Ritenuta d\'Acconto]</span>' : '<span style="color:#22c55e; font-size:0.75rem;">[Imposta Sostitutiva]</span>';
+                    
+                    // Calcolo visivo per il netto se il regime è a ritenuta
+                    let importoVisualizzatoHtml = `<p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">Importo: € ${item.importo}</p>`;
+                    if (item.regime === 'ritenuta') {
+                        const lordoNum = Number(item.importo) || 0;
+                        const nettoVal = item.netto || (lordoNum * 0.77).toFixed(2);
+                        const ritenutaVal = item.ritenuta || (lordoNum * 0.23).toFixed(2);
+                        importoVisualizzatoHtml = `
+                            <p style="font-size:0.85rem; color:#f8fafc; margin-top:4px;">Importo Lordo: € ${lordoNum.toFixed(2)}</p>
+                            <p style="font-size:0.9rem; color:#4ade80; font-weight:bold; margin:2px 0;">Netto a Pagare: € ${nettoVal} <small style="color:#94a3b8; font-weight:normal;">(Ritenuta 23%: € ${ritenutaVal})</small></p>
+                        `;
+                    }
+
                     storicoHtml += `
                         <div class="module-card" style="margin-bottom:12px; border-left: 4px solid #3b82f6;">
                             <strong style="color:#60a5fa; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${item.data} ${regimeLabel}</strong>
                             <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${item.acquirente}</b></p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${item.specie} (${item.peso}g)</p>
-                            <p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">Importo: € ${item.importo}</p>
+                            ${importoVisualizzatoHtml}
                             <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
                                 <button class="overlay-btn" style="background:#2563eb; padding:6px 10px; font-size:0.75rem;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza</button>
                                 <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="modificaRicevuta(${originalIndex})">✏️ Modifica</button>
@@ -422,26 +435,28 @@ function openModule(moduleName, editMode = false) {
             break;
         case 'f24':
             const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
-            if (fData.protocollo && !editMode) {
-                let filePreviewHTML = '';
-                let visualizzaBtnHTML = '';
-                if (fData.contenutoBase64) {
-                    if (fData.tipoFile && fData.tipoFile.startsWith('image/')) {
-                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${fData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
-                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${fData.contenutoBase64}', 'F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
-                    } else {
-                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
-                    }
+            let filePreviewHTML = '';
+            let visualizzaBtnHTML = '';
+            
+            if (fData.contenutoBase64) {
+                if (fData.tipoFile && fData.tipoFile.startsWith('image/')) {
+                    filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${fData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
+                    visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${fData.contenutoBase64}', 'Quietanza F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
                 } else {
-                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                    filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
                 }
+            } else {
+                filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+            }
 
+            if (fData.protocollo && !editMode) {
                 contentHTML = `
                     <h2>F24 ELIDE - Imposta Sostitutiva</h2>
                     <div class="module-card" style="border-left: 4px solid #22c55e;">
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ F24 Registrato</p>
                         <p><strong>Anno Fiscale:</strong> ${fData.anno}</p>
                         <p><strong>Protocollo:</strong> ${fData.protocollo}</p>
+                        <p><strong>Data Versamento:</strong> ${fData.dataVersamento || 'Non specificata'}</p>
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
@@ -456,10 +471,16 @@ function openModule(moduleName, editMode = false) {
                     <div class="module-card">
                         <label>Anno Fiscale di Riferimento:</label>
                         <input type="text" id="f-anno" class="mod-input" value="${fData.anno || new Date().getFullYear()}" placeholder="Es. 2026">
+                        
                         <label>Numero di Protocollo Telematico:</label>
                         <input type="text" id="f-protocollo" class="mod-input" value="${fData.protocollo || ''}" placeholder="Es. 24010112345678901">
+                        
+                        <label>Data di Versamento (fondamentale per la validità 1-16 Gennaio):</label>
+                        <input type="date" id="f-data-versamento" class="mod-input" value="${fData.dataVersamento || ''}">
+                        
                         <label>Carica Quietanza F24 (PDF o Immagine - Obbligatorio):</label>
                         <input type="file" id="f-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
+                        
                         <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="saveF24WithFile()">Archivia F24 ELIDE</button>
                     </div>`;
             }
@@ -882,6 +903,8 @@ function savePagoPAWithFile() {
 function saveF24WithFile() {
     const annoVal = document.getElementById('f-anno').value.trim();
     const protocolloVal = document.getElementById('f-protocollo').value.trim();
+    const dataVersamentoVal = document.getElementById('f-data-versamento').value;
+    
     const fileInput = document.getElementById('f-file');
     const file = fileInput ? fileInput.files[0] : null;
 
@@ -890,19 +913,35 @@ function saveF24WithFile() {
         return;
     }
 
-    const fDataExisting = JSON.parse(localStorage.getItem('f24_data') || '{}');
-
-    // Il file è obbligatorio se non ne esiste già uno precedentemente salvato
-    if (!file && !fDataExisting.contenutoBase64) {
-        alert("Il caricamento della ricevuta F24 (PDF o Immagine) è obbligatorio.");
+    if (!dataVersamentoVal) {
+        alert("Inserisci la data di versamento.");
         return;
     }
 
-    // Funzione helper per il salvataggio sicuro
-    const saveData = (base64Content, fileName, fileType) => {
+    // Lettura sicura dei dati esistenti
+    let fDataExisting = {};
+    try {
+        const rawData = localStorage.getItem('f24_data');
+        if (rawData) {
+            fDataExisting = JSON.parse(rawData);
+        }
+    } catch (err) {
+        console.warn("Dati F24 esistenti non validi, reset della chiave.", err);
+        localStorage.removeItem('f24_data');
+    }
+
+    // Controllo obbligatorietà file se non esiste già un allegato precedente
+    if (!file && !fDataExisting.contenutoBase64) {
+        alert("Il caricamento della quietanza F24 (Immagine o PDF) è obbligatorio.");
+        return;
+    }
+
+    // Funzione interna per il salvataggio unificato su localStorage
+    const executeStorageSave = (base64Content, fileName, fileType) => {
         const data = { 
             anno: annoVal, 
             protocollo: protocolloVal,
+            dataVersamento: dataVersamentoVal,
             nomeFile: fileName !== undefined ? fileName : (fDataExisting.nomeFile || null),
             tipoFile: fileType !== undefined ? fileType : (fDataExisting.tipoFile || null),
             contenutoBase64: base64Content !== undefined ? base64Content : (fDataExisting.contenutoBase64 || null)
@@ -913,19 +952,13 @@ function saveF24WithFile() {
             alert("F24 ELIDE archiviato con successo!");
             openModule('f24');
         } catch (e) {
-            alert("Errore: Spazio di archiviazione esaurito! Prova a caricare un'immagine o PDF più piccolo (max 1.5MB).");
-            console.error(e);
+            console.error("Errore di quota localStorage:", e);
+            alert("Errore: Spazio di archiviazione esaurito! Prova a caricare un file più piccolo (max 1.5MB).");
         }
     };
 
+    // Gestione asincrona del file caricato
     if (file) {
-        // Verifica estensione/tipo file
-        if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
-            alert("Il file deve essere in formato PDF o Immagine.");
-            return;
-        }
-        
-        // Controllo della dimensione del file
         if (file.size > 1.5 * 1024 * 1024) {
             alert("Il file è troppo grande. Carica un documento inferiore a 1.5 MB.");
             return;
@@ -933,12 +966,12 @@ function saveF24WithFile() {
 
         const reader = new FileReader();
         reader.onload = function(e) {
-            saveData(e.target.result, file.name, file.type);
+            executeStorageSave(e.target.result, file.name, file.type);
         };
         reader.readAsDataURL(file);
     } else {
-        // Salva mantenendo il file pre-esistente
-        saveData();
+        // Mantiene il file precedentemente salvato se non viene ricaricato un nuovo file
+        executeStorageSave();
     }
 }
 function saveNewCane() {
@@ -1044,16 +1077,17 @@ function toggleRegimeFiscaleFields() {
 function calcolaRitenutaAcconto() {
     const regime = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
     
-    // Se il regime non è a ritenuta, esce
     if (regime !== 'ritenuta') return;
     
     const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
     
-    // Calcolo basato sul 78% dell'importo inserito
+    // 1. Calcola correttamente la base imponibile (78% del lordo)
     const baseImponibileRitenuta = importoTotale * 0.78; 
     
-    // Applicazione della ritenuta d'acconto (es. 23%) sul 78% dell'imponibile
+    // 2. Calcola il 23% ESCLUSIVAMENTE sulla base imponibile
     const ritenuta = baseImponibileRitenuta * 0.23; 
+    
+    // 3. Calcola il netto sottraendo la ritenuta dal lordo
     const netto = importoTotale - ritenuta;
     
     const elRitenuta = document.getElementById('r-importo-ritenuta');
@@ -1062,80 +1096,162 @@ function calcolaRitenutaAcconto() {
     if (elRitenuta) elRitenuta.value = ritenuta.toFixed(2);
     if (elNetto) elNetto.value = netto.toFixed(2);
 }
+// Codice aggiornato con il calcolo complessivo per anno solare (sia per imposta sostitutiva che per ritenuta d'acconto)
+
 function registraVenditaConPrezzoKg() {
-    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
-    if (!tData.nome || !tData.cf) {
-        alert("Attenzione: Impossibile procedere. Manca la comunicazione dei dati anagrafici e del tesserino.");
-        openModule('tesserino');
+    // Limite fisso massimo per singola ricevuta
+    const LIMITE_BLOCCO_RICEVUTA = 7000;
+    // Limite massimo complessivo per anno solare (es. limite forfettario / attività occasionale)
+    const LIMITE_ANNUALE_TOTALE = 7000;
+
+    let regime = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
+    const acquirente = document.getElementById('r-acquirente') ? document.getElementById('r-acquirente').value.trim() : '';
+    const acquirenteCf = document.getElementById('r-cf-acquirente') ? document.getElementById('r-cf-acquirente').value.trim() : '';
+    const specie = document.getElementById('r-specie') ? document.getElementById('r-specie').value : '';
+    const qualita = document.getElementById('r-qualita') ? document.getElementById('r-qualita').value : '';
+    const peso = parseFloat(document.getElementById('pesoGrammi').value) || 0;
+    const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
+    const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const comune = document.getElementById('r-comune') ? document.getElementById('r-comune').value.trim() : '';
+    const lotto = document.getElementById('r-lotto') ? document.getElementById('r-lotto').value.trim() : '';
+    const f24 = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
+
+    // 1. Controllo del limite per singola ricevuta
+    if (importoTotale > LIMITE_BLOCCO_RICEVUTA) {
+        alert(`❌ Blocco di sicurezza attivo: L'importo inserito (€ ${importoTotale.toFixed(2)}) supera il limite massimo consentito di € ${LIMITE_BLOCCO_RICEVUTA.toFixed(0)} per singola ricevuta.`);
         return;
     }
 
-    let regimeScelto = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
-    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
-    const f24InputVal = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
-    const protocolloF24 = f24InputVal || f24SavedData.protocollo;
-
-    // CONTROLLO AUTOMATICO: SE L'F24 NON È PRESENTE, SI PROCEDE CON LA RITENUTA D'ACCONTO
-    if (regimeScelto === 'sostitutiva' && !protocolloF24) {
-        regimeScelto = 'ritenuta';
-        alert("ℹ️ Ricevuta F24 non rilevata:\nIl sistema ha automaticamente convertito la scelta sul regime a 'Ritenuta d'Acconto (23%)'.");
-    }
-
-    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
-    const acquirenteCf = document.getElementById('r-cf-acquirente').value.trim();
+    // 2. Controllo del totale complessivo per anno solare (indipendentemente dal regime: sostitutiva o ritenuta)
+    const annoCorrente = new Date().getFullYear();
+    let storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     
-    if (!acquirenteNome) {
-        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
+    let totaleAnnoSolare = 0;
+    storicoVendite.forEach(vendita => {
+        // Estrae l'anno dalla stringa della data salvata (formato "DD/MM/YYYY HH:MM" o compatibile)
+        if (vendita.data) {
+            let partiData = vendita.data.split(' ')[0].split('/');
+            if (partiData.length === 3) {
+                let annoVendita = parseInt(partiData[2], 10);
+                if (annoVendita === annoCorrente) {
+                    totaleAnnoSolare += parseFloat(vendita.importo) || 0;
+                }
+            }
+        }
+    });
+
+    // Aggiunge l'importo della vendita corrente al calcolo complessivo dell'anno solare
+    if ((totaleAnnoSolare + importoTotale) > LIMITE_ANNUALE_TOTALE) {
+        let residuo = LIMITE_ANNUALE_TOTALE - totaleAnnoSolare;
+        if (residuo < 0) residuo = 0;
+        alert(`❌ Superamento limite annuo: Con questa transazione (€ ${importoTotale.toFixed(2)}), il totale cumulato per l'anno ${annoCorrente} raggiungerebbe € ${(totaleAnnoSolare + importoTotale).toFixed(2)}, superando il tetto massimo consentito di € ${LIMITE_ANNUALE_TOTALE.toFixed(0)}.\n\nMargine residuo disponibile per l'anno in corso: € ${residuo.toFixed(2)}.`);
         return;
     }
+
+    // Controllo preliminare sui dati del venditore
+    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    const venditoreNome = tData.nome ? tData.nome.trim() : '';
+    const venditoreCf = tData.cf ? tData.cf.trim() : '';
+    const venditoreTesserino = tData.num ? tData.num.trim() : '';
+    const venditoreRegione = tData.regione || 'Non specificata';
+
+    if (!venditoreNome || !venditoreCf || !venditoreTesserino || venditoreNome === 'Non specificato' || venditoreCf === 'Non specificato' || venditoreTesserino === 'Non specificato') {
+        alert("❌ Impossibile registrare la ricevuta: i dati del venditore (Nome, Codice Fiscale e Numero Tesserino) sono mancanti o incompleti. Configura prima il tesserino.");
+        return;
+    }
+
+    // Verifica della data di versamento dell'F24 per regime sostitutiva
+    if (regime === 'sostitutiva') {
+        let f24DataValid = false;
+        try {
+            const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+            if (fData.dataVersamento) {
+                const dataVersamento = new Date(fData.dataVersamento);
+                const annoVersamento = dataVersamento.getFullYear();
+                const meseVersamento = dataVersamento.getMonth();
+                const giornoVersamento = dataVersamento.getDate();
+
+                if (annoVersamento === annoCorrente && meseVersamento === 0 && giornoVersamento >= 1 && giornoVersamento <= 16) {
+                    f24DataValid = true;
+                }
+            }
+        } catch (e) {
+            f24DataValid = false;
+        }
+
+        if (!f24 || !f24DataValid) {
+            const conferma = confirm(
+                "⚠️ Attenzione: F24 ELIDE non valido o data di versamento non compresa tra il 1 e il 16 gennaio dell'anno corrente.\n\n" +
+                "L'imposta sostitutiva richiede un F24 valido in questa finestra temporale. " +
+                "Vuoi procedere convertendo automaticamente la ricevuta in regime con ritenuta (23% del 78% dell'imponibile)?"
+            );
+            
+            if (!conferma) {
+                return;
+            }
+            regime = 'ritenuta';
+        }
+    }
+
+    if (!acquirente) {
+        alert("Inserisci il nome dell'acquirente o del ristorante.");
+        return;
+    }
+
+    if (importoTotale <= 0) {
+        alert("L'importo totale deve essere superiore a zero.");
+        return;
+    }
+
+    let importoRitenuta = 0;
+    let importoNetto = importoTotale;
+    
+    if (regime === 'ritenuta') {
+        const baseImponibile = importoTotale * 0.78;
+        importoRitenuta = Number((baseImponibile * 0.23).toFixed(2));
+        importoNetto = Number((importoTotale - importoRitenuta).toFixed(2));
+    }
+
+    const nuovaVendita = {
+        data: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        regime,
+        acquirente,
+        acquirenteCf,
+        specie,
+        qualita,
+        peso,
+        prezzoKg,
+        importo: importoTotale.toFixed(2),
+        ritenuta: importoRitenuta.toFixed(2),
+        netto: importoNetto.toFixed(2),
+        comune,
+        lotto,
+        f24: regime === 'sostitutiva' ? f24 : 'NON APPLICATO',
+        venditoreNome,
+        venditoreCf,
+        venditoreTesserino,
+        venditoreRegione
+    };
+
+    storicoVendite.push(nuovaVendita);
+    localStorage.setItem('storico_vendite', JSON.stringify(storicoVendite));
 
     let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
-    const clienteEsistente = rubricaClienti.find(c => c.nome.toLowerCase() === acquirenteNome.toLowerCase());
-    
-    if (!clienteEsistente) {
+    const clienteEsistente = rubricaClienti.find(c => c.nome.toLowerCase() === acquirente.toLowerCase());
+    if (clienteEsistente) {
+        clienteEsistente.cf = acquirenteCf || clienteEsistente.cf;
+        clienteEsistente.dataUltimoAcquisto = new Date().toLocaleDateString();
+    } else {
         rubricaClienti.push({
-            nome: acquirenteNome,
+            nome: acquirente,
             cf: acquirenteCf,
             dataUltimoAcquisto: new Date().toLocaleDateString()
         });
-    } else {
-        clienteEsistente.dataUltimoAcquisto = new Date().toLocaleDateString();
-        if(acquirenteCf) clienteEsistente.cf = acquirenteCf;
     }
     localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
 
-    const pesoGrammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
-    const qualitaScelta = document.getElementById('r-qualita').value;
-    const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
-    
-    const importoRitenuta = regimeScelto === 'ritenuta' ? (importoTotale * 0.23).toFixed(2) : '0.00';
-    const importoNetto = regimeScelto === 'ritenuta' ? (importoTotale * 0.77).toFixed(2) : importoTotale.toFixed(2);
-
-    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-    const vendita = {
-        venditoreNome: tData.nome, 
-        venditoreCf: tData.cf, 
-        venditoreTesserino: tData.num || 'N.D.', 
-        venditoreRegione: tData.regione || 'N.D.',
-        acquirente: acquirenteNome, 
-        acquirenteCf: acquirenteCf,
-        specie: document.getElementById('r-specie').value, 
-        qualita: qualitaScelta,
-        peso: pesoGrammi, 
-        importo: importoTotale.toFixed(2),
-        regime: regimeScelto,
-        ritenuta: importoRitenuta,
-        netto: importoNetto,
-        comune: document.getElementById('r-comune').value.trim(), 
-        lotto: document.getElementById('r-lotto').value.trim(), 
-        f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto)', 
-        data: new Date().toLocaleDateString()
-    };
-    
-    storico.push(vendita);
-    localStorage.setItem('storico_vendite', JSON.stringify(storico));
-    alert("✔ Ricevuta registrata correttamente con il regime applicabile!");
-    openModule('storico_ricevute');
+    alert("✅ Ricevuta registrata correttamente. Totale cumulato aggiornato per l'anno " + annoCorrente + ".");
+    visualizzaRicevutaSalvata(storicoVendite.length - 1);
 }
 function visualizzaRicevutaSalvata(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
@@ -1143,15 +1259,23 @@ function visualizzaRicevutaSalvata(index) {
     if(!v) return;
 
     const isRitenuta = v.regime === 'ritenuta';
+    const importoTotaleNum = Number(v.importo) || 0;
+    
+    // Calcoli allineati al 78% dell'imponibile
+    const baseImponibile = importoTotaleNum * 0.78;
+    const valoreRitenuta = v.ritenuta || (baseImponibile * 0.23).toFixed(2);
+    const valoreNetto = v.netto || (importoTotaleNum - valoreRitenuta).toFixed(2);
+
     const dettagliFiscoHtml = isRitenuta ? `
-        <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (esonerata dall'imposta sostitutiva)</p>
-        <p><strong>Compenso Lordo:</strong> € ${v.importo}</p>
-        <p><strong>Ritenuta d'Acconto (23%):</strong> € ${v.ritenuta || (v.importo * 0.23).toFixed(2)}</p>
-        <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Netto a Pagare / Percepito:</strong> € ${v.netto || (v.importo * 0.77).toFixed(2)}</p>
+        <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% sul 78% dell'imponibile (esonerata dall'imposta sostitutiva)</p>
+        <p><strong>Compenso Lordo:</strong> € ${importoTotaleNum.toFixed(2)}</p>
+        <p><strong>Base Imponibile (78%):</strong> € ${baseImponibile.toFixed(2)}</p>
+        <p><strong>Ritenuta d'Acconto (23%):</strong> € ${valoreRitenuta}</p>
+        <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Netto a Pagare / Percepito:</strong> € ${valoreNetto}</p>
     ` : `
         <p><strong>Regime Fiscale:</strong> Imposta Sostitutiva (Legge 145/2018)</p>
         <p><strong>Versamento F24 ELIDE (100€):</strong> Protocollo N. ${v.f24}</p>
-        <p style="font-size: 1.1rem; margin-top: 10px;"><strong>Importo Totale:</strong> € ${v.importo}</p>
+        <p style="font-size: 1.1rem; margin-top: 10px;"><strong>Importo Totale:</strong> € ${importoTotaleNum.toFixed(2)}</p>
     `;
 
     let activeView = document.getElementById('active-module-view');
@@ -1247,52 +1371,85 @@ function modificaRicevuta(index) {
         }
     }, 50);
 }
-function salvaModificaRicevuta(index) {
-    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
-    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
-    
-    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
-    if (!acquirenteNome) {
-        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
+function salvaModificaRicevuta(idRicevuta) {
+    // 1. Recupero dei valori dai selettori corretti del DOM (presenti nel modulo ricevute)
+    const elRegime = document.getElementById('r-regime');
+    const elAcquirente = document.getElementById('r-acquirente');
+    const elCfAcquirente = document.getElementById('r-cf-acquirente');
+    const elSpecie = document.getElementById('r-specie');
+    const elQualita = document.getElementById('r-qualita');
+    const elPeso = document.getElementById('pesoGrammi');
+    const elPrezzoKg = document.getElementById('prezzoKg');
+    const elImportoTotale = document.getElementById('importoTotale');
+    const elComune = document.getElementById('r-comune');
+    const elLotto = document.getElementById('r-lotto');
+    const elF24 = document.getElementById('r-f24');
+
+    const regimeScelto = elRegime ? elRegime.value : 'sostitutiva';
+    const acquirente = elAcquirente ? elAcquirente.value.trim() : '';
+    const acquirenteCf = elCfAcquirente ? elCfAcquirente.value.trim() : '';
+    const specie = elSpecie ? elSpecie.value : '';
+    const qualita = elQualita ? elQualita.value : '';
+    const peso = parseFloat(elPeso ? elPeso.value : 0) || 0;
+    const prezzoKg = parseFloat(elPrezzoKg ? elPrezzoKg.value : 0) || 0;
+    const importoTotale = parseFloat(elImportoTotale ? elImportoTotale.value : 0) || 0;
+    const comune = elComune ? elComune.value.trim() : '';
+    const lotto = elLotto ? elLotto.value.trim() : '';
+    const f24 = elF24 ? elF24.value.trim() : '';
+
+    if (!acquirente) {
+        alert("Inserisci il nome dell'acquirente o del ristorante.");
         return;
     }
 
-    let regimeScelto = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
-    const f24InputVal = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
-    const protocolloF24 = f24InputVal || f24SavedData.protocollo;
-
-    if (regimeScelto === 'sostitutiva' && !protocolloF24) {
-        regimeScelto = 'ritenuta';
+    if (importoTotale <= 0) {
+        alert("L'importo totale deve essere superiore a zero.");
+        return;
     }
 
-    const importoCorrente = parseFloat(document.getElementById('importoTotale').value) || 0;
-    const importoRitenuta = regimeScelto === 'ritenuta' ? (importoCorrente * 0.23).toFixed(2) : '0.00';
-    const importoNetto = regimeScelto === 'ritenuta' ? (importoCorrente * 0.77).toFixed(2) : importoCorrente.toFixed(2);
+    // 2. Calcolo fiscale coerente (Ritenuta 23% sul 78% dell'imponibile se applicabile)
+    let importoRitenuta = 0;
+    let importoNetto = importoTotale;
 
-    storico[index] = {
-        venditoreNome: tData.nome || storico[index].venditoreNome, 
-        venditoreCf: tData.cf || storico[index].venditoreCf, 
-        venditoreTesserino: tData.num || storico[index].venditoreTesserino, 
-        venditoreRegione: tData.regione || storico[index].venditoreRegione,
-        acquirente: acquirenteNome, 
-        acquirenteCf: document.getElementById('r-cf-acquirente').value.trim(),
-        specie: document.getElementById('r-specie').value, 
-        qualita: document.getElementById('r-qualita').value,
-        peso: document.getElementById('pesoGrammi').value, 
-        importo: importoCorrente.toFixed(2),
+    if (regimeScelto === 'ritenuta') {
+        const baseImponibileRitenuta = importoTotale * 0.78;
+        importoRitenuta = Number((baseImponibileRitenuta * 0.23).toFixed(2));
+        importoNetto = Number((importoTotale - importoRitenuta).toFixed(2));
+    }
+
+    // 3. Recupero dello storico dal localStorage
+    let storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    
+    if (!storicoVendite[idRicevuta]) {
+        alert("Errore: Impossibile trovare la ricevuta da modificare.");
+        return;
+    }
+
+    // 4. Aggiornamento dei dati della ricevuta mantenendo data e dati del venditore originali
+    storicoVendite[idRicevuta] = {
+        ...storicoVendite[idRicevuta],
         regime: regimeScelto,
-        ritenuta: importoRitenuta,
-        netto: importoNetto,
-        comune: document.getElementById('r-comune').value.trim(), 
-        lotto: document.getElementById('r-lotto').value.trim(), 
-        f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto)', 
-        data: storico[index].data
+        acquirente,
+        acquirenteCf,
+        specie,
+        qualita,
+        peso,
+        prezzoKg,
+        importo: importoTotale.toFixed(2),
+        ritenuta: importoRitenuta.toFixed(2),
+        netto: importoNetto.toFixed(2),
+        comune,
+        lotto,
+        f24: regimeScelto === 'sostitutiva' ? f24 : 'NON APPLICATO'
     };
 
-    localStorage.setItem('storico_vendite', JSON.stringify(storico));
-    alert("Ricevuta aggiornata con successo!");
-    openModule('storico_ricevute');
+    // 5. Salvataggio nel localStorage
+    localStorage.setItem('storico_vendite', JSON.stringify(storicoVendite));
+
+    alert("✅ Ricevuta aggiornata con successo!");
+
+    // 6. Ritorno alla visualizzazione della ricevuta aggiornata o allo storico
+    visualizzaRicevutaSalvata(idRicevuta);
 }
 async function condividiRicevuta(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
@@ -1497,32 +1654,64 @@ function chiudiVisualizzazioneImmagine(moduloProvenienza = 'tesserino') {
  */
 function validaRequisitiEmissioneRicevuta() {
     try {
-        // Recupera i dati reali salvati nello storage dall'applicazione
-        const f24 = JSON.parse(localStorage.getItem('f24_data') || 'null');
-        const pagoPa = JSON.parse(localStorage.getItem('pagopa_data') || 'null');
+        const annoCorrente = new Date().getFullYear();
         
-        // Verifica se almeno uno dei due metodi di versamento è stato configurato/inserito
-        const haF24Valid = f24 && (f24.anno || f24.protocollo);
-        const haPagoPAValid = pagoPa && (pagoPa.data || pagoPa.importo);
+        // Recupero dei dati dal localStorage in modo sicuro
+        let f24 = null;
+        let pagoPa = null;
+        
+        try {
+            f24 = JSON.parse(localStorage.getItem('f24_data'));
+        } catch(e) { f24 = null; }
 
-        if (!haF24Valid && !haPagoPAValid) {
-            console.warn("Validazione fallita: Nessun dato F24 o PagoPA valido trovato.");
-            return false;
+        try {
+            pagoPa = JSON.parse(localStorage.getItem('pagopa_data'));
+        } catch(e) { pagoPa = null; }
+        
+        let pagoPaValido = false;
+        let f24Valido = false;
+
+        // Controllo PagoPA: verifica della presenza del file e data nell'anno solare in corso
+        if (pagoPa && pagoPa.contenutoBase64 && pagoPa.data) {
+            const annoPagoPa = new Date(pagoPa.data).getFullYear();
+            if (annoPagoPa === annoCorrente) {
+                pagoPaValido = true;
+            }
         }
 
-        return true;
+        // Controllo F24: verifica della presenza del file e versamento tra 1 e 16 gennaio dell'anno in corso
+        if (f24 && f24.contenutoBase64 && f24.dataVersamento) {
+            const dataVersamento = new Date(f24.dataVersamento);
+            const annoVersamento = dataVersamento.getFullYear();
+            const meseVersamento = dataVersamento.getMonth(); // 0 = Gennaio
+            const giornoVersamento = dataVersamento.getDate();
+
+            const eGennaio = (meseVersamento === 0);
+            const eTra1E16 = (giornoVersamento >= 1 && giornoVersamento <= 16);
+
+            if (annoVersamento === annoCorrente && eGennaio && eTra1E16) {
+                f24Valido = true;
+            }
+        }
+
+        const requisitiSoddisfatti = pagoPaValido || f24Valido;
+
+        if (!requisitiSoddisfatti) {
+            console.warn("Requisiti di emissione ricevuta non soddisfatti (controllare vincoli temporali PagoPA o F24 ELIDE).");
+        }
+
+        return requisitiSoddisfatti;
+
     } catch (error) {
         console.error("Errore durante la validazione dei requisiti:", error);
         return false;
     }
 }
-
 /**
  * Genera l'HTML di stampa della ricevuta utilizzando la struttura dati effettiva dell'applicazione.
  * @param {Object} v - Oggetto ricevuta/vendita preso dallo storico o dai dati correnti.
  */
 function generaHTMLStampaRicevuta(v) {
-    // Gestione dei campi con fallback sui nomi chiave standard usati nell'app
     const venditore = v.venditoreNome || v.cedente || "Dato non disponibile";
     const acquirente = v.acquirente || "Dato non disponibile";
     const specie = v.specie || v.prodotto || "-";
@@ -1556,6 +1745,38 @@ function generaHTMLStampaRicevuta(v) {
             </table>
             <hr style="margin-top: 20px;">
             <p style="text-align: center; font-size: 0.9em; color: #555;">Documento generato automaticamente dal sistema.</p>
+        </div>
+    `;
+}
+
+function renderizzaCardRicevuta(ricevuta) {
+    const lordo = Number(ricevuta.importo) || ricevuta.valoreStimato || ricevuta.importoLordo || 0;
+    const isRitenuta = ricevuta.regime === 'ritenuta';
+    
+    // Calcolo coerente con il resto dell'app (Base imponibile 78% e ritenuta 23%)
+    const baseImponibile = lordo * 0.78;
+    const ritenuta = isRitenuta ? (baseImponibile * 0.23) : 0;
+    const netto = lordo - ritenuta;
+
+    return `
+        <div class="card-ricevuta" style="background: #1e293b; border: 1px solid #334155; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+            <div class="card-header" style="color: #60a5fa; font-weight: bold; margin-bottom: 6px;">
+                📄 Ricevuta #${ricevuta.id || 'N.D.'} - ${ricevuta.data || ''} 
+                <span class="badge" style="font-size: 0.75rem; color: ${isRitenuta ? '#38bdf8' : '#22c55e'};">
+                    [${isRitenuta ? "Ritenuta d'Acconto" : "Imposta Sostitutiva"}]
+                </span>
+            </div>
+            <div class="card-body" style="color: #f8fafc; font-size: 0.9rem;">
+                <p><strong>Acquirente:</strong> ${ricevuta.acquirente || 'Non specificato'}</p>
+                <p><strong>Specie:</strong> ${ricevuta.specie || '-'}</p>
+                <p class="importo-lordo"><strong>Importo Lordo:</strong> € ${lordo.toFixed(2)}</p>
+                ${isRitenuta ? `<p class="importo-netto" style="color: #4ade80;"><strong>Netto a Pagare:</strong> € ${netto.toFixed(2)} <small style="color: #94a3b8;">(Ritenuta 23%: € ${ritenuta.toFixed(2)})</small></p>` : ''}
+            </div>
+            <div class="card-actions" style="display: flex; gap: 6px; margin-top: 10px;">
+                <button class="overlay-btn" style="background:#2563eb; padding:6px 10px; font-size:0.75rem;">Visualizza</button>
+                <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;">Modifica</button>
+                <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;">Elimina</button>
+            </div>
         </div>
     `;
 }
