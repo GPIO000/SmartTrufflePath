@@ -7,6 +7,11 @@ setTimeout(() => {
     map.invalidateSize();
 }, 300);
 
+setTimeout(() => {
+    map.invalidateSize();
+    mostraDisclaimerIniziale(); // <-- Mostra il disclaimer subito dopo l'avvio/GPS
+}, 400);
+
 let userMarker = null;
 let carMarker = null;
 let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
@@ -1638,5 +1643,47 @@ function chiudiVisualizzazioneImmagine(moduloProvenienza = 'tesserino') {
         overlayImmagine.style.display = 'none';
     } else {
         openModule(moduloProvenienza);
+    }
+}
+// Funzione per mostrare il Disclaimer Legale all'avvio
+function mostraDisclaimerIniziale() {
+    // Se vuoi che compaia SOLO al primo avvio, usa localStorage. 
+    // Se vuoi che compaia ad *ogni* avvio, rimuovi il controllo localStorage.
+    if (localStorage.getItem('disclaimer_letto') === 'true') return; // Rimuovi questa riga se vuoi vederlo a ogni singolo avvio
+
+    let modalOverlay = document.getElementById('disclaimer-overlay');
+    if (!modalOverlay) {
+        modalOverlay = document.createElement('div');
+        modalOverlay.id = 'disclaimer-overlay';
+        modalOverlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); z-index: 99999;
+            display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
+        `;
+        
+        modalOverlay.innerHTML = `
+            <div style="background: #1e293b; color: #f8fafc; padding: 25px; border-radius: 12px; max-width: 500px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; font-family: sans-serif;">
+                <h3 style="color: #f59e0b; margin-top: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+                    ⚠️ Avviso e Limitazione di Responsabilità
+                </h3>
+                <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; max-height: 55vh; overflow-y: auto; padding-right: 5px; margin: 15px 0;">
+                    <p style="margin-bottom: 10px;">Questa applicazione è uno strumento di supporto hobbistico e di geolocalizzazione per la raccolta dei tartufi.</p>
+                    <p style="margin-bottom: 10px; color: #f87171; font-weight: bold;">Non è un'applicazione finanziaria o fiscale e non sostituisce in alcun modo l'assistenza di un fiscalista o di un commercialista abilitato.</p>
+                    <p style="margin-bottom: 10px;">L'utente rimane l'unico e il solo responsabile della conformità fiscale, della correttezza dei dati inseriti, della gestione delle ricevute e del rispetto di tutti gli adempimenti di legge (es. Legge 145/2018).</p>
+                    <p style="margin: 0;">Gli sviluppatori declinano ogni responsabilità per imprecisioni, errori di calcolo o sanzioni derivanti dall'utilizzo di questo software.</p>
+                </div>
+                <button id="btn-accetta-disclaimer" style="background: #22c55e; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
+                    Acconsento e Accetto
+                </button>
+            </div>
+        `;
+        document.body.appendChild(modalOverlay);
+
+        document.getElementById('btn-accetta-disclaimer').addEventListener('click', () => {
+            localStorage.setItem('disclaimer_letto', 'true'); // Memorizza il consenso (rimuovi se vuoi che appaia sempre)
+            modalOverlay.style.display = 'none';
+        });
+    } else {
+        modalOverlay.style.display = 'flex';
     }
 }
