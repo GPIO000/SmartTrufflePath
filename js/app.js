@@ -1647,9 +1647,9 @@ function chiudiVisualizzazioneImmagine(moduloProvenienza = 'tesserino') {
 }
 // Funzione per mostrare il Disclaimer Legale all'avvio
 function mostraDisclaimerIniziale() {
-    // Se vuoi che compaia SOLO al primo avvio, usa localStorage. 
-    // Se vuoi che compaia ad *ogni* avvio, rimuovi il controllo localStorage.
-    if (localStorage.getItem('disclaimer_letto') === 'true') return; // Rimuovi questa riga se vuoi vederlo a ogni singolo avvio
+    // Se vuoi che compaia SOLO al primo avvio, lascia questa riga. 
+    // Se vuoi che compaia ad *ogni* avvio, rimuovi o commenta la riga sotto.
+    if (localStorage.getItem('disclaimer_letto') === 'true') return; 
 
     let modalOverlay = document.getElementById('disclaimer-overlay');
     if (!modalOverlay) {
@@ -1673,15 +1673,31 @@ function mostraDisclaimerIniziale() {
                     <p style="margin: 0;">Gli sviluppatori declinano ogni responsabilità per imprecisioni, errori di calcolo o sanzioni derivanti dall'utilizzo di questo software.</p>
                 </div>
                 <button id="btn-accetta-disclaimer" style="background: #22c55e; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
-                    Acconsento e Accetto
+                    Accetta e Continua
+                </button>
+                <button id="btn-abbandona-app" style="background: #334155; color: #f87171; border: 1px solid #475569; padding: 10px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer; margin-top: 8px;">
+                    Abbandona
                 </button>
             </div>
         `;
         document.body.appendChild(modalOverlay);
 
+        // Azione per il tasto "Accetta e Continua"
         document.getElementById('btn-accetta-disclaimer').addEventListener('click', () => {
-            localStorage.setItem('disclaimer_letto', 'true'); // Memorizza il consenso (rimuovi se vuoi che appaia sempre)
+            localStorage.setItem('disclaimer_letto', 'true'); // Memorizza il consenso
             modalOverlay.style.display = 'none';
+        });
+
+        // Azione per il tasto "Abbandona"
+        document.getElementById('btn-abbandona-app').addEventListener('click', () => {
+            // Tenta di chiudere la finestra o reindirizzare a una pagina vuota/esterna
+            try {
+                window.close();
+            } catch (e) {
+                console.log(e);
+            }
+            // Se il browser blocca window.close(), reindirizza fuori o mostra una schermata di uscita
+            window.location.href = "about:blank";
         });
     } else {
         modalOverlay.style.display = 'flex';
