@@ -1649,6 +1649,17 @@ function chiudiVisualizzazioneImmagine(moduloProvenienza = 'tesserino') {
 function mostraDisclaimerIniziale() {
     let modalOverlay = document.getElementById('disclaimer-overlay');
     
+    // Testi delle 5 pagine del disclaimer
+    const pagineDisclaimer = [
+        `<strong>1. Natura dello Strumento</strong><br>Questa applicazione è concepita e fornita esclusivamente come strumento informale di supporto hobbistico, tracciabilità interna e geolocalizzazione per la raccolta dei tartufi.`,
+        `<strong>2. Esclusione di Consulenza Fiscale e Professionale</strong><br><span style="color: #f87171;">Il software non costituisce in alcun modo un servizio di consulenza finanziaria, fiscale, legale o professionale, né sostituisce l'assistenza diretta di un commercialista abilitato o di un professionista iscritto agli albi competenti.</span> Le funzioni di calcolo, archiviazione di ricevute e gestione contabile hanno carattere puramente indicativo e di supporto organizzativo privato.`,
+        `<strong>3. Responsabilità Esclusiva dell'Utente</strong><br>L'utente è l'unico e il solo responsabile della conformità fiscale, della correttezza e veridicità dei dati inseriti, della conservazione e gestione dei documenti di pagamento, nonché del puntuale rispetto di tutte le normative vigenti, statali e regionali, in materia di raccolta e commercializzazione dei tartufi.`,
+        `<strong>4. Geolocalizzazione e Sicurezza all'Aperto</strong><br>Le indicazioni di orientamento, le coordinate GPS, la bussola e la memorizzazione dei punti di interesse o dei parcheggi dipendono da fattori esterni. Gli sviluppatori non garantiscono l'accuratezza o la continuità del segnale e declinano ogni responsabilità per eventuali situazioni di smarrimento, ritardi, incidenti o pericoli derivanti dall'esplorazione di aree boschive o impervie.`,
+        `<strong>5. Manleva</strong><br>Gli sviluppatori, i creatori e i distributori del software declinano espressamente ogni responsabilità civile e penale per imprecisioni, errori di calcolo, omissioni, perdite di dati, blocco delle funzionalità o per qualsivoglia sanzione amministrativa, fiscale o giudiziaria derivante, direttamente o indirettamente, dall'utilizzo di questa applicazione.`
+    ];
+
+    let paginaCorrente = 0;
+
     if (!modalOverlay) {
         modalOverlay = document.createElement('div');
         modalOverlay.id = 'disclaimer-overlay';
@@ -1660,39 +1671,75 @@ function mostraDisclaimerIniziale() {
         
         modalOverlay.innerHTML = `
             <div style="background: #1e293b; color: #f8fafc; padding: 25px; border-radius: 12px; max-width: 500px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; font-family: sans-serif;">
-                <h3 style="color: #f59e0b; margin-top: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
-                    ⚠️ Avviso e Limitazione di Responsabilità
+                <h3 style="color: #f59e0b; margin-top: 0; font-size: 1.2rem; display: flex; align-items: center; justify-content: space-between;">
+                    <span>⚠️ Avviso e Limitazione di Responsabilità</span>
+                    <span id="disclaimer-counter" style="font-size: 0.8rem; color: #94a3b8; font-weight: normal;">1 / 5</span>
                 </h3>
-                <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; max-height: 55vh; overflow-y: auto; padding-right: 5px; margin: 15px 0;">
-                    <p style="margin-bottom: 10px;">Questa applicazione è uno strumento di supporto hobbistico e di geolocalizzazione per la raccolta dei tartufi.</p>
-                    <p style="margin-bottom: 10px; color: #f87171; font-weight: bold;">Non è un'applicazione finanziaria o fiscale e non sostituisce in alcun modo l'assistenza di un fiscalista o di un commercialista abilitato.</p>
-                    <p style="margin-bottom: 10px;">L'utente rimane l'unico e il solo responsabile della conformità fiscale, della correttezza dei dati inseriti, della gestione delle ricevute e del rispetto di tutti gli adempimenti di legge (es. Legge 145/2018).</p>
-                    <p style="margin: 0;">Gli sviluppatori declinano ogni responsabilità per imprecisioni, errori di calcolo o sanzioni derivanti dall'utilizzo di questo software.</p>
+                <div id="disclaimer-text-container" style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; min-height: 110px; max-height: 55vh; overflow-y: auto; padding-right: 5px; margin: 15px 0;">
+                    ${pagineDisclaimer[0]}
                 </div>
-                <button id="btn-accetta-disclaimer" style="background: #22c55e; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
-                    Accetta e Continua
-                </button>
-                <button id="btn-abbandona-app" style="background: #334155; color: #f87171; border: 1px solid #475569; padding: 10px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer; margin-top: 8px;">
-                    Abbandona
-                </button>
+                <div id="disclaimer-buttons-container">
+                    <button id="btn-avanti-disclaimer" style="background: #3b82f6; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
+                        Avanti
+                    </button>
+                </div>
             </div>
         `;
         document.body.appendChild(modalOverlay);
 
-        // Azione per il tasto "Accetta e Continua" (chiude semplicemente la finestra senza salvarla)
-        document.getElementById('btn-accetta-disclaimer').addEventListener('click', () => {
-            modalOverlay.style.display = 'none';
+        const textContainer = document.getElementById('disclaimer-text-container');
+        const counterContainer = document.getElementById('disclaimer-counter');
+        const buttonsContainer = document.getElementById('disclaimer-buttons-container');
+
+        function aggiornaVistaDisclaimer() {
+            textContainer.innerHTML = pagineDisclaimer[paginaCorrente];
+            counterContainer.innerText = `${paginaCorrente + 1} / 5`;
+
+            if (paginaCorrente < pagineDisclaimer.length - 1) {
+                // Pagine intermedie: mostra solo il tasto "Avanti"
+                buttonsContainer.innerHTML = `
+                    <button id="btn-avanti-disclaimer" style="background: #3b82f6; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
+                        Avanti
+                    </button>
+                `;
+                document.getElementById('btn-avanti-disclaimer').addEventListener('click', () => {
+                    paginaCorrente++;
+                    aggiornaVistaDisclaimer();
+                });
+            } else {
+                // Ultima pagina: mostra i tasti originali della funzione
+                buttonsContainer.innerHTML = `
+                    <button id="btn-accetta-disclaimer" style="background: #22c55e; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
+                        Accetta e Continua
+                    </button>
+                    <button id="btn-abbandona-app" style="background: #334155; color: #f87171; border: 1px solid #475569; padding: 10px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer; margin-top: 8px;">
+                        Abbandona
+                    </button>
+                `;
+
+                // Azione per il tasto "Accetta e Continua"
+                document.getElementById('btn-accetta-disclaimer').addEventListener('click', () => {
+                    modalOverlay.style.display = 'none';
+                });
+
+                // Azione per il tasto "Abbandona"
+                document.getElementById('btn-abbandona-app').addEventListener('click', () => {
+                    try {
+                        window.close();
+                    } catch (e) {
+                        console.log(e);
+                    }
+                    window.location.href = "about:blank";
+                });
+            }
+        }
+
+        // Assegnazione evento primo click sul tasto "Avanti" iniziale
+        document.getElementById('btn-avanti-disclaimer').addEventListener('click', () => {
+            paginaCorrente++;
+            aggiornaVistaDisclaimer();
         });
 
-        // Azione per il tasto "Abbandona"
-        document.getElementById('btn-abbandona-app').addEventListener('click', () => {
-            try {
-                window.close();
-            } catch (e) {
-                console.log(e);
-            }
-            window.location.href = "about:blank";
-        });
     } else {
         modalOverlay.style.display = 'flex';
     }
