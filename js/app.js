@@ -311,21 +311,40 @@ function openModule(moduleName, editMode = false) {
         case 'ricevute':
             const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
             const defaultProtocollo = f24SavedData.protocollo || '';
+            
+            const annoCorrenteReg = new Date().getFullYear();
+            let f24ValidoPreview = false;
+            if (f24SavedData.protocollo && f24SavedData.dataPagamento) {
+                const dataP = new Date(f24SavedData.dataPagamento);
+                const scadenzaF24 = new Date(annoCorrenteReg, 1, 16, 23, 59, 59);
+                if (dataP <= scadenzaF24) f24ValidoPreview = true;
+            }
+            const regimeRilevatoTesto = f24ValidoPreview 
+                ? '<span style="color:#22c55e; font-weight:bold;">Imposta Sostitutiva (F24 ELIDE valido)</span>' 
+                : '<span style="color:#38bdf8; font-weight:bold;">Ritenuta d\'Acconto (23% - F24 assente o non valido)</span>';
+
             contentHTML = `
                 <h2>Ricevuta di Vendita Occasionale</h2>
                 <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
                 <div class="module-card">
-                    <label>Regime Fiscale / Modalità di Assoggettamento:</label>
-                    <select id="r-regime" class="mod-input" onchange="toggleRegimeFiscaleFields()">
-                        <option value="sostitutiva">Imposta Sostitutiva (F24 ELIDE - 100€ annui, esonero ritenuta)</option>
-                        <option value="ritenuta">Ritenuta d'Acconto (23% operata dal sostituto d'imposta)</option>
-                    </select>
+                    <div style="background:#0f172a; padding:12px; border-radius:6px; margin-bottom:15px; border:1px solid #334155;">
+                        <p style="font-size:0.8rem; color:#94a3b8; margin-bottom:4px; text-transform:uppercase;">Regime Fiscale (Selezione Automatica):</p>
+                        <p style="font-size:0.9rem; margin:0;">${regimeRilevatoTesto}</p>
+                    </div>
+
+                    <input type="hidden" id="r-regime" value="${f24ValidoPreview ? 'sostitutiva' : 'ritenuta'}">
 
                     <label>Acquirente (Privato o Ristorante / Ragione Sociale):</label>
-                    <input type="text" id="r-acquirente" class="mod-input" placeholder="Nome o Ristorante">
+                    <input type="text" id="r-acquirente" class="mod-input" placeholder="Nome o Ristorante" oninput="autocompilaDatiCliente(this.value)">
                     
                     <label>P.IVA / Codice Fiscale Acquirente:</label>
                     <input type="text" id="r-cf-acquirente" class="mod-input" placeholder="P.IVA o CF acquirente">
+
+                    <label>Indirizzo Acquirente:</label>
+                    <input type="text" id="r-indirizzo-acquirente" class="mod-input" placeholder="Via, Città, CAP">
+
+                    <label>Email Acquirente:</label>
+                    <input type="email" id="r-email-acquirente" class="mod-input" placeholder="email@esempio.it">
                     
                     <label>Specie Tartufo:</label>
                     <select id="r-specie" class="mod-input">
@@ -339,12 +358,14 @@ function openModule(moduleName, editMode = false) {
                         <option value="Tuber macrosporum Vitt. (Nero Liscio)">Tuber macrosporum Vitt. (Nero Liscio)</option>
                         <option value="Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)">Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)</option>
                     </select>
+                    
                     <label>Classificazione Qualità:</label>
                     <select id="r-qualita" class="mod-input">
                         <option value="Prima Scelta">Prima Scelta</option>
                         <option value="Seconda Scelta">Seconda Scelta</option>
                         <option value="Terza Scelta">Terza Scelta</option>
                     </select>
+                    
                     <label>Peso (grammi):</label>
                     <input type="number" id="pesoGrammi" class="mod-input" placeholder="Es. 150" oninput="calcolaTotale()">
 
@@ -354,7 +375,7 @@ function openModule(moduleName, editMode = false) {
                     <label>Importo Complessivo / Corrispettivo (€):</label>
                     <input type="number" id="importoTotale" class="mod-input" placeholder="Es. 200.00" oninput="calcolaRitenutaAcconto()">
 
-                    <div id="container-ritenuta" style="display:none; background:#0f172a; padding:10px; border-radius:6px; margin:10px 0; border:1px solid #334155;">
+                    <div id="container-ritenuta" style="display:${f24ValidoPreview ? 'none' : 'block'}; background:#0f172a; padding:10px; border-radius:6px; margin:10px 0; border:1px solid #334155;">
                         <p style="font-size:0.85rem; color:#38bdf8; margin-bottom:6px;"><b>Calcolo Ritenuta d'Acconto (23%):</b></p>
                         <label>Importo Ritenuta d'Acconto (€):</label>
                         <input type="number" id="r-importo-ritenuta" class="mod-input" readonly style="background:#1e293b; color:#22c55e; font-weight:bold;">
@@ -362,55 +383,61 @@ function openModule(moduleName, editMode = false) {
                         <input type="number" id="r-netto-pagare" class="mod-input" readonly style="background:#1e293b; color:#22c55e; font-weight:bold;">
                     </div>
 
-                    <label>Comune di Raccolta / Località:</label>
-                    <input type="text" id="r-comune" class="mod-input" placeholder="Comune di ritrovamento">
+                    <label>Luogo / Area di Raccolta e Provincia <span style="color:#ef4444;">*</span>:</label>
+                    <input type="text" id="r-comune" class="mod-input" placeholder="Es. Comune / Località (Provincia) - Obbligatorio">
                     
                     <label>Codice Lotto / Tracciabilità:</label>
                     <input type="text" id="r-lotto" class="mod-input" value="LOTTO-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-01" placeholder="Codice lotto">
                     
-                    <div id="container-f24-field">
+                    <div id="container-f24-field" style="display:${f24ValidoPreview ? 'block' : 'none'};">
                         <label>N. Protocollo F24 ELIDE collegato:</label>
                         <input type="text" id="r-f24" class="mod-input" value="${defaultProtocollo}" placeholder="Protocollo F24">
                     </div>
+
+                    <!-- Nuova Sezione: Note Cliente per la Rubrica -->
+                    <label style="margin-top: 10px;">📝 Note Cliente (Rubrica):</label>
+                    <textarea id="r-nota-cliente" class="mod-input" placeholder="Scrivi una nota per questo cliente..." rows="2" style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 6px; font-size: 0.8rem;"></textarea>
                     
-                    <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="registraVenditaConPrezzoKg()">Registra e Genera Ricevuta Conforme</button>
+                    <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="try { registraVenditaConPrezzoKg(); } catch(e) { alert('Errore: ' + e.message); console.error(e); }">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             setTimeout(toggleRegimeFiscaleFields, 50);
             break;
-        case 'clienti':
-            const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
-            const storicoVenditeClienti = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-            let clientiHtml = '<h2>Rubrica Clienti</h2><p>Elenco dei clienti e ristoranti salvati automaticamente:</p>';
-            if (rubricaClienti.length === 0) {
-                clientiHtml += '<div class="module-card"><p>Nessun cliente registrato in rubrica. Emetti una ricevuta per aggiungerli automaticamente.</p></div>';
-            } else {
-                clientiHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Clienti Registrati (${rubricaClienti.length}):</h3>`;
-                rubricaClienti.forEach((cliente, idx) => {
-                    const venditeCliente = storicoVenditeClienti.filter(v => v.acquirente.toLowerCase() === cliente.nome.toLowerCase());
-                    const totaleSpeso = venditeCliente.reduce((acc, v) => acc + Number(v.importo), 0);
-                    clientiHtml += `
-                        <div class="module-card" style="border-left: 4px solid #38bdf8; margin-bottom: 12px;">
-                            <strong style="color:#f8fafc; font-size:1rem;">👤 ${cliente.nome}</strong>
-                            <p style="font-size:0.85rem; color:#cbd5e1; margin: 4px 0;">P.IVA / CF: ${cliente.cf || 'Non inserito'}</p>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin: 2px 0;">📅 Ultimo acquisto: ${cliente.dataUltimoAcquisto || 'N.D.'}</p>
-                            <p style="font-size:0.85rem; color:#22c55e; font-weight:bold; margin-top: 4px;">Totale Acquisti: € ${totaleSpeso.toFixed(2)} (${venditeCliente.length} ricevute)</p>
-                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem; margin-top:8px;" onclick="deleteCliente(${idx})">🗑️ Rimuovi da Rubrica</button>
-                        </div>`;
-                });
-            }
-            contentHTML = clientiHtml;
-            break;
-        case 'storico_ricevute':
-            const storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-            let storicoHtml = '<h2>Archivio Storico Ricevute</h2><p>Elenco cronologico delle ricevute di vendita emesse:</p>';
-            if (storicoVendite.length === 0) {
-            storicoHtml += '<div class="module-card"><p>Nessuna ricevuta emessa finora.</p></div>';
+
+           case 'storico_ricevute':
+    let storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const filtroCliente = localStorage.getItem('filtro_storico_cliente');
+
+    let storicoHtml = `<h2>Archivio Storico Ricevute</h2>`;
+
+    // Se c'è un filtro attivo dalla rubrica, mostra il banner e filtra l'array
+    if (filtroCliente) {
+        storicoHtml += `
+            <div style="background: rgba(2, 132, 199, 0.2); border: 1px solid #0284c7; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <span style="color: #38bdf8; font-size: 0.9rem;">🔍 Filtrato per cliente: <strong>${filtroCliente}</strong></span>
+                <button class="overlay-btn" style="background: #475569; padding: 4px 8px; font-size: 0.75rem;" onclick="localStorage.removeItem('filtro_storico_cliente'); openModule('storico_ricevute');">Mostra Tutte</button>
+            </div>`;
+        
+        // Filtra le ricevute in base al nome dell'acquirente (mantenendo il legame con il loro indice originale)
+        storicoVendite = storicoVendite
+            .map((item, realIndex) => ({ item, realIndex }))
+            .filter(obj => obj.item.acquirente && obj.item.acquirente.toLowerCase() === filtroCliente.toLowerCase());
     } else {
-        storicoVendite.slice().reverse().forEach((item, index) => {
-            const originalIndex = storicoVendite.length - 1 - index;
+        // Mappa normale senza filtro
+        storicoVendite = storicoVendite.map((item, realIndex) => ({ item, realIndex }));
+    }
+
+    storicoHtml += `<p>Elenco cronologico delle ricevute di vendita emesse${filtroCliente ? ' per questo cliente' : ''}:</p>`;
+
+    if (storicoVendite.length === 0) {
+        storicoHtml += `<div class="module-card"><p>Nessuna ricevuta emessa finora${filtroCliente ? ' per questo cliente' : ''}.</p></div>`;
+    } else {
+        // Inverte l'ordine per mostrare prima le più recenti
+        storicoVendite.slice().reverse().forEach((obj, index) => {
+            const item = obj.item;
+            const originalIndex = obj.realIndex;
+            
             const regimeLabel = item.regime === 'ritenuta' ? '<span style="color:#38bdf8; font-size:0.75rem;">[Ritenuta d\'Acconto]</span>' : '<span style="color:#22c55e; font-size:0.75rem;">[Imposta Sostitutiva]</span>';
             
-            // Calcolo dinamico o lettura del netto/ritenuta salvati
             let dettaglioImporto = `Importo: € ${item.importo}`;
             if (item.regime === 'ritenuta') {
                 const nettoVisibile = item.netto ? item.netto : (item.importo * 0.77).toFixed(2);
@@ -433,6 +460,7 @@ function openModule(moduleName, editMode = false) {
     }
     contentHTML = storicoHtml;
     break;
+
         case 'f24':
             const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
             if (fData.protocollo && !editMode) {
@@ -845,9 +873,65 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = clinicHtml;
             break;
+
+       case 'clienti':
+    const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    
+    // Ordina dal cliente che ha speso di più a quello che ha speso di meno
+    rubricaClienti.sort((a, b) => (b.totaleAcquisti || 0) - (a.totaleAcquisti || 0));
+
+    let clientiHtml = `
+        <h2>Rubrica Clienti & Acquirenti</h2>
+        <p>Elenco dei clienti salvati con storico acquisti:</p>
+    `;
+    if (rubricaClienti.length === 0) {
+        clientiHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun cliente salvato in rubrica.</p></div>`;
+    } else {
+        rubricaClienti.forEach((cliente, idx) => {
+            // Formattazione del totale acquisti in valuta
+            const totaleFormattato = (cliente.totaleAcquisti || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+            
+            clientiHtml += `
+                <div class="module-card" style="border-left: 4px solid #0284c7; margin-bottom: 12px;">
+                    <strong style="color:#f8fafc; font-size:1rem;">👤 ${cliente.nome}</strong>
+                    <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">P.IVA / CF: ${cliente.cf || 'Non inserito'}</p>
+                    <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📍 Indirizzo: ${cliente.indirizzo || 'Non inserito'}</p>
+                    <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📧 Email: ${cliente.email || 'Non specificata'}</p>
+                    
+                    <!-- Sezione Statistiche Spesa -->
+                    <div style="background: rgba(15, 23, 42, 0.6); padding: 8px; border-radius: 6px; margin: 8px 0;">
+                        <p style="font-size:0.85rem; color:#4ade80; margin: 0; font-weight: bold;">💰 Totale Acquisti: ${totaleFormattato}</p>
+                        <p style="font-size:0.75rem; color:#94a3b8; margin: 2px 0 0 0;">📦 Ricevute emesse: ${cliente.numeroAcquisti || 1} | Ultimo: ${cliente.dataUltimoAcquisto || 'N.D.'}</p>
+                    </div>
+
+                    <!-- Sezione Note Cliente con Tasto Salva a pieno larghezza -->
+                    <div style="margin: 8px 0;">
+                        <label style="font-size:0.75rem; color:#94a3b8; display:block; margin-bottom:2px;">📝 Note Cliente:</label>
+                        <textarea 
+                            id="nota-cliente-${idx}"
+                            style="width: 100%; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 6px; font-size: 0.8rem; resize: vertical;" 
+                            rows="2" 
+                            placeholder="Scrivi una nota per questo cliente..."
+                        >${cliente.nota || ''}</textarea>
+                        <button class="overlay-btn" style="width: 100%; background:#eab308; color:#0f172a; font-weight:bold; padding:8px; font-size:0.85rem; margin-top:6px; border-radius:4px; border:none; cursor:pointer;" onclick="salvaNotaClienteDaInput(${idx})">💾 Salva Nota</button>
+                    </div>
+
+                    <!-- Blocco tasti principali distanziato -->
+                    <div style="display:flex; gap:6px; margin-top:16px; flex-wrap:wrap;">
+                        <button class="overlay-btn" style="background:#16a34a; padding:6px 10px; font-size:0.75rem;" onclick="creaRicevutaPerCliente(${idx})">📄 Nuova Ricevuta</button>
+                        <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="mostraRicevuteCliente('${cliente.nome.replace(/'/g, "\\'")}')">📜 Vedi Ricevute</button>
+                        <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteCliente(${idx})">🗑️ Elimina</button>
+                    </div>
+                </div>`;
+        });
+    }
+    contentHTML = clientiHtml;
+    break;
+
         default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
     }
+    
     activeView.innerHTML = `
         <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
@@ -857,6 +941,7 @@ function openModule(moduleName, editMode = false) {
     `;
     activeView.style.display = 'flex';
 }
+
 function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
@@ -1037,6 +1122,29 @@ function deleteDog(index) {
         openModule('canidiary');
     }
 }
+
+function creaRicevutaPerCliente(index) {
+    const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    const cliente = rubricaClienti[index];
+    if (!cliente) return;
+
+    // Apre il modulo per la creazione della ricevuta
+    openModule('ricevute');
+
+    // Popola automaticamente i campi del modulo con i dati del cliente selezionato
+    setTimeout(() => {
+        const elAcquirente = document.getElementById('r-acquirente');
+        const elCf = document.getElementById('r-cf-acquirente');
+        const elIndirizzo = document.getElementById('r-indirizzo-acquirente');
+        const elEmail = document.getElementById('r-email-acquirente');
+
+        if (elAcquirente) elAcquirente.value = cliente.nome || '';
+        if (elCf) elCf.value = cliente.cf || '';
+        if (elIndirizzo) elIndirizzo.value = cliente.indirizzo || '';
+        if (elEmail) elEmail.value = cliente.email || '';
+    }, 50);
+}
+
 function deleteCliente(index) {
     if (confirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
         let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
@@ -1152,58 +1260,48 @@ function registraVenditaConPrezzoKg() {
         return;
     }
 
-    let regimeScelto = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
-    
-    // 3. CONTROLLO RICEVUTA F24 (Imposta sostitutiva 100€)
+    // 3. CONTROLLO RICEVUTA F24 (Imposta sostitutiva 100€) - SCELTA AUTOMATICA REGIME
     const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
     const f24InputVal = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
     const protocolloF24 = f24InputVal || f24SavedData.protocollo;
     let dataPagamentoF24 = f24SavedData.dataPagamento ? new Date(f24SavedData.dataPagamento) : null;
 
     let f24Valido = false;
-
     if (protocolloF24 && dataPagamentoF24 && !isNaN(dataPagamentoF24.getTime())) {
         const scadenzaF24 = new Date(annoCorrente, 1, 16, 23, 59, 59); // 1 = Febbraio
-        
         if (dataPagamentoF24 <= scadenzaF24) {
             f24Valido = true;
         }
     }
 
-    // 4. COMMUTAZIONE AUTOMATICA A REGIME RITENUTA D'ACCONTO
-    if (regimeScelto === 'sostitutiva' && !f24Valido) {
-        regimeScelto = 'ritenuta';
-        alert("ℹ️ Ricevuta F24 non rilevata, non valida o fuori termine:\nIl sistema ha automaticamente convertito la scelta sul regime a 'Ritenuta d'Acconto (23% sul 78%)'.");
+    let regimeScelto = f24Valido ? 'sostitutiva' : 'ritenuta';
+
+    // 4. CONTROLLO OBBLIGATORIETÀ LUOGO / AREA DI RACCOLTA E PROVINCIA (Tracciabilità)
+    const luogoRaccoltaInput = document.getElementById('r-comune');
+    const luogoAreaRaccolta = luogoRaccoltaInput ? luogoRaccoltaInput.value.trim() : '';
+    
+    if (!luogoAreaRaccolta) {
+        alert("❌ Dato obbligatorio mancante!\nIl campo 'Luogo / Area di Raccolta e Provincia' è fondamentale per gli adempimenti della tracciabilità e non può essere lasciato vuoto.");
+        if (luogoRaccoltaInput) luogoRaccoltaInput.focus();
+        return;
     }
 
-    // 5. GESTIONE ACQUIRENTE E RUBRICA
+    // 5. GESTIONE ACQUIRENTE
     const acquirenteNome = document.getElementById('r-acquirente').value.trim();
     const acquirenteCf = document.getElementById('r-cf-acquirente').value.trim();
+    const acquirenteIndirizzo = document.getElementById('r-indirizzo-acquirente') ? document.getElementById('r-indirizzo-acquirente').value.trim() : '';
+    const acquirenteEmail = document.getElementById('r-email-acquirente') ? document.getElementById('r-email-acquirente').value.trim() : '';
     
     if (!acquirenteNome) {
         alert("Inserisci il nome o la ragione sociale dell'acquirente.");
         return;
     }
 
-    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
-    const clienteEsistente = rubricaClienti.find(c => c.nome.toLowerCase() === acquirenteNome.toLowerCase());
-    
-    if (!clienteEsistente) {
-        rubricaClienti.push({
-            nome: acquirenteNome,
-            cf: acquirenteCf,
-            dataUltimoAcquisto: new Date().toLocaleDateString()
-        });
-    } else {
-        clienteEsistente.dataUltimoAcquisto = new Date().toLocaleDateString();
-        if(acquirenteCf) clienteEsistente.cf = acquirenteCf;
-    }
-    localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
-
-    // 6. CALCOLI FINANZIARI (Lordo inserito -> Ritenuta calcolata a scendere)
+    // 6. CALCOLI FINANZIARI
     const pesoGrammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
     const qualitaScelta = document.getElementById('r-qualita').value;
     const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const dataOdierna = new Date().toLocaleDateString();
     
     let importoRitenuta = '0.00';
     let importoNetto = importoTotale.toFixed(2);
@@ -1215,24 +1313,36 @@ function registraVenditaConPrezzoKg() {
         importoNetto = (importoTotale - calcoloRitenuta).toFixed(2);
     }
 
-    // 7. CALCOLO SOGLIA ANNUA (7000 €) BASATO SUL LORDO E VERIFICA BLOCCO
+    // 6.1 ACQUISIZIONE NOTA E AGGIORNAMENTO AUTOMATICO RUBRICA CLIENTI
+    const notaClienteInput = document.getElementById('r-nota-cliente');
+    const notaClienteValore = notaClienteInput ? notaClienteInput.value.trim() : '';
+
+    if (typeof salvaClienteInRubrica === 'function') {
+        salvaClienteInRubrica({
+            acquirente: acquirenteNome,
+            cfAcquirente: acquirenteCf,
+            indirizzoAcquirente: acquirenteIndirizzo,
+            emailAcquirente: acquirenteEmail,
+            totale: importoTotale,
+            data: dataOdierna,
+            nota: notaClienteValore // Passa correttamente la nota alla rubrica
+        });
+    }
+
+    // 7. CALCOLO SOGLIA ANNUA (7000 €)
     let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     
     let totaleVenditeAnno = storico.reduce((acc, v) => {
         const dataVendita = v.data ? new Date(v.data.split('/').reverse().join('-')) : new Date();
         const annoVendita = dataVendita.getFullYear();
         if (annoVendita === annoCorrente) {
-            // Prende sempre l'importo totale (lordo) della ricevuta precedente
-            const valoreLordo = parseFloat(v.importo) || 0;
-            return acc + valoreLordo;
+            return acc + (parseFloat(v.importo) || 0);
         }
         return acc;
     }, 0);
 
     const sogliaBlocco = 7000.00;
-    // Prende l'importo totale (lordo) della transazione corrente
-    const importoCorrenteLordo = importoTotale; 
-    const nuovoTotaleAnno = totaleVenditeAnno + importoCorrenteLordo;
+    const nuovoTotaleAnno = totaleVenditeAnno + importoTotale;
     const quantoManca = Math.max(0, sogliaBlocco - nuovoTotaleAnno);
 
     if (nuovoTotaleAnno > sogliaBlocco) {
@@ -1240,7 +1350,7 @@ function registraVenditaConPrezzoKg() {
         return;
     }
 
-    // 8. MESSAGGIO DI RIEPILOGO CON PRESA VISIONE (SOLO RISULTATI €)
+    // 8. MESSAGGIO DI RIEPILOGO CON TRACCIABILITÀ E PRESA VISIONE
     const tipoRicevutaTesto = regimeScelto === 'sostitutiva' 
         ? "Imposta Sostitutiva (F24)" 
         : "Ritenuta d'Acconto (23% sul 78%)";
@@ -1248,7 +1358,8 @@ function registraVenditaConPrezzoKg() {
     const messaggioRiepilogo = 
         `📋 RIEPILOGO NUOVA RICEVUTA\n` +
         `----------------------------------------\n` +
-        `• Tipo Regime: ${tipoRicevutaTesto}\n` +
+        `• Luogo / Area di Raccolta e Provincia: ${luogoAreaRaccolta} [OBBLIGATORIO - TRACCIABILITÀ]\n` +
+        `• Tipo Regime (Automatico): ${tipoRicevutaTesto}\n` +
         `• Importo Totale (Lordo): € ${importoTotale.toFixed(2)}\n` +
         `• Ritenuta applicata: € ${importoRitenuta}\n` +
         `• Importo Netto: € ${importoNetto}\n` +
@@ -1257,12 +1368,11 @@ function registraVenditaConPrezzoKg() {
         `• Mancante alla soglia di blocco: € ${quantoManca.toFixed(2)}\n\n` +
         `Premi OK per confermare la presa visione e registrare la vendita, oppure Annulla per interrompere.`;
 
-    const confermaPresaVisione = window.confirm(messaggioRiepilogo);
-    if (!confermaPresaVisione) {
+    if (!window.confirm(messaggioRiepilogo)) {
         return; 
     }
-
-    // 9. REGISTRAZIONE NELLO STORICO VENDITE E MESSAGGIO FINALE
+   
+    // 9. REGISTRAZIONE NELLO STORICO VENDITE (Le note del cliente restano escluse dalla ricevuta stampata)
     const vendita = {
         venditoreNome: tData.nome, 
         venditoreCf: tData.cf, 
@@ -1270,6 +1380,8 @@ function registraVenditaConPrezzoKg() {
         venditoreRegione: tData.regione || 'N.D.',
         acquirente: acquirenteNome, 
         acquirenteCf: acquirenteCf,
+        acquirenteIndirizzo: acquirenteIndirizzo,
+        acquirenteEmail: acquirenteEmail,
         specie: document.getElementById('r-specie').value, 
         qualita: qualitaScelta,
         peso: pesoGrammi, 
@@ -1277,17 +1389,64 @@ function registraVenditaConPrezzoKg() {
         regime: regimeScelto,
         ritenuta: importoRitenuta,
         netto: importoNetto,
-        comune: document.getElementById('r-comune').value.trim(), 
+        luogoRaccolta: luogoAreaRaccolta, 
         lotto: document.getElementById('r-lotto').value.trim(), 
         f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto 23% su 78%)', 
-        data: new Date().toLocaleDateString()
+        data: dataOdierna
     };
     
     storico.push(vendita);
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
     
-    alert(`✔ Ricevuta registrata con successo!\n\nRiepilogo operazione:\n- Importo Lordo: € ${importoTotale.toFixed(2)}\n- Totale annuo progressivo: € ${nuovoTotaleAnno.toFixed(2)}`);
-    openModule('storico_ricevute');
+    const nuovoIndice = storico.length - 1;
+
+    alert(`✔ Ricevuta registrata con successo!\n\nApertura automatica della ricevuta in corso...`);
+    
+    // 10. APERTURA DIRETTA DELLA VISUALIZZAZIONE
+    if (typeof openModule === 'function') {
+        openModule('storico_ricevute');
+    }
+    
+    setTimeout(() => {
+        if (typeof visualizzaRicevutaSalvata === 'function') {
+            visualizzaRicevutaSalvata(nuovoIndice);
+        }
+    }, 100);
+}
+
+// Funzione di supporto per la gestione della rubrica con storico acquisti
+function salvaClienteInRubrica(nuovaRicevuta) {
+    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    
+    const index = rubricaClienti.findIndex(c => c.nome.toLowerCase() === nuovaRicevuta.acquirente.toLowerCase());
+    const importoRicevuta = parseFloat(nuovaRicevuta.totale) || 0;
+
+    if (index !== -1) {
+        rubricaClienti[index].totaleAcquisti = (parseFloat(rubricaClienti[index].totaleAcquisti) || 0) + importoRicevuta;
+        rubricaClienti[index].numeroAcquisti = (rubricaClienti[index].numeroAcquisti || 0) + 1;
+        rubricaClienti[index].dataUltimoAcquisto = nuovaRicevuta.data;
+        if (nuovaRicevuta.cfAcquirente) rubricaClienti[index].cf = nuovaRicevuta.cfAcquirente;
+        if (nuovaRicevuta.indirizzoAcquirente) rubricaClienti[index].indirizzo = nuovaRicevuta.indirizzoAcquirente;
+        if (nuovaRicevuta.emailAcquirente) rubricaClienti[index].email = nuovaRicevuta.emailAcquirente;
+        
+        // Aggiorna la nota se compilata in fase di ricevuta
+        if (nuovaRicevuta.nota) {
+            rubricaClienti[index].nota = nuovaRicevuta.nota;
+        }
+    } else {
+        rubricaClienti.push({
+            nome: nuovaRicevuta.acquirente,
+            cf: nuovaRicevuta.cfAcquirente || '',
+            indirizzo: nuovaRicevuta.indirizzoAcquirente || '',
+            email: nuovaRicevuta.emailAcquirente || '',
+            totaleAcquisti: importoRicevuta,
+            numeroAcquisti: 1,
+            dataUltimoAcquisto: nuovaRicevuta.data,
+            nota: nuovaRicevuta.nota || '' 
+        });
+    }
+
+    localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
 }
 
 function visualizzaRicevutaSalvata(index) {
@@ -1296,57 +1455,78 @@ function visualizzaRicevutaSalvata(index) {
     if(!v) return;
 
     const isRitenuta = v.regime === 'ritenuta';
+    
+    // Dati fiscali pronti per essere inseriti alla fine dei dettagli
     const dettagliFiscoHtml = isRitenuta ? `
-        <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (esonerata dall'imposta sostitutiva)</p>
-        <p><strong>Compenso Lordo:</strong> € ${v.importo}</p>
-        <p><strong>Ritenuta d'Acconto (23%):</strong> € ${v.ritenuta || (v.importo * 0.23).toFixed(2)}</p>
-        <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Netto a Pagare / Percepito:</strong> € ${v.netto || (v.importo * 0.77).toFixed(2)}</p>
+        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ccc;">
+            <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (esonerata dall'imposta sostitutiva)</p>
+            <p><strong>Compenso Lordo:</strong> € ${v.importo}</p>
+            <p><strong>Ritenuta d'Acconto (23%):</strong> € ${v.ritenuta || (v.importo * 0.23).toFixed(2)}</p>
+            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${v.netto || (v.importo * 0.77).toFixed(2)}</p>
+        </div>
     ` : `
-        <p><strong>Regime Fiscale:</strong> Imposta Sostitutiva (Legge 145/2018)</p>
-        <p><strong>Versamento F24 ELIDE (100€):</strong> Protocollo N. ${v.f24}</p>
-        <p style="font-size: 1.1rem; margin-top: 10px;"><strong>Importo Totale:</strong> € ${v.importo}</p>
+        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ccc;">
+            <p><strong>Regime Fiscale:</strong> Imposta Sostitutiva (Legge 145/2018)</p>
+            <p><strong>Versamento F24 ELIDE (100€):</strong> Protocollo N. ${v.f24}</p>
+            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${v.importo}</p>
+        </div>
     `;
+
+    // Supporto per retrocompatibilità con vecchie ricevute salvate come v.comune
+    const luogoAreaVisualizzazione = v.luogoRaccolta || v.comune || 'Non specificato';
 
     let activeView = document.getElementById('active-module-view');
     activeView.querySelector('.module-body-content').innerHTML = `
-        <h2>RICEVUTA VENDITA OCCASIONALE N. ${index + 1}</h2>
-        <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
-        <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
-            <p style="font-size: 0.72rem; color: #444; text-align: justify; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 8px; line-height: 1.3;">
-                <strong>DICHIARAZIONE DI CESSIONE OCCASIONALE E TRACCIABILITÀ:</strong> 
-                Operazione effettuata nell'ambito della raccolta hobbistica/occasionale dei tartufi, esonerata dall'obbligo di emissione di fattura elettronica e di certificazione fiscale ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 e s.m.i., nonché in conformità alle disposizioni di cui alla Legge 30 dicembre 2018, n. 145. Si attesta inoltre la piena tracciabilità del prodotto alimentare ai sensi degli artt. 18 e 19 del Regolamento (CE) n. 178/2002.
-            </p>
-            <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati del Venditore (Cessionario occasionale)</h3>
-            <p><strong>Nome e Cognome:</strong> ${v.venditoreNome}</p>
-            <p><strong>Codice Fiscale:</strong> ${v.venditoreCf}</p>
-            <p><strong>Tesserino Raccolta N.:</strong> ${v.venditoreTesserino} - <p><strong> Rilasciato dalla Regione:</strong> ${v.venditoreRegione}</p>
-            ${dettagliFiscoHtml}
-            <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati dell'Acquirente</h3>
-            <p><strong>Acquirente / Ristorante:</strong> ${v.acquirente}</p>
-            <p><strong>P.IVA / Codice Fiscale:</strong> ${v.acquirenteCf || 'Non inserito'}</p>
-            <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dettagli Prodotto & Tracciabilità</h3>
-            <p><strong>Specie di Tartufo:</strong> ${v.specie}</p>
-            <p><strong>Classificazione Qualità:</strong> ${v.qualita || 'Non specificata'}</p>
-            <p><strong>Peso:</strong> ${v.peso} grammi</p>
-            <p><strong>Comune di Raccolta / Località:</strong> ${v.comune}</p>
-            <p><strong>Codice Lotto / Tracciabilità:</strong> ${v.lotto}</p>
-            <p><strong>Data Vendita:</strong> ${v.data}</p>
-            <div style="margin-top: 30px; display: flex; justify-content: space-between; page-break-inside: avoid;">
-                <div style="width: 45%; text-align: center;">
-                    <div style="border-bottom: 1px solid #000; height: 40px; margin-bottom: 5px;"></div>
-                    <p style="font-size: 0.85rem;">Firma dell'Acquirente</p>
-                </div>
-                <div style="width: 45%; text-align: center;">
-                    <div style="border-bottom: 1px solid #000; height: 40px; margin-bottom: 5px;"></div>
-                    <p style="font-size: 0.85rem;">Firma del Venditore (Cessionario)</p>
+        <div id="ricevuta-${index}">
+            <h2>RICEVUTA VENDITA OCCASIONALE N. ${index + 1}</h2>
+            <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
+            <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
+                <p style="font-size: 0.72rem; color: #444; text-align: justify; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 8px; line-height: 1.3;">
+                    <strong>DICHIARAZIONE DI CESSIONE OCCASIONALE E TRACCIABILITÀ:</strong> 
+                    Operazione effettuata nell'ambito della raccolta hobbistica/occasionale dei tartufi, esonerata dall'obbligo di emissione di fattura elettronica e di certificazione fiscale ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 e s.m.i., nonché in conformità alle disposizioni di cui alla Legge 30 dicembre 2018, n. 145. Si attesta inoltre la piena tracciabilità del prodotto alimentare ai sensi degli artt. 18 e 19 del Regolamento (CE) n. 178/2002.
+                </p>
+                
+                <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati del Venditore (Cessionario occasionale)</h3>
+                <p><strong>Nome e Cognome:</strong> ${v.venditoreNome}</p>
+                <p><strong>Codice Fiscale:</strong> ${v.venditoreCf}</p>
+                <p><strong>Tesserino Raccolta N.:</strong> ${v.venditoreTesserino} - <strong>Rilasciato dalla Regione:</strong> ${v.venditoreRegione}</p>
+                
+                <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati dell'Acquirente</h3>
+                <p><strong>Acquirente:</strong> ${v.acquirente}</p>
+                <p><strong>P.IVA / Codice Fiscale:</strong> ${v.acquirenteCf || 'Non inserito'}</p>
+                <p><strong>Indirizzo:</strong> ${v.acquirenteIndirizzo || 'Non inserito'}</p>
+                <p><strong>Email:</strong> ${v.acquirenteEmail || 'Non specificata'}</p>
+                
+                <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dettagli Ricevuta e Tracciabilità</h3>
+                <p><strong>Specie di Tartufo:</strong> ${v.specie}</p>
+                <p><strong>Classificazione Qualità:</strong> ${v.qualita || 'Non specificata'}</p>
+                <p><strong>Peso:</strong> ${v.peso} grammi</p>
+                <p><strong>Luogo / Area di Raccolta e Provincia:</strong> ${luogoAreaVisualizzazione}</p>
+                <p><strong>Codice Lotto / Tracciabilità:</strong> ${v.lotto}</p>
+                
+                ${dettagliFiscoHtml}
+
+                <p style="margin-top: 10px;"><strong>Data Vendita:</strong> ${v.data}</p>
+
+                <div style="margin-top: 30px; display: flex; justify-content: space-between; page-break-inside: avoid;">
+                    <div style="width: 45%; text-align: center;">
+                        <div style="border-bottom: 1px solid #000; height: 40px; margin-bottom: 5px;"></div>
+                        <p style="font-size: 0.85rem;">Firma dell'Acquirente</p>
+                    </div>
+                    <div style="width: 45%; text-align: center;">
+                        <div style="border-bottom: 1px solid #000; height: 40px; margin-bottom: 5px;"></div>
+                        <p style="font-size: 0.85rem;">Firma del Venditore (Cessionario)</p>
+                    </div>
                 </div>
             </div>
         </div>
         <button class="overlay-btn" style="background:#2563eb; margin-top:15px; width:100%;" onclick="window.print()">🖨️ Stampa / Salva PDF Conforme</button>
-        <button class="overlay-btn" style="background:#0284c7; margin-top:10px; width:100%;" onclick="condividiRicevuta(${index})">📤 Condividi Ricevuta (WhatsApp / PDF)</button>
+        <button class="overlay-btn" style="background:#0284c7; margin-top:10px; width:100%;" onclick="condividiRicevuta(${index})">📤 Condividi Ricevuta (WhatsApp)</button>
+        <button class="overlay-btn" style="background:#16a34a; margin-top:10px; width:100%;" onclick="condividiRicevutaEmail(${index})">📧 Condividi / Invia Email (${v.acquirenteEmail || 'Email non inserita'})</button>
         <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
     `;
 }
+
 function eliminaRicevutaConDoppiaConferma(index) {
     const primaConferma = confirm("Sei sicuro di voler eliminare questa ricevuta dallo storico?");
     if (primaConferma) {
@@ -1515,6 +1695,16 @@ function esportaDatiCSV() {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
 }
 
+function mostraRicevuteCliente(nomeCliente) {
+    // Salva il filtro attivo nel localStorage
+    localStorage.setItem('filtro_storico_cliente', nomeCliente);
+    
+    // Apre il modulo dello storico ricevute
+    if (typeof openModule === 'function') {
+        openModule('storico_ricevute');
+    }
+}
+
 function esportaBackupJSON() {
     const backupData = { 
         tesserino: localStorage.getItem('tesserino_data'), 
@@ -1616,10 +1806,25 @@ function deleteVetHistoryItem(index) {
 }
 
 function shareAppUrl() {
-    const appUrl = window.location.href;
-    if (navigator.share) { navigator.share({ title: 'Truffle App', url: appUrl }).catch(() => {}); }
-    else { navigator.clipboard.writeText(appUrl).then(() => alert("Link copiato!")); }
+    const shareData = {
+        title: 'Truffle App',
+        text: 'Condividi la tua applicazione per la raccolta dei tartufi',
+        url: window.location.href
+    };
+
+    if (navigator.share) {
+        navigator.share(shareData).catch((err) => {
+            console.log("Condivisione annullata o non riuscita", err);
+        });
+    } else {
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            alert("Link copiato negli appunti!");
+        }).catch(() => {
+            alert("Impossibile condividere o copiare il link.");
+        });
+    }
 }
+
 function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tesserino') {
     if (!base64Data) return;
     
@@ -1742,5 +1947,163 @@ function mostraDisclaimerIniziale() {
 
     } else {
         modalOverlay.style.display = 'flex';
+    }
+}
+
+// 1. Funzione per autocompilare i campi cliente richiamando i dati salvati
+function autocompilaDatiCliente(nomeInserito) {
+    if (!nomeInserito || nomeInserito.trim() === '') return;
+    const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    const clienteTrovato = rubricaClienti.find(c => c.nome.toLowerCase() === nomeInserito.trim().toLowerCase());
+
+    if (clienteTrovato) {
+        const elCf = document.getElementById('r-cf-acquirente');
+        const elIndirizzo = document.getElementById('r-indirizzo-acquirente');
+        const elEmail = document.getElementById('r-email-acquirente');
+        const elNota = document.getElementById('r-nota-cliente');
+
+        if (elCf && !elCf.value) elCf.value = clienteTrovato.cf || '';
+        if (elIndirizzo && !elIndirizzo.value) elIndirizzo.value = clienteTrovato.indirizzo || '';
+        if (elEmail && !elEmail.value) elEmail.value = clienteTrovato.email || '';
+        if (elNota && !elNota.value) elNota.value = clienteTrovato.nota || '';
+    }
+}
+
+// Funzione per condividere la ricevuta via Email (da richiamare nella visualizzazione ricevuta)
+function condividiRicevutaEmail(index) {
+    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const v = storico[index];
+    if (!v) {
+        alert("Ricevuta non trovata.");
+        return;
+    }
+
+    // L'email viene inserita nel testo anziché nel parametro mailto principale se vuoi che l'utente la veda lì
+    const emailTesto = v.acquirenteEmail ? v.acquirenteEmail : "Non specificata";
+
+    const oggetto = encodeURIComponent(`Ricevuta di Vendita Occasionale - Lotto ${v.lotto || 'Tartufo'}`);
+    const corpo = encodeURIComponent(
+        `Gentile ${v.acquirente},\n\n` +
+        `Indirizzo Email Acquirente: ${emailTesto}\n\n` +
+        `Di seguito i dettagli della ricevuta di vendita occasionale di tartufi conforme alla Legge 145/2018:\n\n` +
+        `• Data: ${v.data}\n` +
+        `• Specie: ${v.specie}\n` +
+        `• Qualità: ${v.qualita || 'Non specificata'}\n` +
+        `• Peso: ${v.peso} grammi\n` +
+        `• Importo Totale: € ${v.importo}\n` +
+        `• Comune di Raccolta: ${v.comune}\n` +
+        `• Codice Lotto: ${v.lotto}\n\n` +
+        `Cordiali saluti,\n${v.venditoreNome}`
+    );
+
+    // Se non vuoi che inserisca l'email nel campo "A:", rimuovi ${v.acquirenteEmail} prima del punto e virgola
+    window.location.href = `mailto:?subject=${oggetto}&body=${corpo}`;
+}
+
+async function condividiRicevutaEmail(index) {
+    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const v = storico[index];
+    if (!v) {
+        alert("Ricevuta non trovata.");
+        return;
+    }
+
+    const emailDestinatarioTesto = v.acquirenteEmail ? v.acquirenteEmail : "Non specificato";
+    const isRitenuta = v.regime === 'ritenuta';
+
+    // Gestione dinamica dei dettagli economici in base al regime fiscale registrato
+    let dettagliEconomiciTesto = "";
+    if (isRitenuta) {
+        const lordo = parseFloat(v.importo) || 0;
+        const ritenuta = v.ritenuta ? parseFloat(v.ritenuta) : (lordo * 0.23);
+        const netto = v.netto !== undefined ? parseFloat(v.netto) : (lordo - ritenuta);
+
+        dettagliEconomiciTesto = 
+            `• Regime Fiscale: Ritenuta d'Acconto (23%)\n` +
+            `• Compenso Lordo: € ${lordo.toFixed(2)}\n` +
+            `• Ritenuta d'Acconto (23%): € ${ritenuta.toFixed(2)}\n` +
+            `• Importo Netto Corrisposto: € ${netto.toFixed(2)}`;
+    } else {
+        dettagliEconomiciTesto = 
+            `• Regime Fiscale: Imposta Sostitutiva (Legge 145/2018)\n` +
+            `• Importo Totale: € ${v.importo}`;
+    }
+
+    const corpo = 
+        `Gentile ${v.acquirente},\n\n` +
+        `Di seguito i dettagli della ricevuta di vendita occasionale di tartufi conforme alla Legge 145/2018:\n\n` +
+        `• Email Acquirente Registrata: ${emailDestinatarioTesto}\n` +
+        `• Data: ${v.data}\n` +
+        `• Specie: ${v.specie}\n` +
+        `• Qualità: ${v.qualita || 'Non specificata'}\n` +
+        `• Peso: ${v.peso} grammi\n` +
+        `${dettagliEconomiciTesto}\n` +
+        `• Comune / Area di Raccolta: ${v.luogoRaccolta || v.comune || 'Non specificato'}\n` +
+        `• Codice Lotto: ${v.lotto}\n\n` +
+        `Cordiali saluti,\n${v.venditoreNome}`;
+
+    if (navigator.share) {
+        try {
+            let fileToShare = null;
+
+            if (typeof html2pdf !== 'undefined') {
+                const element = document.getElementById(`ricevuta-${index}`);
+                if (element) {
+                    const options = {
+                        margin: 10,
+                        filename: `Ricevuta_${index + 1}.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2, useCORS: true },
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    };
+                    
+                    const pdfBlob = await html2pdf().from(element).set(options).output('blob');
+                    fileToShare = new File([pdfBlob], `Ricevuta_${index + 1}.pdf`, { type: 'application/pdf' });
+                }
+            }
+
+            const shareData = {
+                title: `Ricevuta di Vendita Occasionale - Lotto ${v.lotto || 'Tartufo'}`,
+                text: corpo
+            };
+
+            if (fileToShare && navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
+                shareData.files = [fileToShare];
+            }
+
+            await navigator.share(shareData);
+            return;
+
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.log("Condivisione email annullata o non riuscita", err);
+            }
+        }
+    } else {
+        // Fallback per desktop o browser che non supportano navigator.share con file
+        alert(`Il tuo browser non supporta l'allegato automatico via Web. L'indirizzo email dell'acquirente è: ${emailDestinatarioTesto}`);
+    }
+}
+
+function salvaNotaCliente(index, testoNota) {
+    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    if (rubricaClienti[index]) {
+        rubricaClienti[index].nota = testoNota;
+        localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
+        // Facoltativo: un piccolo feedback visivo di conferma
+        console.log("Nota salvata con successo per il cliente index:", index);
+    }
+}
+
+function salvaNotaClienteDaInput(index) {
+    const textarea = document.getElementById(`nota-cliente-${index}`);
+    if (!textarea) return;
+
+    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    if (rubricaClienti[index]) {
+        rubricaClienti[index].nota = textarea.value.trim();
+        localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
+        alert("📝 Nota del cliente salvata con successo!");
+        openModule('clienti');
     }
 }
