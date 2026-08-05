@@ -642,6 +642,7 @@ function openModule(moduleName, editMode = false) {
                         <option value="🎗️ Collare Antiparassitario">Collare Antiparassitario</option>
                         <option value="🩺 Visita Veterinaria">Visita Veterinaria / Controllo</option>
                         <option value="🩹 Medicazione / Zecca">Medicazione / Ferita / Zecca</option>
+                        <option value="🏥 Somministrazione Farmaci / Altro">Somministrazione Farmaci / Altro</option>
                     </select>
                     <label>Data del Trattamento:</label>
                     <input type="date" id="vh-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
@@ -733,11 +734,70 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = registroHtml;
             break;
+        case 'spese':
+            const speseList = JSON.parse(localStorage.getItem('spese_list') || '[]');
+            let totaleSpeseAnno = 0;
+            const annoCorrenteSpese = new Date().getFullYear();
+
+            let speseHtml = `
+                <h2>Gestione Spese Tartufaio</h2>
+                <p>Traccia carburante, attrezzatura, manutenzione e spese veterinarie:</p>
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Nuova Spesa</h3>
+                    <label>Data:</label>
+                    <input type="date" id="spese-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+                    <label>Categoria:</label>
+                    <select id="spese-categoria" class="mod-input">
+                        <option value="⛽ Carburante / Trasferte">⛽ Carburante / Trasferte</option>
+                        <option value="🐕 Alimentazione & Cura Cane">🐕 Alimentazione & Cura Cane</option>
+                        <option value="🩺 Visite & Spese Veterinarie">🩺 Visite & Spese Veterinarie</option>
+                        <option value="🛠️ Attrezzatura & Zappe">🛠️ Attrezzatura & Zappe</option>
+                        <option value="🛡️ Assicurazioni & Tasse">🛡️ Assicurazioni & Tasse</option>
+                        <option value="📦 Altro">📦 Altro</option>
+                    </select>
+                    <label>Importo (€):</label>
+                    <input type="number" step="0.01" id="spese-importo" class="mod-input" placeholder="Es. 25.00">
+                    <label>Note / Descrizione:</label>
+                    <input type="text" id="spese-note" class="mod-input" placeholder="Es. Benzina per uscita bosco">
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveSpesa()">Salva Spesa</button>
+                </div>`;
+
+            if (speseList.length === 0) {
+                speseHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna spesa registrata.</p></div>`;
+            } else {
+                speseHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Elenco Spese Registrate:</h3>`;
+                
+                speseList.slice().reverse().forEach((item, index) => {
+                    const originalIndex = speseList.length - 1 - index;
+                    const dataSpesa = item.data ? new Date(item.data) : null;
+                    if (dataSpesa && dataSpesa.getFullYear() === annoCorrenteSpese) {
+                        totaleSpeseAnno += parseFloat(item.importo) || 0;
+                    }
+
+                    speseHtml += `
+                        <div class="module-card" style="border-left: 4px solid #f59e0b; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:0.95rem;">💶 € ${parseFloat(item.importo).toFixed(2)}</strong>
+                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;"><b>${item.categoria}</b></p>
+                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteSpesa(${originalIndex})">🗑️ Elimina</button>
+                        </div>`;
+                });
+
+                speseHtml = `
+                    <div class="module-card" style="background: #0f172a; border: 1px solid #334155; margin-bottom: 15px; text-align: center;">
+                        <p style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase;">Totale Spese Anno Corrente (${annoCorrenteSpese})</p>
+                        <p style="font-size: 1.4rem; color: #f59e0b; font-weight: bold; margin: 4px 0 0 0;">€ ${totaleSpeseAnno.toFixed(2)}</p>
+                    </div>` + speseHtml;
+            }
+            contentHTML = speseHtml;
+            break;
         case 'bilancio':
             const venditeSalvateBilancio = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+            const speseSalvateBilancio = JSON.parse(localStorage.getItem('spese_list') || '[]');
             const annoCorrenteBilancio = new Date().getFullYear();
             
-            // Variabili per i due blocchi separati
+            // Variabili per i guadagni
             let lordoSostitutiva = 0;
             let nettoSostitutiva = 0;
             let countSostitutiva = 0;
@@ -748,7 +808,15 @@ function openModule(moduleName, editMode = false) {
             let countRitenuta = 0;
 
             venditeSalvateBilancio.forEach(item => {
-                const dataVendita = item.data ? new Date(item.data.split('/').reverse().join('-')) : new Date();
+                let dataVendita = new Date();
+                if (item.data) {
+                    const dataStr = item.data.includes('/') ? item.data.split('/').reverse().join('-') : item.data;
+                    const parsedDate = new Date(dataStr);
+                    if (!isNaN(parsedDate.getTime())) {
+                        dataVendita = parsedDate;
+                    }
+                }
+
                 if (dataVendita.getFullYear() === annoCorrenteBilancio) {
                     const lordo = parseFloat(item.importo) || 0;
                     const regime = item.regime || 'sostitutiva';
@@ -762,7 +830,6 @@ function openModule(moduleName, editMode = false) {
                         totaleRitenuteSubite += ritenuta;
                         countRitenuta++;
                     } else {
-                        // Imposta sostitutiva (il netto coincide con il lordo percepito)
                         lordoSostitutiva += lordo;
                         nettoSostitutiva += lordo;
                         countSostitutiva++;
@@ -770,14 +837,29 @@ function openModule(moduleName, editMode = false) {
                 }
             });
 
-            // Somma dei guadagni percepiti (NETTI) per il bilancio/guadagno effettivo in tasca
-            const sommaTotaleNettiPercepiti = nettoSostitutiva + nettoRitenuta;
+            // Calcoli totali
+            const totaleNettoGuadagni = nettoSostitutiva + nettoRitenuta;
+            const totaleLordoGuadagni = lordoSostitutiva + lordoRitenuta;
 
-            // Il controllo del limite normativo rimane basato sul totale dei LORDI
-            const sommaTotaleLordi = lordoSostitutiva + lordoRitenuta;
+            // Calcolo totale spese per l'anno corrente
+            let sommaTotaleSpeseAnno = 0;
+            speseSalvateBilancio.forEach(item => {
+                const dataSpesa = item.data ? new Date(item.data) : null;
+                if (dataSpesa && !isNaN(dataSpesa.getTime()) && dataSpesa.getFullYear() === annoCorrenteBilancio) {
+                    sommaTotaleSpeseAnno += parseFloat(item.importo) || 0;
+                }
+            });
+
+            // Utile Netto Finale (Netto Guadagni - Spese)
+            const utileNettoEffettivo = totaleNettoGuadagni - sommaTotaleSpeseAnno;
+
+            // Controllo soglia limite normativo
             const sogliaLimiteBilancio = 7000.00;
-            const differenzaSoglia = sogliaLimiteBilancio - sommaTotaleLordi;
-            const isSuperato = sommaTotaleLordi > sogliaLimiteBilancio;
+            const differenzaSoglia = sogliaLimiteBilancio - totaleLordoGuadagni;
+            const isSuperato = totaleLordoGuadagni > sogliaLimiteBilancio;
+
+            // Stile comune per le caselle a dimensione uniforme
+            const boxStyleUniforme = "background: #0f172a; border: 1px solid #334155; text-align: center; padding: 15px; margin-bottom: 12px; border-radius: 8px;";
 
             contentHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -787,39 +869,43 @@ function openModule(moduleName, editMode = false) {
                     </button>
                 </div>
                 
-                <!-- Blocco 1: Imposta Sostitutiva -->
-                <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 15px;">
-                    <h3 style="font-size:0.95rem; color:#22c55e; margin-bottom:8px;">🟢 Regime Imposta Sostitutiva (F24)</h3>
-                    <p>Ricevute emesse: <strong>${countSostitutiva}</strong></p>
-                    <p>Totale Lordo / Netto: <strong style="color:#22c55e;">€ ${nettoSostitutiva.toFixed(2)}</strong></p>
-                    <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">Imposta Sostitutiva F24 (Fissa): € 100,00</p>
+                <!-- Dettaglio 1: Imposta Sostitutiva -->
+                <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
+                    <h3 style="font-size:0.9rem; color:#22c55e; margin-bottom:6px;">🟢 Regime Imposta Sostitutiva</h3>
+                    <p style="font-size:0.85rem; margin:2px 0;">Ricevute: <strong>${countSostitutiva}</strong> | Netto: <strong style="color:#22c55e;">€ ${nettoSostitutiva.toFixed(2)}</strong></p>
                 </div>
 
-                <!-- Blocco 2: Ritenuta d'Acconto -->
+                <!-- Dettaglio 2: Ritenuta d'Acconto -->
                 <div class="module-card" style="border-left: 4px solid #38bdf8; margin-bottom: 15px;">
-                    <h3 style="font-size:0.95rem; color:#38bdf8; margin-bottom:8px;">🔵 Regime Ritenuta d'Acconto (23%)</h3>
-                    <p>Ricevute emesse: <strong>${countRitenuta}</strong></p>
-                    <p>Totale Lordo: € ${lordoRitenuta.toFixed(2)}</p>
-                    <p>Totale Ritenute Subite: <span style="color:#f87171;">€ ${totaleRitenuteSubite.toFixed(2)}</span></p>
-                    <p>Totale Netto Percepito: <strong style="color:#38bdf8;">€ ${nettoRitenuta.toFixed(2)}</strong></p>
+                    <h3 style="font-size:0.9rem; color:#38bdf8; margin-bottom:6px;">🔵 Regime Ritenuta d'Acconto (23%)</h3>
+                    <p style="font-size:0.85rem; margin:2px 0;">Ricevute: <strong>${countRitenuta}</strong> | Lordo: € ${lordoRitenuta.toFixed(2)}</p>
+                    <p style="font-size:0.85rem; margin:2px 0;">Ritenute subite: <span style="color:#f87171;">- € ${totaleRitenuteSubite.toFixed(2)}</span></p>
+                    <p style="font-size:0.85rem; margin:2px 0;">Netto percepito: <strong style="color:#38bdf8;">€ ${nettoRitenuta.toFixed(2)}</strong></p>
                 </div>
 
-                <!-- Blocco Riepilogo Complessivo e Differenza Limite -->
-                <div class="module-card" style="background: #0f172a; border: 1px solid #334155; text-align: center; padding: 15px;">
-                    <p style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Somma Totale Guadagni Percepiti (Netto): Ricevute Sostitutiva + Ritenuta d'Acconto</p>
-                    <p style="font-size: 1.5rem; color: #22c55e; font-weight: bold; margin: 8px 0 15px 0;">€ ${sommaTotaleNettiPercepiti.toFixed(2)}</p>
-                    
-                    <hr style="border-color:#334155; margin:12px 0;">
-                    
-                    <p style="font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Controllo Soglia di Blocco (sul Lordo): € ${sommaTotaleLordi.toFixed(2)} / € 7.000,00</p>
-                    <p style="font-size: 1.8rem; font-weight: 900; margin-top: 8px; color: #ef4444;">
-                        ${isSuperato 
-                            ? `SUPERATO di € ${Math.abs(differenzaSoglia).toFixed(2)}` 
-                            : `Disponibile: € ${differenzaSoglia.toFixed(2)}`
-                        }
-                    </p>
-                    <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 6px;">
-                        ${isSuperato ? 'Attenzione: È stata superata la soglia di occasionalità.' : 'Entro i limiti previsti dalla normativa.'}
+                <!-- 1. TOTALE NETTO DEI GUADAGNI (Dimensioni uguali) -->
+                <div class="module-card" style="${boxStyleUniforme} border-color: #22c55e;">
+                    <p style="font-size: 0.8rem; color: #4ade80; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold; margin: 0;">Totale Netto dei Guadagni</p>
+                    <p style="font-size: 1.6rem; color: #22c55e; font-weight: bold; margin: 6px 0 0 0;">€ ${totaleNettoGuadagni.toFixed(2)}</p>
+                </div>
+
+                <!-- 2. TOTALE SPESE SOSENUTE (Dimensioni uguali) -->
+                <div class="module-card" style="${boxStyleUniforme} border-color: #f59e0b;">
+                    <p style="font-size: 0.8rem; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold; margin: 0;">Totale Spese Sostenute</p>
+                    <p style="font-size: 1.6rem; color: #f59e0b; font-weight: bold; margin: 6px 0 0 0;">€ ${sommaTotaleSpeseAnno.toFixed(2)}</p>
+                </div>
+
+                <!-- Utile Netto Effettivo (Dimensioni uguali) -->
+                <div class="module-card" style="${boxStyleUniforme}">
+                    <p style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Utile Finale (Netto Guadagni - Spese)</p>
+                    <p style="font-size: 1.6rem; color: ${utileNettoEffettivo >= 0 ? '#22c55e' : '#ef4444'}; font-weight: bold; margin: 6px 0 0 0;">€ ${utileNettoEffettivo.toFixed(2)}</p>
+                </div>
+
+                <!-- Controllo Soglia (In rosso come richiesto) -->
+                <div class="module-card" style="background: #450a0a; border: 1px solid #ef4444; text-align: center; padding: 15px; border-radius: 8px;">
+                    <p style="font-size: 0.8rem; color: #fca5a5; text-transform: uppercase; font-weight: bold; margin: 0;">Soglia Occasionalità (sul Lordo): € ${totaleLordoGuadagni.toFixed(2)} / € 7.000,00</p>
+                    <p style="font-size: 1.3rem; font-weight: bold; margin-top: 6px; color: #f87171;">
+                        ${isSuperato ? `SUPERATO di € ${Math.abs(differenzaSoglia).toFixed(2)}` : `Disponibile: € ${differenzaSoglia.toFixed(2)}`}
                     </p>
                 </div>`;
             break;
@@ -1683,16 +1769,35 @@ async function condividiRicevuta(index) {
 function chiudiDettaglioRicevuta() {
     openModule('storico_ricevute');
 }
+
 function esportaDatiCSV() {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-    if(storico.length === 0) { alert("Nessuna vendita registrata."); return; }
-    let csvContent = "data:text/csv;charset=utf-8,Data,Acquirente,Specie,Peso,Importo\n";
-    storico.forEach(r => { csvContent += `${r.data},"${r.acquirente}","${r.specie}",${r.peso},${r.importo}\n`; });
-    var encodedUri = encodeURI(csvContent);
-    var link = document.createElement("a");
+    if(storico.length === 0) { 
+        alert("Nessuna vendita registrata."); 
+        return; 
+    }
+    
+    let csvContent = "data:text/csv;charset=utf-8,Data,Acquirente,Specie,Peso (g),Importo (€),Regime\n";
+    
+    storico.forEach(r => {
+        const row = [
+            `"${r.data || ''}"`,
+            `"${(r.acquirente || '').replace(/"/g, '""')}"`,
+            `"${(r.specie || '').replace(/"/g, '""')}"`,
+            r.peso || 0,
+            r.importo || 0,
+            `"${r.regime || 'sostitutiva'}"`
+        ];
+        csvContent += row.join(",") + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "report_tartufi.csv");
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    link.setAttribute("download", `contabilita_tartufi_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 function mostraRicevuteCliente(nomeCliente) {
@@ -1719,8 +1824,11 @@ function esportaBackupJSON() {
     };
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
     const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr); downloadAnchor.setAttribute("download", "backup_truffle.json");
-    document.body.appendChild(downloadAnchor); downloadAnchor.click(); downloadAnchor.remove();
+    downloadAnchor.setAttribute("href", dataStr); 
+    downloadAnchor.setAttribute("download", "backup_truffle.json");
+    document.body.appendChild(downloadAnchor); 
+    downloadAnchor.click(); 
+    downloadAnchor.remove();
 }
 
 function importBackupData(event) {
@@ -1730,17 +1838,21 @@ function importBackupData(event) {
     reader.onload = function(e) {
         try {
             const data = JSON.parse(e.target.result);
-            if(data.tesserino) localStorage.setItem('tesserino_data', data.tesserino);
-            if(data.pagopa) localStorage.setItem('pagopa_data', data.pagopa);
-            if(data.f24) localStorage.setItem('f24_data', data.f24);
-            if(data.storicoVendite) localStorage.setItem('storico_vendite', data.storicoVendite);
-            if(data.poiList) localStorage.setItem('poi_list', data.poiList);
-            if(data.dogsList) localStorage.setItem('dogs_list', data.dogsList);
-            if(data.polizzeList) localStorage.setItem('polizze_list', data.polizzeList);
-            if(data.storicoRaccolta) localStorage.setItem('storico_raccolta_giornaliera', data.storicoRaccolta);
-            if(data.rubricaClienti) localStorage.setItem('rubrica_clienti', data.rubricaClienti);
-            alert("Backup ripristinato con successo!"); location.reload();
-        } catch(err) { alert("Errore durante la lettura del file di backup."); }
+            if (data.tesserino) localStorage.setItem('tesserino_data', data.tesserino);
+            if (data.pagopa) localStorage.setItem('pagopa_data', data.pagopa);
+            if (data.f24) localStorage.setItem('f24_data', data.f24);
+            if (data.storicoVendite) localStorage.setItem('storico_vendite', data.storicoVendite);
+            if (data.poiList) localStorage.setItem('poi_list', data.poiList);
+            if (data.dogsList) localStorage.setItem('dogs_list', data.dogsList);
+            if (data.polizzeList) localStorage.setItem('polizze_list', data.polizzeList);
+            if (data.storicoRaccolta) localStorage.setItem('storico_raccolta_giornaliera', data.storicoRaccolta);
+            if (data.rubricaClienti) localStorage.setItem('rubrica_clienti', data.rubricaClienti);
+            
+            alert("Backup ripristinato con successo!"); 
+            location.reload();
+        } catch(err) { 
+            alert("Errore durante la lettura del file di backup."); 
+        }
     };
     reader.readAsText(file);
 }
@@ -1896,7 +2008,7 @@ function mostraDisclaimerIniziale() {
         const counterContainer = document.getElementById('disclaimer-counter');
         const buttonsContainer = document.getElementById('disclaimer-buttons-container');
 
-        function aggiornaVistaDisclaimer() {
+function aggiornaVistaDisclaimer() {
             textContainer.innerHTML = pagineDisclaimer[paginaCorrente];
             counterContainer.innerText = `${paginaCorrente + 1} / 5`;
 
@@ -2105,5 +2217,32 @@ function salvaNotaClienteDaInput(index) {
         localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
         alert("📝 Nota del cliente salvata con successo!");
         openModule('clienti');
+    }
+}
+function saveSpesa() {
+    const data = document.getElementById('spese-data').value;
+    const categoria = document.getElementById('spese-categoria').value;
+    const importo = parseFloat(document.getElementById('spese-importo').value);
+    const note = document.getElementById('spese-note').value.trim();
+
+    if (!data || isNaN(importo) || importo <= 0) {
+        alert("Inserisci una data valida e un importo superiore a zero.");
+        return;
+    }
+
+    let speseList = JSON.parse(localStorage.getItem('spese_list') || '[]');
+    speseList.push({ data, categoria, importo, note });
+    localStorage.setItem('spese_list', JSON.stringify(speseList));
+    
+    alert("Spesa registrata con successo!");
+    openModule('spese');
+}
+
+function deleteSpesa(index) {
+    if (confirm("Vuoi davvero eliminare questa spesa?")) {
+        let speseList = JSON.parse(localStorage.getItem('spese_list') || '[]');
+        speseList.splice(index, 1);
+        localStorage.setItem('spese_list', JSON.stringify(speseList));
+        openModule('spese');
     }
 }
