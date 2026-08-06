@@ -1014,7 +1014,7 @@ function openModule(moduleName, editMode = false) {
     contentHTML = clientiHtml;
     break;
 
-        case 'archivio':
+            case 'archivio':
             // Specie commercializzabili in Italia (Legge 752/1985 e s.m.i.) - ID da 0 a 8
             const specieTartufiArchivio = [
                 "Tuber magnatum Pico (Tartufo bianco pregiato)",          // ID 0
@@ -1103,6 +1103,22 @@ function openModule(moduleName, editMode = false) {
                     </div>
                 `;
             });
+
+            // INSERITO QUI IL BLOCCO DI BACKUP & RIPRISTINO CALENDARI:
+            archivioHtml += `
+                <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-bottom: 15px; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                    <h3 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px;">💾 Backup & Ripristino Calendari</h3>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">
+                        Esporta i tuoi calendari regionali personalizzati su file/condividili o ripristinali da un backup precedente:
+                    </p>
+                    <button class="overlay-btn" style="width: 100%; background: #16a34a; font-weight: bold; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-bottom: 10px;" onclick="esportaCalendariJSON()">
+                        📥 Scarica o Condividi Calendari (JSON)
+                    </button>
+                    
+                    <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 4px;">Carica Calendari da File JSON:</label>
+                    <input type="file" id="import-calendari-file" accept=".json" class="mod-input" style="padding: 6px; font-size: 0.8rem;" onchange="importaCalendariJSON(event)">
+                </div>
+            `;
 
             archivioHtml += `
                 <div style="margin-top: 15px; margin-bottom: 25px;">
@@ -2660,4 +2676,74 @@ function estraiDateTartufiDaTesto() {
     } else {
         alert("⚠️ Impossibile estrarre automaticamente le date. Verifica che il testo contenga i nomi corretti e la struttura 'dal ... al ...'.");
     }
+}
+// Funzione per scaricare i calendari e le note regionali in formato JSON
+// Funzione per esportare e condividere i calendari e le note regionali in formato JSON
+async function esportaCalendariJSON() {
+    const calendari = localStorage.getItem('calendari_tartufi_custom') || '{}';
+    const note = localStorage.getItem('note_regionali_tartufi') || '{}';
+    
+    const exportData = {
+        calendari_tartufi_custom: JSON.parse(calendari),
+        note_regionali_tartufi: JSON.parse(note),
+        dataExport: new Date().toISOString()
+    };
+
+    const fileName = `calendari_tartufi_backup_${new Date().toISOString().slice(0,10)}.json`;
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const file = new File([jsonString], fileName, { type: 'application/json' });
+
+    // Controlla se il dispositivo supporta la condivisione nativa (es. Smartphone / Tablet)
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+            await navigator.share({
+                title: 'Backup Calendari Tartufi',
+                text: 'Ecco il file di backup dei calendari e delle note regionali dei tartufi.',
+                files: [file]
+            });
+            return; // Condivisione riuscita
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.log("Condivisione nativa annullata o fallita, procedo con il download classico.", error);
+            } else {
+                return; // L'utente ha annullato esplicitamente la condivisione
+            }
+        }
+    }
+
+    // Fallback per PC o browser non supportati (Download diretto del file)
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonString);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", fileName);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+}
+
+// Funzione per caricare/ripristinare i calendari da un file JSON
+function importaCalendariJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const content = JSON.parse(e.target.result);
+            
+            if (content.calendari_tartufi_custom) {
+                localStorage.setItem('calendari_tartufi_custom', JSON.stringify(content.calendari_tartufi_custom));
+            }
+            if (content.note_regionali_tartufi) {
+                localStorage.setItem('note_regionali_tartufi', JSON.stringify(content.note_regionali_tartufi));
+            }
+
+            alert("✔ Calendari e note regionali importati con successo!");
+            openModule('archivio'); // Ricarica il modulo archivio per mostrare i dati aggiornati
+        } catch (err) {
+            alert("❌ Errore durante la lettura del file JSON. Assicurati che sia un file di backup valido.");
+            console.error(err);
+        }
+    };
+    reader.readAsText(file);
 }
