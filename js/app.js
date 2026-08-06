@@ -2010,14 +2010,21 @@ function esportaBackupJSON() {
         storicoVendite: localStorage.getItem('storico_vendite'), 
         poiList: localStorage.getItem('poi_list'),
         dogsList: localStorage.getItem('dogs_list'),
+        caneData: localStorage.getItem('cane_data'),
         polizzeList: localStorage.getItem('polizze_list'),
         storicoRaccolta: localStorage.getItem('storico_raccolta_giornaliera'),
-        rubricaClienti: localStorage.getItem('rubrica_clienti')
+        rubricaClienti: localStorage.getItem('rubrica_clienti'),
+        speseList: localStorage.getItem('spese_list'),
+        vetHistoryList: localStorage.getItem('vet_history_list'),
+        vetClinicsList: localStorage.getItem('vet_clinics_list'),
+        calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
+        noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
+        carCoords: localStorage.getItem('car_coords')
     };
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr); 
-    downloadAnchor.setAttribute("download", "backup_truffle.json");
+    downloadAnchor.setAttribute("download", "backup_truffle_completo.json");
     document.body.appendChild(downloadAnchor); 
     downloadAnchor.click(); 
     downloadAnchor.remove();
@@ -2036,9 +2043,16 @@ function importBackupData(event) {
             if (data.storicoVendite) localStorage.setItem('storico_vendite', data.storicoVendite);
             if (data.poiList) localStorage.setItem('poi_list', data.poiList);
             if (data.dogsList) localStorage.setItem('dogs_list', data.dogsList);
+            if (data.caneData) localStorage.setItem('cane_data', data.caneData);
             if (data.polizzeList) localStorage.setItem('polizze_list', data.polizzeList);
             if (data.storicoRaccolta) localStorage.setItem('storico_raccolta_giornaliera', data.storicoRaccolta);
             if (data.rubricaClienti) localStorage.setItem('rubrica_clienti', data.rubricaClienti);
+            if (data.speseList) localStorage.setItem('spese_list', data.speseList);
+            if (data.vetHistoryList) localStorage.setItem('vet_history_list', data.vetHistoryList);
+            if (data.vetClinicsList) localStorage.setItem('vet_clinics_list', data.vetClinicsList);
+            if (data.calendariTartufiCustom) localStorage.setItem('calendari_tartufi_custom', data.calendariTartufiCustom);
+            if (data.noteRegionaliTartufi) localStorage.setItem('note_regionali_tartufi', data.noteRegionaliTartufi);
+            if (data.carCoords) localStorage.setItem('car_coords', data.carCoords);
             
             alert("Backup ripristinato con successo!"); 
             location.reload();
