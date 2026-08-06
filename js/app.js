@@ -1029,7 +1029,7 @@ function openModule(moduleName, editMode = false) {
             ];
 
             // Recupera la regione selezionata nell'archivio o usa una di default
-            const regioneSelezionataArchivio = window.currentArchivioRegione || "Abruzzo";
+            const regioneSelezionataArchivio = window.currentArchivioRegione || "Campania";
 
             let calendariPersonalizzatiArchivio = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
             let datiRegioneArchivio = calendariPersonalizzatiArchivio[regioneSelezionataArchivio] || {};
@@ -1104,7 +1104,7 @@ function openModule(moduleName, editMode = false) {
 
             case 'calendario':
     const gpsTextCal = document.getElementById('gps-status-text');
-    let regioneCal = "Abruzzo"; // Default di fallback
+    let regioneCal = "Campania"; // Default di fallback
     if (gpsTextCal && gpsTextCal.innerHTML) {
         const matchReg = gpsTextCal.innerHTML.match(/<b>(.*?)<\/b>/);
         if (matchReg && matchReg[1]) regioneCal = matchReg[1];
