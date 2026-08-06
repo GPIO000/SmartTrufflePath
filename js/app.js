@@ -2524,32 +2524,24 @@ function estraiDateTartufiDaTesto() {
     const selectRegione = document.getElementById('seleziona-regione-archivio');
     const regioneCorrente = selectRegione ? selectRegione.value : (window.currentArchivioRegione || "Abruzzo");
 
-    // Unisce le righe spezzate dai ritorni a capo per evitare che le date vengano interrotte
-    testo = testo.replace(/(\d)\s*\n\s*([a-zA-Zà-ù])/g, '$1 $2');
+    // Normalizza i ritorni a capo e gli spazi multipli
+    testo = testo.replace(/\r?\n|\r/g, ' '); 
+    testo = testo.replace(/\s+/g, ' ');
+    const testoLower = testo.toLowerCase();
 
-    // Mappatura rigorosa ordinata dalla variante più specifica a quella base
+    // Mappatura ordinata dalla più specifica alla più generica
     const regoleEstrazione = [
-        { id: 8, keywords: ["tuber brumale var. moschatum", "tartufo moscato"] },
-        { id: 4, keywords: ["tuber brumale", "tartufo nero d’inverno", "tartufo nero di inverno"] },
-        { id: 0, keywords: ["tuber magnatum", "tartufo bianco pregiato"] },
-        { id: 1, keywords: ["tuber melanosporum", "tartufo nero di norcia"] },
-        { id: 2, keywords: ["tuber aestivum", "scorzone estivo", "tartufo estivo"] },
-        { id: 3, keywords: ["tuber uncinatum", "scorzone invernale", "tartufo uncinato"] },
-        { id: 5, keywords: ["tuber borchii", "t. albidum", "bianchetto", "marzuolo"] },
+        { id: 8, keywords: ["tuber brumale var. moschatum", "tuber brumale var moschatum", "tartufo moscato"] },
+        { id: 4, keywords: ["tuber brumale", "tartufo nero d’inverno", "tartufo nero di inverno", "trifola nera"] },
+        { id: 0, keywords: ["tuber magnatum", "tartufo bianco"] },
+        { id: 1, keywords: ["tuber melanosporum", "tartufo nero di norcia", "tartufo nero pregiato"] },
+        { id: 2, keywords: ["tuber aestivum", "scorzone", "tartufo d'estate", "tartufo estivo"] },
+        { id: 3, keywords: ["tuber uncinatum", "tartufo uncinato" ] },
+        { id: 5, keywords: ["tuber borchii", "t. borchi", "t. albidum", "bianchetto", "marzuolo"] },
         { id: 6, keywords: ["tuber macrosporum", "tartufo nero liscio"] },
         { id: 7, keywords: ["tuber mesentericum", "tartufo nero ordinario", "tartufo nero di bagnoli"] }
     ];
 
-    function estraiPeriodoPulito(fraseGrezza) {
-        const regexPeriodo = /dal\s+([\d]{1,2}\s+[a-zA-Zà-ù]+|[\d]{1,2}[\/\-\.][\d]{1,2})\s+al\s+([\d]{1,2}\s+[a-zA-Zà-ù]+|[\d]{1,2}[\/\-\.][\d]{1,2})/i;
-        const match = fraseGrezza.match(regexPeriodo);
-        if (match) {
-            return `${match[1].trim()} - ${match[2].trim()}`;
-        }
-        return null;
-    }
-
-    const frasi = testo.split(/[.;\n]+/);
     let calendariPersonalizzati = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
     if (!calendariPersonalizzati[regioneCorrente]) {
         calendariPersonalizzati[regioneCorrente] = {};
@@ -2558,33 +2550,73 @@ function estraiDateTartufiDaTesto() {
     let modificheEffettuate = 0;
     const specieAggiornate = new Set();
 
-    frasi.forEach(frase => {
-        const fraseLower = frase.toLowerCase();
-        
-        regoleEstrazione.forEach(regola => {
-            // Evita di elaborare due volte la stessa specie nello stesso testo
-            if (specieAggiornate.has(regola.id)) return;
+    // Raccoglie tutte le specie trovate nel testo con la loro posizione iniziale esatta
+    let occorrenzeTrovate = [];
 
-            const matchKeyword = regola.keywords.some(kw => fraseLower.includes(kw));
-            if (matchKeyword) {
-                let periodoTrovato = estraiPeriodoPulito(frase);
+    regoleEstrazione.forEach(regola => {
+        if (specieAggiornate.has(regola.id)) return;
 
-                if (periodoTrovato) {
-                    calendariPersonalizzati[regioneCorrente][regola.id] = periodoTrovato;
-                    
-                    const inputSpecie = document.getElementById(`specie-archivio-${regola.id}`);
-                    if (inputSpecie) {
-                        inputSpecie.value = periodoTrovato;
-                    }
-                    specieAggiornate.add(regola.id);
-                    modificheEffettuate++;
-                }
+        let primaPos = -1;
+        for (let kw of regola.keywords) {
+            let idx = testoLower.indexOf(kw);
+            if (idx !== -1 && (primaPos === -1 || idx < primaPos)) {
+                primaPos = idx;
             }
-        });
+        }
+
+        if (primaPos !== -1) {
+            occorrenzeTrovate.push({ id: regola.id, posizione: primaPos });
+            specieAggiornate.add(regola.id); // Evita duplicati di specie
+        }
+    });
+
+    // Ordina le specie in base alla loro sequenza di comparsa nel testo
+    occorrenzeTrovate.sort((a, b) => a.posizione - b.posizione);
+
+    // Estrae i periodi delimitando lo spazio compreso tra una specie e la successiva
+    occorrenzeTrovate.forEach((specie, index) => {
+        let inizioSlice = specie.posizione;
+        // La ricerca per questa specie si ferma dove inizia la specie successiva nel testo (o alla fine del testo)
+        let fineSlice = (index + 1 < occorrenzeTrovate.length) ? occorrenzeTrovate[index + 1].posizione : testo.length;
+        
+        let porzioneTesto = testo.substring(inizioSlice, fineSlice);
+
+        // Cerca tutte le date del tipo "dal ... al ..." in questo intervallo circoscritto
+        const regexSingola = /dal\s+([\d]{1,2}[\s°ªa-zA-Zà-ù]+?)\s+al\s+([\d]{1,2}[\s°ªa-zA-Zà-ù]+?)(?=\s+e\s+dal|[;.,]|$)/gi;
+        
+        let match;
+        let periodiTrovati = [];
+
+        while ((match = regexSingola.exec(porzioneTesto)) !== null) {
+            let p1 = match[1].replace(/[()]/g, '').trim();
+            let p2 = match[2].replace(/[()]/g, '').trim();
+            let periodoStr = `${p1} - ${p2}`;
+
+            if (!periodiTrovati.includes(periodoStr)) {
+                periodiTrovati.push(periodoStr);
+            }
+        }
+
+        if (periodiTrovati.length > 0) {
+            let periodoFinale = periodiTrovati.join(" e ");
+
+            calendariPersonalizzati[regioneCorrente][specie.id] = periodoFinale;
+
+            const inputSpecie = document.getElementById(`specie-archivio-${specie.id}`);
+            if (inputSpecie) {
+                inputSpecie.value = periodoFinale;
+            }
+            modificheEffettuate++;
+        }
     });
 
     if (modificheEffettuate > 0) {
         localStorage.setItem('calendari_tartufi_custom', JSON.stringify(calendariPersonalizzati));
+        
+        if (typeof aggiornaCalendarioGPS === 'function') {
+            aggiornaCalendarioGPS();
+        }
+
         alert(`🔍 Estrazione completata con successo!\nAggiornati ${modificheEffettuate} periodi di raccolta per la regione: ${regioneCorrente}.`);
     } else {
         alert("⚠️ Impossibile estrarre automaticamente le date. Verifica che il testo contenga i nomi corretti e la struttura 'dal ... al ...'.");
