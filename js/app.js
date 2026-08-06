@@ -748,10 +748,10 @@ function openModule(moduleName, editMode = false) {
                     <input type="date" id="spese-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
                     <label>Categoria:</label>
                     <select id="spese-categoria" class="mod-input">
-                        <option value="⛽ Carburante / Trasferte">⛽ Carburante / Trasferte</option>
+                        <option value="⛽ Caosti Auto">⛽ Costi Auto</option>
                         <option value="🐕 Alimentazione & Cura Cane">🐕 Alimentazione & Cura Cane</option>
                         <option value="🩺 Visite & Spese Veterinarie">🩺 Visite & Spese Veterinarie</option>
-                        <option value="🛠️ Attrezzatura & Zappe">🛠️ Attrezzatura & Zappe</option>
+                        <option value="🛠️ Attrezzatura & Abbigliamento">🛠️ Attrezzatura & Abbigliamento</option>
                         <option value="🛡️ Assicurazioni & Tasse">🛡️ Assicurazioni & Tasse</option>
                         <option value="📦 Altro">📦 Altro</option>
                     </select>
@@ -1012,6 +1012,152 @@ function openModule(moduleName, editMode = false) {
         });
     }
     contentHTML = clientiHtml;
+    break;
+
+        case 'archivio':
+            // Specie commercializzabili in Italia (Legge 752/1985 e s.m.i.) - ID da 0 a 8
+            const specieTartufiArchivio = [
+                "Tuber magnatum Pico (Tartufo bianco pregiato)",          // ID 0
+                "Tuber melanosporum Vitt. (Nero Pregiato, Nero di Norcia)",       // ID 1
+                "Tuber aestivum Vitt. (Scorzone, Tartufo Estivo)",         // ID 2
+                "Tuber uncinatum Chatin (Scorzone Invernale)",    // ID 3
+                "Tuber brumale Vitt. (Tartufo nero d’inverno)",    // ID 4
+                "Tuber borchii Vitt. Tartufo albidum Pico (Bianchetto)",// ID 5
+                "Tuber macrosporum Vitt. (Nero Liscio)",          // ID 6
+                "Tuber mesentericum Vitt. (Nero Ordinario)",      // ID 7
+                "Tuber brumale var. moschatum De Ferry, (Tartufo moscato)"          // ID 8
+            ];
+
+            // Recupera la regione selezionata nell'archivio o usa una di default
+            const regioneSelezionataArchivio = window.currentArchivioRegione || "Abruzzo";
+
+            let calendariPersonalizzatiArchivio = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
+            let datiRegioneArchivio = calendariPersonalizzatiArchivio[regioneSelezionataArchivio] || {};
+
+            let archivioHtml = `
+                <h2>📚 Archivio Date per Regione</h2>
+                <p>Gestisci e memorizza i periodi autorizzati per le regioni di interesse.</p>
+
+                <div class="module-card" style="background: #0f172a; border: 1px solid #334155; margin-bottom: 15px;">
+                    <label style="font-size: 0.85rem; color: #94a3b8; display: block; margin-bottom: 5px;">Seleziona Regione da Archiviare:</label>
+                    <select id="seleziona-regione-archivio" class="mod-input" onchange="window.currentArchivioRegione = this.value; openModule('archivio');">
+                        <option value="${regioneSelezionataArchivio}" selected>${regioneSelezionataArchivio}</option>
+                        <option value="Abruzzo">Abruzzo</option>
+                        <option value="Calabria">Calabria</option>
+                        <option value="Campania">Campania</option>
+                        <option value="Emilia-Romagna">Emilia-Romagna</option>
+                        <option value="Lazio">Lazio</option>
+                        <option value="Liguria">Liguria</option>
+                        <option value="Lombardia">Lombardia</option>
+                        <option value="Marche">Marche</option>
+                        <option value="Molise">Molise</option>
+                        <option value="Piemonte">Piemonte</option>
+                        <option value="Puglia">Puglia</option>
+                        <option value="Sardegna">Sardegna</option>
+                        <option value="Sicilia">Sicilia</option>
+                        <option value="Toscana">Toscana</option>
+                        <option value="Umbria">Umbria</option>
+                        <option value="Veneto">Veneto</option>
+                    </select>
+                </div>
+
+                <!-- Box di Estrazione Automatica da Testo Ufficiale -->
+                <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-bottom: 15px; border-radius: 8px; padding: 15px;">
+                    <h3 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px;">📋 Estrazione Automatica Date da Testo</h3>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">
+                        Incolla qui il testo ufficiale della Regione (es. bollettino o legge regionale) contenente le date di raccolta delle specie di tartufo:
+                    </p>
+                    <textarea id="testo-normativa-tartufi" class="mod-input" rows="5" placeholder="Es. Il tartufo bianco pregiato si raccoglie dal 1 ottobre al 31 dicembre. Lo scorzone dal 1 maggio al 31 agosto..." style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 8px; font-size: 0.85rem; width: 100%; box-sizing: border-box;"></textarea>
+                    <button class="overlay-btn" style="margin-top: 10px; width: 100%; background: #0284c7; font-weight: bold; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" onclick="estraiDateTartufiDaTesto()">
+                        🔍 Estrai e Compila Date
+                    </button>
+                </div>
+            `;
+
+            specieTartufiArchivio.forEach((specie, idSpecie) => {
+                let defaultPeriodo = "Ottobre - Gennaio";
+                if (specie.includes("Aestivum")) defaultPeriodo = "Maggio - Settembre";
+                if (specie.includes("Borchii")) defaultPeriodo = "Gennaio - Aprile";
+                if (specie.includes("Melanosporum")) defaultPeriodo = "Novembre - Marzo";
+
+                let periodoSalvato = datiRegioneArchivio[idSpecie] !== undefined ? datiRegioneArchivio[idSpecie] : defaultPeriodo;
+
+                archivioHtml += `
+                    <div class="module-card" style="border-left: 4px solid #f59e0b; margin-bottom: 10px; background: #1e293b;">
+                        <strong style="color: #f8fafc; font-size: 0.9rem; display: block; margin-bottom: 5px;">🍄 [ID Specie: ${idSpecie}] ${specie}</strong>
+                        <label style="font-size: 0.75rem; color: #94a3b8;">Periodo di raccolta autorizzato:</label>
+                        <input type="text" id="specie-archivio-${idSpecie}" class="mod-input" value="${periodoSalvato}" placeholder="Es. 1 Ottobre - 31 Dicembre" style="margin-top: 3px; font-size: 0.85rem;">
+                    </div>
+                `;
+            });
+
+            archivioHtml += `
+                <div style="margin-top: 15px; margin-bottom: 25px;">
+                    <button class="overlay-btn" style="width: 100%; background: #22c55e; color: #0f172a; font-weight: bold; padding: 12px; font-size: 0.95rem; border-radius: 6px; border: none; cursor: pointer;" onclick="salvaArchivioRegionaleTartufi('${regioneSelezionataArchivio}')">
+                        💾 Salva Date in Archivio
+                    </button>
+                </div>
+            `;
+
+            contentHTML = archivioHtml;
+            break;
+
+            case 'calendario':
+    const gpsTextCal = document.getElementById('gps-status-text');
+    let regioneCal = "Abruzzo"; // Default di fallback
+    if (gpsTextCal && gpsTextCal.innerHTML) {
+        const matchReg = gpsTextCal.innerHTML.match(/<b>(.*?)<\/b>/);
+        if (matchReg && matchReg[1]) regioneCal = matchReg[1];
+    }
+
+    let allCalendari = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
+    let datiRegioneCorrente = allCalendari[regioneCal] || {};
+
+    const specieTartufiCal = [
+        "Tuber magnatum Pico (Pregiato Bianco)",
+        "Tuber melanosporum Vitt. (Nero Pregiato)",
+        "Tuber aestivum Vitt. (Scorzone Estivo)",
+        "Tuber uncinatum Chatin (Scorzone Invernale)",
+        "Tuber brumale Vitt. (Moscatuto / Invernale)",
+        "Tuber borchii Vitt. / albidum Pico (Bianchetto)",
+        "Tuber macrosporum Vitt. (Nero Liscio)",
+        "Tuber mesentericum Vitt. (Nero Ordinario)",
+        "Tuber albidum / Altra specie regionale"
+    ];
+
+    let calHtml = `
+        <h2>📅 Calendario Raccolta (GPS)</h2>
+        <p>Regione rilevata: <strong style="color:#38bdf8;">${regioneCal}</strong></p>
+        <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:15px;">Specie con periodo di raccolta attualmente <b>aperto</b>:</p>
+    `;
+
+    let specieAperteTrovate = 0;
+
+    specieTartufiCal.forEach((specie, id) => {
+        let periodo = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : "Ottobre - Gennaio";
+        let isOpen = isSpecieApertaCorrente(periodo);
+
+        if (isOpen) {
+            specieAperteTrovate++;
+            calHtml += `
+                <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: #1e293b; padding: 10px; border-radius: 6px;">
+                    <strong style="color: #f8fafc; font-size: 0.85rem; display: block;">🍄 [ID: ${id}] ${specie}</strong>
+                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">🗓️ Periodo consentito: ${periodo}</div>
+                    <div style="font-size: 0.75rem; margin-top: 6px;"><span style="color:#22c55e; font-weight:bold;">🟢 RACCOLTA APERTA</span></div>
+                </div>
+            `;
+        }
+    });
+
+    if (specieAperteTrovate === 0) {
+        calHtml += `
+            <div class="module-card" style="background: #1e293b; border-left: 4px solid #ef4444; padding: 12px; text-align: center;">
+                <p style="color: #ef4444; font-weight: bold; margin: 0;">🔴 Nessuna specie aperta in questo periodo per la regione ${regioneCal}.</p>
+            </div>
+        `;
+    }
+
+    contentHTML = calHtml;
     break;
 
         default:
@@ -2244,5 +2390,203 @@ function deleteSpesa(index) {
         speseList.splice(index, 1);
         localStorage.setItem('spese_list', JSON.stringify(speseList));
         openModule('spese');
+    }
+}
+
+function salvaArchivioRegionaleTartufi(regione) {
+    let calendariPersonalizzatiArchivio = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
+    if (!calendariPersonalizzatiArchivio[regione]) {
+        calendariPersonalizzatiArchivio[regione] = {};
+    }
+
+    // Legge i 9 campi numerati da 0 a 8 associati alle specie
+    for (let idSpecie = 0; idSpecie <= 8; idSpecie++) {
+        const inputEl = document.getElementById(`specie-archivio-${idSpecie}`);
+        if (inputEl) {
+            calendariPersonalizzatiArchivio[regione][idSpecie] = inputEl.value.trim();
+        }
+    }
+
+    localStorage.setItem('calendari_tartufi_custom', JSON.stringify(calendariPersonalizzatiArchivio));
+    alert(`✔ Date e periodi per la regione ${regione} salvati con successo nell'archivio unificato!`);
+    openModule('archivio');
+}
+
+function isSpecieApertaCorrente(periodoStr) {
+    if (!periodoStr) return false;
+    
+    const oggi = new Date();
+    const annoCorrente = oggi.getFullYear();
+    
+    // Mappatura completa dei mesi in italiano (inclusi abbreviazioni)
+    const mesiMap = {
+        "gennaio": 0, "gen": 0,
+        "febbraio": 1, "feb": 1,
+        "marzo": 2, "mar": 2,
+        "aprile": 3, "apr": 3,
+        "maggio": 4, "mag": 4,
+        "giugno": 5, "giu": 5,
+        "luglio": 6, "lug": 6,
+        "agosto": 7, "ago": 7,
+        "settembre": 8, "set": 8, "sett": 8,
+        "ottobre": 9, "ott": 9,
+        "novembre": 10, "nov": 10,
+        "dicembre": 11, "dic": 11
+    };
+
+    // Funzione interna di supporto per convertire una stringa di data (es. "1 ottobre" o "15/10") in un oggetto Date
+    function parseDataStringa(stringaData, annoRiferimento) {
+        stringaData = stringaData.toLowerCase().trim();
+        
+        // Tentativo 1: Formato numerico (es. 01/10 o 1-10 o 1.10.2026)
+        const matchNum = stringaData.match(/(\d{1,2})[\/\-\.\s](\d{1,2})(?:[\/\-\.\s](\d{4}))?/);
+        if (matchNum) {
+            const giorno = parseInt(matchNum[1], 10);
+            const mese = parseInt(matchNum[2], 10) - 1; // I mesi in JS vanno da 0 a 11
+            const anno = matchNum[3] ? parseInt(matchNum[3], 10) : annoRiferimento;
+            return new Date(anno, mese, giorno);
+        }
+
+        // Tentativo 2: Formato testuale (es. "1 ottobre" o "ottobre")
+        let trovatoMese = null;
+        let giorno = 1; // Default al primo del mese se il giorno non è specificato
+
+        for (const [nomeMese, idxMese] of Object.entries(mesiMap)) {
+            if (stringaData.includes(nomeMese)) {
+                trovatoMese = idxMese;
+                break;
+            }
+        }
+
+        if (trovatoMese === null) return null;
+
+        // Cerca se c'è un numero che rappresenta il giorno prima del mese
+        const matchGiorno = stringaData.match(/(\d{1,2})/);
+        if (matchGiorno) {
+            giorno = parseInt(matchGiorno[1], 10);
+        }
+
+        return new Date(annoRiferimento, trovatoMese, giorno);
+    }
+
+    // Pulisce la stringa rimuovendo parole superflue come "dal", "al", "ore", ecc.
+    let testoPulito = periodoStr.toLowerCase()
+        .replace(/\bdal\b/g, '')
+        .replace(/\bal\b/g, '-')
+        .replace(/\bdel\b/g, '')
+        .trim();
+
+    // Divide la stringa in due parti usando il trattino o la parola "al" come separatore
+    const parti = testoPulito.split(/\s*-\s*/);
+    if (parti.length < 2) return false;
+
+    let dataInizio = parseDataStringa(parti[0], annoCorrente);
+    let dataFine = parseDataStringa(parti[1], annoCorrente);
+
+    if (!dataInizio || !dataFine) return false;
+
+    // Se la data di fine è precedente o uguale a quella di inizio, significa che siamo a cavallo d'anno (es. Ottobre - Gennaio)
+    if (dataInizio > dataFine) {
+        if (oggi.getMonth() <= dataFine.getMonth()) {
+            // Se siamo nei primi mesi dell'anno corrente, l'inizio è avvenuto l'anno scorso
+            dataInizio.setFullYear(annoCorrente - 1);
+        } else {
+            // Altrimenti, la fine si sposta all'anno prossimo
+            dataFine.setFullYear(annoCorrente + 1);
+        }
+    }
+
+    // Normalizza l'orario a inizio e fine giornata per un confronto pulito
+    dataInizio.setHours(0, 0, 0, 0);
+    dataFine.setHours(23, 59, 59, 999);
+
+    return oggi >= dataInizio && oggi <= dataFine;
+}
+
+function elaboraTestoIncollato() {
+    // Esempio di utilizzo collegato a un pulsante o a un evento
+    const testo = document.getElementById('inputTestoGrezzo').value;
+    const datiEstratti = estraiSpecieEPeriodiDaTesto(testo);
+    
+    console.log(datiEstratti);
+}
+
+function estraiDateTartufiDaTesto() {
+    const textarea = document.getElementById('testo-normativa-tartufi');
+    if (!textarea) return;
+    
+    let testo = textarea.value.trim();
+    if (!testo) {
+        alert("Inserisci o incolla prima il testo della normativa regionale nel riquadro.");
+        return;
+    }
+
+    const selectRegione = document.getElementById('seleziona-regione-archivio');
+    const regioneCorrente = selectRegione ? selectRegione.value : (window.currentArchivioRegione || "Abruzzo");
+
+    // Unisce le righe spezzate dai ritorni a capo per evitare che le date vengano interrotte
+    testo = testo.replace(/(\d)\s*\n\s*([a-zA-Zà-ù])/g, '$1 $2');
+
+    // Mappatura rigorosa ordinata dalla variante più specifica a quella base
+    const regoleEstrazione = [
+        { id: 8, keywords: ["tuber brumale var. moschatum", "tartufo moscato"] },
+        { id: 4, keywords: ["tuber brumale", "tartufo nero d’inverno", "tartufo nero di inverno"] },
+        { id: 0, keywords: ["tuber magnatum", "tartufo bianco pregiato"] },
+        { id: 1, keywords: ["tuber melanosporum", "tartufo nero di norcia"] },
+        { id: 2, keywords: ["tuber aestivum", "scorzone estivo", "tartufo estivo"] },
+        { id: 3, keywords: ["tuber uncinatum", "scorzone invernale", "tartufo uncinato"] },
+        { id: 5, keywords: ["tuber borchii", "t. albidum", "bianchetto", "marzuolo"] },
+        { id: 6, keywords: ["tuber macrosporum", "tartufo nero liscio"] },
+        { id: 7, keywords: ["tuber mesentericum", "tartufo nero ordinario", "tartufo nero di bagnoli"] }
+    ];
+
+    function estraiPeriodoPulito(fraseGrezza) {
+        const regexPeriodo = /dal\s+([\d]{1,2}\s+[a-zA-Zà-ù]+|[\d]{1,2}[\/\-\.][\d]{1,2})\s+al\s+([\d]{1,2}\s+[a-zA-Zà-ù]+|[\d]{1,2}[\/\-\.][\d]{1,2})/i;
+        const match = fraseGrezza.match(regexPeriodo);
+        if (match) {
+            return `${match[1].trim()} - ${match[2].trim()}`;
+        }
+        return null;
+    }
+
+    const frasi = testo.split(/[.;\n]+/);
+    let calendariPersonalizzati = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
+    if (!calendariPersonalizzati[regioneCorrente]) {
+        calendariPersonalizzati[regioneCorrente] = {};
+    }
+
+    let modificheEffettuate = 0;
+    const specieAggiornate = new Set();
+
+    frasi.forEach(frase => {
+        const fraseLower = frase.toLowerCase();
+        
+        regoleEstrazione.forEach(regola => {
+            // Evita di elaborare due volte la stessa specie nello stesso testo
+            if (specieAggiornate.has(regola.id)) return;
+
+            const matchKeyword = regola.keywords.some(kw => fraseLower.includes(kw));
+            if (matchKeyword) {
+                let periodoTrovato = estraiPeriodoPulito(frase);
+
+                if (periodoTrovato) {
+                    calendariPersonalizzati[regioneCorrente][regola.id] = periodoTrovato;
+                    
+                    const inputSpecie = document.getElementById(`specie-archivio-${regola.id}`);
+                    if (inputSpecie) {
+                        inputSpecie.value = periodoTrovato;
+                    }
+                    specieAggiornate.add(regola.id);
+                    modificheEffettuate++;
+                }
+            }
+        });
+    });
+
+    if (modificheEffettuate > 0) {
+        localStorage.setItem('calendari_tartufi_custom', JSON.stringify(calendariPersonalizzati));
+        alert(`🔍 Estrazione completata con successo!\nAggiornati ${modificheEffettuate} periodi di raccolta per la regione: ${regioneCorrente}.`);
+    } else {
+        alert("⚠️ Impossibile estrarre automaticamente le date. Verifica che il testo contenga i nomi corretti e la struttura 'dal ... al ...'.");
     }
 }
