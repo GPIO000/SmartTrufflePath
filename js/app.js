@@ -1034,6 +1034,10 @@ function openModule(moduleName, editMode = false) {
             let calendariPersonalizzatiArchivio = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
             let datiRegioneArchivio = calendariPersonalizzatiArchivio[regioneSelezionataArchivio] || {};
 
+            // Recupera la nota regionale salvata (se presente)
+            let noteRegionaliSalvate = JSON.parse(localStorage.getItem('note_regionali_tartufi') || '{}');
+            let notaCorrenteRegione = noteRegionaliSalvate[regioneSelezionataArchivio] || '';
+
             let archivioHtml = `
                 <h2>📚 Archivio Date per Regione</h2>
                 <p>Gestisci e memorizza i periodi autorizzati per le regioni di interesse.</p>
@@ -1072,6 +1076,15 @@ function openModule(moduleName, editMode = false) {
                         🔍 Estrai e Compila Date
                     </button>
                 </div>
+
+                <!-- Box Note, Fermi Biologici e Decreti Regionali -->
+                <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-bottom: 15px; border-radius: 8px; padding: 15px;">
+                    <h3 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px;">📝 Note, Fermi Biologici & Decreti Regionali</h3>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">
+                        Annota estremi di decreti, limitazioni straordinarie o periodi di fermo biologico per la regione ${regioneSelezionataArchivio}:
+                    </p>
+                    <textarea id="nota-regione-speciale" class="mod-input" rows="3" placeholder="Es. Delibera straordinaria: divieto di raccolta o fermo biologico..." style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 8px; font-size: 0.85rem; width: 100%; box-sizing: border-box;">${notaCorrenteRegione}</textarea>
+                </div>
             `;
 
             specieTartufiArchivio.forEach((specie, idSpecie) => {
@@ -1094,7 +1107,7 @@ function openModule(moduleName, editMode = false) {
             archivioHtml += `
                 <div style="margin-top: 15px; margin-bottom: 25px;">
                     <button class="overlay-btn" style="width: 100%; background: #22c55e; color: #0f172a; font-weight: bold; padding: 12px; font-size: 0.95rem; border-radius: 6px; border: none; cursor: pointer;" onclick="salvaArchivioRegionaleTartufi('${regioneSelezionataArchivio}')">
-                        💾 Salva Date in Archivio
+                        💾 Salva Date e Note in Archivio
                     </button>
                 </div>
             `;
@@ -1102,9 +1115,9 @@ function openModule(moduleName, editMode = false) {
             contentHTML = archivioHtml;
             break;
 
-            case 'calendario':
+            case 'calendario': {
     const gpsTextCal = document.getElementById('gps-status-text');
-    let regioneCal = "Campania"; // Default di fallback
+    let regioneCal = "Campania"; 
     if (gpsTextCal && gpsTextCal.innerHTML) {
         const matchReg = gpsTextCal.innerHTML.match(/<b>(.*?)<\/b>/);
         if (matchReg && matchReg[1]) regioneCal = matchReg[1];
@@ -1112,6 +1125,9 @@ function openModule(moduleName, editMode = false) {
 
     let allCalendari = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
     let datiRegioneCorrente = allCalendari[regioneCal] || {};
+
+    let noteRegionaliSalvate = JSON.parse(localStorage.getItem('note_regionali_tartufi') || '{}');
+    let notaRegionaleCorrente = noteRegionaliSalvate[regioneCal] || '';
 
     const specieTartufiCal = [
         "Tuber magnatum Pico (Pregiato Bianco)",
@@ -1135,7 +1151,9 @@ function openModule(moduleName, editMode = false) {
 
     specieTartufiCal.forEach((specie, id) => {
         let periodo = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : "Ottobre - Gennaio";
-        let isOpen = isSpecieApertaCorrente(periodo);
+        
+        // Controllo di sicurezza nel caso in cui la funzione di verifica non esista
+        let isOpen = typeof window.isSpecieApertaCorrente === 'function' ? isSpecieApertaCorrente(periodo) : true;
 
         if (isOpen) {
             specieAperteTrovate++;
@@ -1151,14 +1169,26 @@ function openModule(moduleName, editMode = false) {
 
     if (specieAperteTrovate === 0) {
         calHtml += `
-            <div class="module-card" style="background: #1e293b; border-left: 4px solid #ef4444; padding: 12px; text-align: center;">
+            <div class="module-card" style="background: #1e293b; border-left: 4px solid #ef4444; padding: 12px; text-align: center; margin-bottom: 15px;">
                 <p style="color: #ef4444; font-weight: bold; margin: 0;">🔴 Nessuna specie aperta in questo periodo per la regione ${regioneCal}.</p>
+            </div>
+        `;
+    }
+
+    if (notaRegionaleCorrente && notaRegionaleCorrente.trim() !== "") {
+        calHtml += `
+            <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-top: 15px; border-radius: 8px; padding: 15px;">
+                <h4 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    📝 Note & Fermi Biologici
+                </h4>
+                <p style="font-size: 0.8rem; color: #cbd5e1; margin: 0; white-space: pre-wrap; line-height: 1.4;">${notaRegionaleCorrente}</p>
             </div>
         `;
     }
 
     contentHTML = calHtml;
     break;
+}
 
         default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
@@ -2408,7 +2438,16 @@ function salvaArchivioRegionaleTartufi(regione) {
     }
 
     localStorage.setItem('calendari_tartufi_custom', JSON.stringify(calendariPersonalizzatiArchivio));
-    alert(`✔ Date e periodi per la regione ${regione} salvati con successo nell'archivio unificato!`);
+
+    // Salvataggio della nota regionale / fermo biologico
+    const inputNotaRegionale = document.getElementById('nota-regione-speciale');
+    if (inputNotaRegionale) {
+        let noteRegionaliSalvate = JSON.parse(localStorage.getItem('note_regionali_tartufi') || '{}');
+        noteRegionaliSalvate[regione] = inputNotaRegionale.value.trim();
+        localStorage.setItem('note_regionali_tartufi', JSON.stringify(noteRegionaliSalvate));
+    }
+
+    alert(`✔ Date, note e periodi per la regione ${regione} salvati con successo nell'archivio unificato!`);
     openModule('archivio');
 }
 
