@@ -1206,14 +1206,17 @@ function openModule(moduleName, editMode = false) {
     break;
 }
 
-        default:
+    default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
     }
     
     activeView.innerHTML = `
         <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
-            <button onclick="toggleDrawer(); closeActiveModule();" class="back-map-btn" style="color: #f8fafc;">☰ Torna al Menu</button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button onclick="mostraInfoModulo('${moduleName}')" class="back-map-btn" style="background: #334155; color: #38bdf8; border: 1px solid #475569; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; padding: 0;" title="Guida modulo">❓</button>
+                <button onclick="toggleDrawer(); closeActiveModule();" class="back-map-btn" style="color: #f8fafc;">☰ Torna al Menu</button>
+            </div>
         </div>
         <div class="module-body-content">${contentHTML}</div>
     `;
@@ -2760,4 +2763,28 @@ function importaCalendariJSON(event) {
         }
     };
     reader.readAsText(file);
+}
+function mostraInfoModulo(moduleName) {
+    const guideTesti = {
+        'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
+        'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto o un PDF del documento (max 1.5MB) per averlo sempre a portata di mano.",
+        'pagopa': "ℹ️ **Guida - Ricevuta PagoPA & PDF**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
+        'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto (Imposta Sostitutiva o Ritenuta d'Acconto) in base alla presenza di un F24 valido.",
+        'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\Consulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
+        'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
+        'canidiary': "ℹ️ **Guida - Profilo Cani & Diario**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo razza, data di nascita e numero di microchip.",
+        'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
+        'vet': "ℹ️ **Guida - Libretto Sanitario & Profilassi**\n\nRegistra lo storico dei trattamenti veterinari, dei vaccini e della somministrazione di antiparassitari per i tuoi cani.",
+        'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
+        'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
+        'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
+        'export': "ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV, scarica un backup completo in formato JSON o ripristina i dati da un file di salvataggio precedente.",
+        'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
+        'clienti': "ℹ️ **Guida - Rubrica Clienti & Acquirenti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico e gestisci le note dedicate.",
+        'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
+        'calendario': "ℹ️ **Guida - Calendario Raccolta (GPS)**\n\nVerifica in base alla tua posizione GPS attuale quali specie di tartufo hanno il periodo di raccolta attualmente aperto o chiuso."
+    };
+
+    const messaggio = guideTesti[moduleName] || "ℹ️ Guida non disponibile per questo modulo.";
+    alert(messaggio);
 }
