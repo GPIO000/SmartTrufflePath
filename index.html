@@ -22,7 +22,7 @@
     <div id="app-container">
         <!-- Header Superiore -->
         <header id="app-header">
-            <button id="menu-toggle-btn" onclick="toggleDrawer()">☰</button>
+            <button id="menu-toggle-btn" type="button">☰</button>
             <h1 id="gps-status-text">Truffle App</h1>
             <div id="gps-status-dot" title="GPS in attesa..."></div>
         </header>
@@ -34,13 +34,13 @@
             
             <!-- Bottoni Overlay rialzati -->
             <div id="map-overlays">
-                <button class="overlay-btn" style="background:#0ea5e9;" onclick="centerOnUser()">🎯 Centra</button>
-                <button class="overlay-btn" onclick="saveCarPosition()">🚗 Auto</button>
-                <button class="overlay-btn" onclick="returnToCar()">🧭 Vai</button>
-                <button class="overlay-btn" style="background:#dc2626;" onclick="deleteCarPosition()">🗑️ Del</button>
-                <button class="overlay-btn" onclick="savePoiPosition()">📍 Punto</button>
-                <button class="overlay-btn" onclick="openModule('poilist')">📋 Elenco</button>
-                <button class="overlay-btn sos-overlay-btn" onclick="triggerSOS()">🚨 SOS</button>
+                <button type="button" class="overlay-btn" style="background:#0ea5e9;" data-action="centerOnUser">🎯 Centra</button>
+                <button type="button" class="overlay-btn" data-action="saveCarPosition">🚗 Auto</button>
+                <button type="button" class="overlay-btn" data-action="returnToCar">🧭 Vai</button>
+                <button type="button" class="overlay-btn" style="background:#dc2626;" data-action="deleteCarPosition">🗑️ Del</button>
+                <button type="button" class="overlay-btn" data-action="savePoiPosition">📍 Punto</button>
+                <button type="button" class="overlay-btn" data-module="poilist">📋 Elenco</button>
+                <button type="button" class="overlay-btn sos-overlay-btn" data-action="triggerSOS">🚨 SOS</button>
             </div>
         </div>
     </div>
@@ -49,45 +49,45 @@
     <div id="app-drawer">
         <div class="drawer-header">
             <h2>Menu</h2>
-            <button onclick="toggleDrawer()">✕</button>
+            <button type="button" data-action="toggleDrawer">✕</button>
         </div>
         <div class="drawer-content">
             <div class="drawer-section">
                 <h3>Normativa & Fisco (Legge 145/2018)</h3>
-                <button onclick="openModule('calendario')">📅 Calendario Raccolta Tartufi</button>
-                <button onclick="openModule('archivio')">📚 Archivio Data raccolta Tartufi per Regione</button>
-                <button onclick="openModule('registro_giornaliero')">🍄 Registro Ritrovamenti</button>
-                <button onclick="openModule('tesserino')">🆔 Anagrafica & Tesserino</button>
-                <button onclick="openModule('pagopa')">💳 Ricevuta PagoPA (Tassa)</button>
-                <button onclick="openModule('f24')">📄 F24 ELIDE (Imposta 100€)</button>
-                <button onclick="openModule('clienti')">👥 Rubrica Clienti</button>
-                <button onclick="openModule('ricevute')">📝 Emetti Ricevuta Vendita</button>
-                <button onclick="openModule('storico_ricevute')">📂 Archivio Ricevute</button>
+                <button type="button" data-module="calendario">📅 Calendario Raccolta Tartufi</button>
+                <button type="button" data-module="archivio">📚 Archivio Data raccolta Tartufi per Regione</button>
+                <button type="button" data-module="registro_giornaliero">🍄 Registro Ritrovamenti</button>
+                <button type="button" data-module="tesserino">🆔 Anagrafica & Tesserino</button>
+                <button type="button" data-module="pagopa">💳 Ricevuta PagoPA (Tassa)</button>
+                <button type="button" data-module="f24">📄 F24 ELIDE (Imposta 100€)</button>
+                <button type="button" data-module="clienti">👥 Rubrica Clienti</button>
+                <button type="button" data-module="ricevute">📝 Emetti Ricevuta Vendita</button>
+                <button type="button" data-module="storico_ricevute">📂 Archivio Ricevute</button>
             </div>
 
             <div class="drawer-section">
                 <h3>Contabilità & Spese</h3>
-                <button onclick="openModule('spese')">💸 Gestione Spese</button>
-                <button onclick="openModule('bilancio')">📊 Bilancio & Contabilità</button>
+                <button type="button" data-module="spese">💸 Gestione Spese</button>
+                <button type="button" data-module="bilancio">📊 Bilancio & Contabilità</button>
             </div>
 
             <div class="drawer-section">
                 <h3>Cane & Sicurezza</h3>
-                <button onclick="openModule('canidiary')">🐕 Profilo Cane</button>
-                <button onclick="openModule('vet')">💉 Libretto Sanitario</button>
-                <button onclick="openModule('vet-emergency')">⚠️ Pronto Soccorso H24</button>
-                <button onclick="openModule('polizze')">🛡️ Polizze & Assicurazioni</button>
-                <button onclick="openModule('emergency')">📞 Chiama 112</button>
+                <button type="button" data-module="canidiary">🐕 Profilo Cane</button>
+                <button type="button" data-module="vet">💉 Libretto Sanitario</button>
+                <button type="button" data-module="vet-emergency">⚠️ Pronto Soccorso H24</button>
+                <button type="button" data-module="polizze">🛡️ Polizze & Assicurazioni</button>
+                <button type="button" data-module="emergency">📞 Chiama 112</button>
             </div>
 
             <div class="drawer-section">
                 <h3>Sistema</h3>
-                <button onclick="openModule('export')">💾 Backup & Report CSV</button>
-                <button onclick="shareAppUrl()">📤 Condividi App</button>
+                <button type="button" data-module="export">💾 Backup & Report CSV</button>
+                <button type="button" data-action="shareAppUrl">📤 Condividi App</button>
             </div>
         </div>
     </div>
-    <div id="drawer-backdrop" onclick="toggleDrawer()"></div>
+    <div id="drawer-backdrop"></div>
 
     <!-- Contenitore viste dinamiche a schermo intero -->
     <div id="active-module-view"></div>
@@ -103,6 +103,7 @@
 
     <!-- Script Principale dell'App (Conferma percorso cartella js) -->
     <script src="./js/app.js"></script>
+    <script src="./js/register-ui-handlers.js"></script>
 
     <!-- Registrazione Service Worker per PWA -->
     <script>
