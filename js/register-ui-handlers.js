@@ -40,3 +40,15 @@ function registerUIHandlers() {
 
 // Se il DOM è già pronto (app.js incluso a fine body) registriamo subito
 try { registerUIHandlers(); } catch (e) { console.error('registerUIHandlers failed', e); }
+
+// Stubs leggeri per evitare errori se alcune funzioni non sono ancora implementate
+(function createStubs(keys){
+  keys.forEach(k => {
+    if (typeof window[k] !== 'function') {
+      window[k] = function(...args) {
+        console.warn(`Stub eseguito per funzione non implementata: ${k}`, ...args);
+        // fallback minimo: non interrompere l'app
+      };
+    }
+  });
+})(['centerOnUser','saveCarPosition','returnToCar','deleteCarPosition','savePoiPosition','triggerSOS','shareAppUrl','openModule','toggleDrawer']);
