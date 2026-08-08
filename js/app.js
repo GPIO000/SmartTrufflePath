@@ -1340,7 +1340,7 @@ function openModule(moduleName, editMode = false) {
 
             archivioHtml += `
                 <div style="margin-top: 15px; margin-bottom: 25px;">
-                    <button class="overlay-btn" style="width: 100%; background: #22c55e; color: #0f172a; font-weight: bold; padding: 12px; font-size: 0.95rem; border-radius: 6px; border: none; cursor: pointer;" onclick="salvaArchivioRegionaleTartufi(window.currentArchivioRegione)">
+                    <button class="overlay-btn" style="width: 100%; background: #22c55e; color: #0f172a; font-weight: bold; padding: 12px; font-size: 0.95rem; border-radius: 6px; border: none; cursor: pointer;" onclick="salvaArchivioRegionaleTartufi((document.getElementById('seleziona-regione-archivio') || {}).value)">
                         💾 Salva Date e Note in Archivio
                     </button>
                 </div>
@@ -2703,7 +2703,6 @@ function salvaArchivioRegionaleTartufi(regione) {
         return;
     }
 
-    window.currentArchivioRegione = regioneEffettiva;
     regione = regioneEffettiva;
 
     let calendariPersonalizzatiArchivio = readStorageJSON('calendari_tartufi_custom', {});
