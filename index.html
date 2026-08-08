@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="it" class="no-scroll-body">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Truffle App</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+
+    <!-- File di Stile Principale (Aggiornato alla cartella CSS) -->
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body class="no-scroll-body">
+
+    <div id="app-container">
+        <!-- Header Superiore -->
+        <header id="app-header">
+            <button id="menu-toggle-btn" onclick="toggleDrawer()">☰</button>
+            <h1 id="gps-status-text">Truffle App</h1>
+            <div id="gps-status-dot" title="GPS in attesa..."></div>
+        </header>
+
+        <!-- Dashboard Mappa e Controlli -->
+        <div id="map-dashboard">
+            <div id="compass-box">🧭 In attesa di posizione GPS...</div>
+            <div id="map"></div>
+            
+            <!-- Bottoni Overlay rialzati -->
+            <div id="map-overlays">
+                <button class="overlay-btn" style="background:#0ea5e9;" onclick="centerOnUser()">🎯 Centra</button>
+                <button class="overlay-btn" onclick="saveCarPosition()">🚗 Auto</button>
+                <button class="overlay-btn" onclick="returnToCar()">🧭 Vai</button>
+                <button class="overlay-btn" style="background:#dc2626;" onclick="deleteCarPosition()">🗑️ Del</button>
+                <button class="overlay-btn" onclick="savePoiPosition()">📍 Punto</button>
+                <button class="overlay-btn" onclick="openModule('poilist')">📋 Elenco</button>
+                <button class="overlay-btn sos-overlay-btn" onclick="triggerSOS()">🚨 SOS</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu a Cassetto (Drawer) -->
+    <div id="app-drawer">
+        <div class="drawer-header">
+            <h2>Menu</h2>
+            <button onclick="toggleDrawer()">✕</button>
+        </div>
+        <div class="drawer-content">
+            <div class="drawer-section">
+                <h3>Normativa & Fisco (Legge 145/2018)</h3>
+                <button onclick="openModule('calendario')">📅 Calendario Raccolta Tartufi</button>
+                <button onclick="openModule('archivio')">📚 Archivio Data raccolta Tartufi per Regione</button>
+                <button onclick="openModule('registro_giornaliero')">🍄 Registro Ritrovamenti</button>
+                <button onclick="openModule('tesserino')">🆔 Anagrafica & Tesserino</button>
+                <button onclick="openModule('pagopa')">💳 Ricevuta PagoPA (Tassa)</button>
+                <button onclick="openModule('f24')">📄 F24 ELIDE (Imposta 100€)</button>
+                <button onclick="openModule('clienti')">👥 Rubrica Clienti</button>
+                <button onclick="openModule('ricevute')">📝 Emetti Ricevuta Vendita</button>
+                <button onclick="openModule('storico_ricevute')">📂 Archivio Ricevute</button>
+            </div>
+
+            <div class="drawer-section">
+                <h3>Contabilità & Spese</h3>
+                <button onclick="openModule('spese')">💸 Gestione Spese</button>
+                <button onclick="openModule('bilancio')">📊 Bilancio & Contabilità</button>
+            </div>
+
+            <div class="drawer-section">
+                <h3>Cane & Sicurezza</h3>
+                <button onclick="openModule('canidiary')">🐕 Profilo Cane</button>
+                <button onclick="openModule('vet')">💉 Libretto Sanitario</button>
+                <button onclick="openModule('vet-emergency')">⚠️ Pronto Soccorso H24</button>
+                <button onclick="openModule('polizze')">🛡️ Polizze & Assicurazioni</button>
+                <button onclick="openModule('emergency')">📞 Chiama 112</button>
+            </div>
+
+            <div class="drawer-section">
+                <h3>Sistema</h3>
+                <button onclick="openModule('export')">💾 Backup & Report CSV</button>
+                <button onclick="shareAppUrl()">📤 Condividi App</button>
+            </div>
+        </div>
+    </div>
+    <div id="drawer-backdrop" onclick="toggleDrawer()"></div>
+
+    <!-- Contenitore viste dinamiche a schermo intero -->
+    <div id="active-module-view"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- QRCode JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <!-- html2pdf JS (Necessario per la condivisione e il download diretto del PDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- Script Principale dell'App (Conferma percorso cartella js) -->
+    <script src="./js/app.js"></script>
+
+    <!-- Registrazione Service Worker per PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrato con successo:', reg.scope))
+                    .catch(err => console.log('Registrazione Service Worker fallita:', err));
+            });
+        }
+    </script>
+</body>
+</html>
