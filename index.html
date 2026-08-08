@@ -84,6 +84,7 @@
                 <h3>Sistema</h3>
                 <button onclick="openModule('export')">💾 Backup & Report CSV</button>
                 <button onclick="shareAppUrl()">📤 Condividi App</button>
+                <button id="btn-installa-app" onclick="installApp()">📲 Installa App</button>
             </div>
         </div>
     </div>
@@ -95,9 +96,6 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
-    <!-- QRCode JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
     <!-- html2pdf JS (Necessario per la condivisione e il download diretto del PDF) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 

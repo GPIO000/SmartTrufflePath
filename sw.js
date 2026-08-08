@@ -1,4 +1,4 @@
-const CACHE_NAME = 'truffle-mobile-first-v20';
+const CACHE_NAME = 'truffle-mobile-first-v22';
 const ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,8 @@ const ASSETS = [
   './icon-192.png',
   './icon-512.png',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
 
 // Installazione Service Worker e salvataggio in cache[span_0](start_span)[span_0](end_span)

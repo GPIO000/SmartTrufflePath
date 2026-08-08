@@ -3,6 +3,131 @@ const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
 
+function cloneFallbackValue(value) {
+    if (Array.isArray(value)) return [...value];
+    if (value && typeof value === 'object') return { ...value };
+    return value;
+}
+
+function readStorageJSON(key, fallbackValue) {
+    const rawValue = localStorage.getItem(key);
+    if (rawValue === null || rawValue === '') return cloneFallbackValue(fallbackValue);
+
+    try {
+        const parsedValue = JSON.parse(rawValue);
+        if (Array.isArray(fallbackValue)) return Array.isArray(parsedValue) ? parsedValue : cloneFallbackValue(fallbackValue);
+        if (fallbackValue && typeof fallbackValue === 'object') {
+            return parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)
+                ? parsedValue
+                : cloneFallbackValue(fallbackValue);
+        }
+        return parsedValue ?? cloneFallbackValue(fallbackValue);
+    } catch (error) {
+        console.warn(`Dati non validi ignorati per ${key}`, error);
+        return cloneFallbackValue(fallbackValue);
+    }
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[char]));
+}
+
+function sanitizeRenderable(value) {
+    if (Array.isArray(value)) return value.map(sanitizeRenderable);
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, sanitizeRenderable(nestedValue)]));
+    }
+    return typeof value === 'string' ? escapeHtml(value) : value;
+}
+
+function getRenderableStorageJSON(key, fallbackValue) {
+    return sanitizeRenderable(readStorageJSON(key, fallbackValue));
+}
+
+function sanitizePhoneHref(phoneNumber) {
+    return String(phoneNumber ?? '').replace(/[^0-9+]/g, '');
+}
+
+function isSafeDataUrl(value) {
+    return /^data:(image\/[a-z0-9.+-]+|application\/pdf);base64,[a-z0-9+/=\s]+$/i.test(String(value ?? ''));
+}
+
+function getStoredDocumentData(storageKey) {
+    const data = readStorageJSON(storageKey, {});
+    return isSafeDataUrl(data.contenutoBase64) ? data.contenutoBase64 : '';
+}
+
+function viewStoredDocument(storageKey, title, moduleName) {
+    const base64Data = getStoredDocumentData(storageKey);
+    if (!base64Data) {
+        alert("Documento non disponibile o non valido.");
+        return;
+    }
+    visualizzaImmagineSalvata(base64Data, title, moduleName);
+}
+
+function normalizeBackupEntry(entryValue, fallbackValue) {
+    let parsedValue = entryValue;
+    if (typeof entryValue === 'string') {
+        try {
+            parsedValue = JSON.parse(entryValue);
+        } catch (error) {
+            throw new Error('Voce backup non valida');
+        }
+    }
+
+    if (Array.isArray(fallbackValue) && !Array.isArray(parsedValue)) {
+        throw new Error('Formato array non valido');
+    }
+
+    if (fallbackValue && typeof fallbackValue === 'object' && !Array.isArray(fallbackValue)) {
+        if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
+            throw new Error('Formato oggetto non valido');
+        }
+    }
+
+    return JSON.stringify(parsedValue);
+}
+
+function restoreBackupEntries(data) {
+    const backupSchema = {
+        tesserino: { storageKey: 'tesserino_data', fallbackValue: {} },
+        pagopa: { storageKey: 'pagopa_data', fallbackValue: {} },
+        f24: { storageKey: 'f24_data', fallbackValue: {} },
+        storicoVendite: { storageKey: 'storico_vendite', fallbackValue: [] },
+        poiList: { storageKey: 'poi_list', fallbackValue: [] },
+        dogsList: { storageKey: 'dogs_list', fallbackValue: [] },
+        caneData: { storageKey: 'cane_data', fallbackValue: {} },
+        polizzeList: { storageKey: 'polizze_list', fallbackValue: [] },
+        storicoRaccolta: { storageKey: 'storico_raccolta_giornaliera', fallbackValue: [] },
+        rubricaClienti: { storageKey: 'rubrica_clienti', fallbackValue: [] },
+        speseList: { storageKey: 'spese_list', fallbackValue: [] },
+        vetHistoryList: { storageKey: 'vet_history_list', fallbackValue: [] },
+        vetClinicsList: { storageKey: 'vet_clinics_list', fallbackValue: [] },
+        calendariTartufiCustom: { storageKey: 'calendari_tartufi_custom', fallbackValue: {} },
+        noteRegionaliTartufi: { storageKey: 'note_regionali_tartufi', fallbackValue: {} },
+        carCoords: { storageKey: 'car_coords', fallbackValue: {} }
+    };
+
+    const normalizedEntries = [];
+
+    Object.entries(backupSchema).forEach(([backupKey, config]) => {
+        if (!Object.prototype.hasOwnProperty.call(data, backupKey) || data[backupKey] === null) return;
+        const normalizedValue = normalizeBackupEntry(data[backupKey], config.fallbackValue);
+        normalizedEntries.push([config.storageKey, normalizedValue]);
+    });
+
+    normalizedEntries.forEach(([storageKey, normalizedValue]) => {
+        localStorage.setItem(storageKey, normalizedValue);
+    });
+}
+
 setTimeout(() => {
     map.invalidateSize();
 }, 300);
@@ -14,8 +139,8 @@ setTimeout(() => {
 
 let userMarker = null;
 let carMarker = null;
-let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
-let poiList = JSON.parse(localStorage.getItem('poi_list') || '[]');
+let carCoordinates = readStorageJSON('car_coords', null);
+let poiList = readStorageJSON('poi_list', []);
 let poiMapMarkers = {}; 
 let targetNavigation = null;
 if (navigator.geolocation) {
@@ -57,8 +182,9 @@ function renderAllPoiMarkers() {
     Object.values(poiMapMarkers).forEach(marker => map.removeLayer(marker));
     poiMapMarkers = {};
     poiList.forEach((poi, index) => {
+        const safePoi = sanitizeRenderable(poi);
         const marker = L.marker([poi.lat, poi.lng]).addTo(map)
-            .bindPopup(`<b>📍 Tartufo / Punto</b><br>Nota: ${poi.note || 'Nessuna nota'}<br><small>${poi.date}</small>`);
+            .bindPopup(`<b>📍 Tartufo / Punto</b><br>Nota: ${safePoi.note || 'Nessuna nota'}<br><small>${safePoi.date || ''}</small>`);
         poiMapMarkers[index] = marker;
     });
 }
@@ -198,10 +324,11 @@ function openModule(moduleName, editMode = false) {
                 poiHtml += '<div class="module-card"><p>Nessun punto salvato. Usa il tasto "Punto" sulla mappa.</p></div>';
             } else {
                 poiList.forEach((poi, idx) => {
+                    const safePoi = sanitizeRenderable(poi);
                     poiHtml += `
                         <div class="module-card" style="margin-bottom:12px;">
-                            <strong style="color:#60a5fa; font-size:1rem;">📍 ${poi.note}</strong>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin:4px 0;">Data: ${poi.date}</p>
+                            <strong style="color:#60a5fa; font-size:1rem;">📍 ${safePoi.note}</strong>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin:4px 0;">Data: ${safePoi.date}</p>
                             <p style="font-size:0.8rem; color:#cbd5e1;">Lat: ${poi.lat.toFixed(4)}, Lng: ${poi.lng.toFixed(4)}</p>
                             <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
                                 <button class="overlay-btn" style="background:#16a34a;" onclick="navigateToPoi(${idx})">🧭 Vai</button>
@@ -214,14 +341,14 @@ function openModule(moduleName, editMode = false) {
             contentHTML = poiHtml;
             break;
         case 'tesserino':
-            const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+            const tData = getRenderableStorageJSON('tesserino_data', {});
             if (tData.nome && !editMode) {
                 let filePreviewHTML = '';
                 let visualizzaBtnHTML = '';
-                if (tData.contenutoBase64) {
+                if (getStoredDocumentData('tesserino_data')) {
                     if (tData.tipoFile && tData.tipoFile.startsWith('image/')) {
-                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${tData.nomeFile || 'Immagine'}</p><img src="${tData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Tesserino"></div>`;
-                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${tData.contenutoBase64}', 'Tesserino Digitale', 'tesserino')">👁️ Visualizza Immagine</button>`;
+                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${tData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('tesserino_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Tesserino"></div>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="viewStoredDocument('tesserino_data', 'Tesserino Digitale', 'tesserino')">👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${tData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -265,14 +392,14 @@ function openModule(moduleName, editMode = false) {
             }
             break;
         case 'pagopa':
-            const pData = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
+            const pData = getRenderableStorageJSON('pagopa_data', {});
             if (pData.id && !editMode) {
                 let filePreviewHTML = '';
                 let visualizzaBtnHTML = '';
-                if (pData.contenutoBase64) {
+                if (getStoredDocumentData('pagopa_data')) {
                     if (pData.tipoFile && pData.tipoFile.startsWith('image/')) {
-                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${pData.nomeFile || 'Immagine'}</p><img src="${pData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Quietanza PagoPA"></div>`;
-                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${pData.contenutoBase64}', 'Quietanza PagoPA', 'pagopa')">👁️ Visualizza Immagine</button>`;
+                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${pData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('pagopa_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Quietanza PagoPA"></div>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="viewStoredDocument('pagopa_data', 'Quietanza PagoPA', 'pagopa')">👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${pData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -309,7 +436,7 @@ function openModule(moduleName, editMode = false) {
             }
             break;
         case 'ricevute':
-            const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+            const f24SavedData = readStorageJSON('f24_data', {});
             const defaultProtocollo = f24SavedData.protocollo || '';
             
             const annoCorrenteReg = new Date().getFullYear();
@@ -404,8 +531,9 @@ function openModule(moduleName, editMode = false) {
             break;
 
            case 'storico_ricevute':
-    let storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-    const filtroCliente = localStorage.getItem('filtro_storico_cliente');
+    let storicoVendite = readStorageJSON('storico_vendite', []);
+    const filtroCliente = localStorage.getItem('filtro_storico_cliente') || '';
+    const filtroClienteRender = escapeHtml(filtroCliente);
 
     let storicoHtml = `<h2>Archivio Storico Ricevute</h2>`;
 
@@ -413,7 +541,7 @@ function openModule(moduleName, editMode = false) {
     if (filtroCliente) {
         storicoHtml += `
             <div style="background: rgba(2, 132, 199, 0.2); border: 1px solid #0284c7; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                <span style="color: #38bdf8; font-size: 0.9rem;">🔍 Filtrato per cliente: <strong>${filtroCliente}</strong></span>
+                <span style="color: #38bdf8; font-size: 0.9rem;">🔍 Filtrato per cliente: <strong>${filtroClienteRender}</strong></span>
                 <button class="overlay-btn" style="background: #475569; padding: 4px 8px; font-size: 0.75rem;" onclick="localStorage.removeItem('filtro_storico_cliente'); openModule('storico_ricevute');">Mostra Tutte</button>
             </div>`;
         
@@ -434,21 +562,22 @@ function openModule(moduleName, editMode = false) {
         // Inverte l'ordine per mostrare prima le più recenti
         storicoVendite.slice().reverse().forEach((obj, index) => {
             const item = obj.item;
+            const safeItem = sanitizeRenderable(item);
             const originalIndex = obj.realIndex;
             
             const regimeLabel = item.regime === 'ritenuta' ? '<span style="color:#38bdf8; font-size:0.75rem;">[Ritenuta d\'Acconto]</span>' : '<span style="color:#22c55e; font-size:0.75rem;">[Imposta Sostitutiva]</span>';
             
-            let dettaglioImporto = `Importo: € ${item.importo}`;
+            let dettaglioImporto = `Importo: € ${escapeHtml(item.importo)}`;
             if (item.regime === 'ritenuta') {
                 const nettoVisibile = item.netto ? item.netto : (item.importo * 0.77).toFixed(2);
-                dettaglioImporto = `Lordo: € ${item.importo} | <span style="color:#38bdf8;">Netto: € ${nettoVisibile}</span>`;
+                dettaglioImporto = `Lordo: € ${escapeHtml(item.importo)} | <span style="color:#38bdf8;">Netto: € ${escapeHtml(nettoVisibile)}</span>`;
             }
 
             storicoHtml += `
                 <div class="module-card" style="margin-bottom:12px; border-left: 4px solid #3b82f6;">
-                    <strong style="color:#60a5fa; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${item.data} ${regimeLabel}</strong>
-                    <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${item.acquirente}</b></p>
-                    <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${item.specie} (${item.peso}g)</p>
+                    <strong style="color:#60a5fa; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${safeItem.data} ${regimeLabel}</strong>
+                    <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${safeItem.acquirente}</b></p>
+                    <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${safeItem.specie} (${safeItem.peso}g)</p>
                     <p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">${dettaglioImporto}</p>
                     <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
                         <button class="overlay-btn" style="background:#2563eb; padding:6px 10px; font-size:0.75rem;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza</button>
@@ -462,14 +591,14 @@ function openModule(moduleName, editMode = false) {
     break;
 
         case 'f24':
-            const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+            const fData = getRenderableStorageJSON('f24_data', {});
             if (fData.protocollo && !editMode) {
                 let filePreviewHTML = '';
                 let visualizzaBtnHTML = '';
-                if (fData.contenutoBase64) {
+                if (getStoredDocumentData('f24_data')) {
                     if (fData.tipoFile && fData.tipoFile.startsWith('image/')) {
-                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${fData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
-                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${fData.contenutoBase64}', 'F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
+                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('f24_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="viewStoredDocument('f24_data', 'F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -513,7 +642,7 @@ function openModule(moduleName, editMode = false) {
             }
             break;
         case 'canidiary':
-            const dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
+            const dogsList = getRenderableStorageJSON('dogs_list', []);
             let dogsHtml = `
                 <h2>Profilo Cani & Diario Ricerca</h2>
                 <p>Gestisci i tuoi cani da tartufo:</p>
@@ -547,7 +676,7 @@ function openModule(moduleName, editMode = false) {
             contentHTML = dogsHtml;
             break;
         case 'polizze':
-            const polizzeList = JSON.parse(localStorage.getItem('polizze_list') || '[]');
+            const polizzeList = getRenderableStorageJSON('polizze_list', []);
             let polizzeHtml = `
                 <h2>Polizze & Assicurazioni</h2>
                 <p>Gestisci le polizze assicurative (RC Cane, Responsabilità Civile Raccolta, Infortuni):</p>
@@ -616,10 +745,10 @@ function openModule(moduleName, editMode = false) {
             contentHTML = polizzeHtml;
             break;
         case 'vet':
-            const dogsListVet = JSON.parse(localStorage.getItem('dogs_list') || '[]');
-            const cDataVet = JSON.parse(localStorage.getItem('cane_data') || '{}');
+            const dogsListVet = getRenderableStorageJSON('dogs_list', []);
+            const cDataVet = getRenderableStorageJSON('cane_data', {});
             const nomeCaneDefault = cDataVet.nome || (dogsListVet.length > 0 ? dogsListVet[0].nome : 'Il tuo cane');
-            const vetHistory = JSON.parse(localStorage.getItem('vet_history_list') || '[]');
+            const vetHistory = getRenderableStorageJSON('vet_history_list', []);
             let optionsHtml = '';
             if (dogsListVet.length > 0) {
                 dogsListVet.forEach(dog => {
@@ -669,7 +798,7 @@ function openModule(moduleName, editMode = false) {
             contentHTML = vetHtml;
             break;
         case 'registro_giornaliero':
-            const storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
+            const storicoRaccolta = getRenderableStorageJSON('storico_raccolta_giornaliera', []);
             const elAnno = document.getElementById('filtro-anno');
             const filtroAnno = elAnno ? elAnno.value : 'tutti';
             const elSpecie = document.getElementById('filtro-specie');
@@ -735,7 +864,7 @@ function openModule(moduleName, editMode = false) {
             contentHTML = registroHtml;
             break;
         case 'spese':
-            const speseList = JSON.parse(localStorage.getItem('spese_list') || '[]');
+            const speseList = getRenderableStorageJSON('spese_list', []);
             let totaleSpeseAnno = 0;
             const annoCorrenteSpese = new Date().getFullYear();
 
@@ -793,8 +922,8 @@ function openModule(moduleName, editMode = false) {
             contentHTML = speseHtml;
             break;
         case 'bilancio':
-            const venditeSalvateBilancio = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-            const speseSalvateBilancio = JSON.parse(localStorage.getItem('spese_list') || '[]');
+            const venditeSalvateBilancio = readStorageJSON('storico_vendite', []);
+            const speseSalvateBilancio = readStorageJSON('spese_list', []);
             const annoCorrenteBilancio = new Date().getFullYear();
             
             // Variabili per i guadagni
@@ -925,7 +1054,7 @@ function openModule(moduleName, editMode = false) {
             window.location.href = "tel:112";
             return;
         case 'vet-emergency':
-            const vetClinics = JSON.parse(localStorage.getItem('vet_clinics_list') || '[]');
+            const vetClinics = getRenderableStorageJSON('vet_clinics_list', []);
             let clinicHtml = `
                 <h2>Pronto Soccorso & Cliniche Veterinarie H24</h2>
                 <p>Gestisci i numeri d'emergenza dei veterinari:</p>
@@ -944,14 +1073,16 @@ function openModule(moduleName, editMode = false) {
             } else {
                 clinicHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">I tuoi contatti salvati:</h3>`;
                 vetClinics.forEach((clinic, idx) => {
+                    const safeClinic = sanitizeRenderable(clinic);
+                    const telHref = sanitizePhoneHref(clinic.tel);
                     clinicHtml += `
                         <div class="module-card" style="border-left: 4px solid #dc2626; margin-bottom: 12px;">
-                            <strong style="color:#f8fafc; font-size:1rem;">🏥 ${clinic.nome}</strong>
-                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">📞 ${clinic.tel}</p>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 ${clinic.note || 'Nessuna nota'}</p>
+                            <strong style="color:#f8fafc; font-size:1rem;">🏥 ${safeClinic.nome}</strong>
+                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">📞 ${safeClinic.tel}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 ${safeClinic.note || 'Nessuna nota'}</p>
                             <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                                <a href="tel:${clinic.tel}" class="overlay-btn" style="background:#dc2626; text-decoration:none; text-align:center; display:inline-block; padding:8px 12px;">📞 Chiama</a>
-                                <button class="overlay-btn" style="background:#0284c7; padding:8px 12px;" onclick="shareLocationToVet('${clinic.tel}')">📍 Invia GPS</button>
+                                <a href="tel:${telHref}" class="overlay-btn" style="background:#dc2626; text-decoration:none; text-align:center; display:inline-block; padding:8px 12px;">📞 Chiama</a>
+                                <button class="overlay-btn" style="background:#0284c7; padding:8px 12px;" onclick="shareLocationToVetByIndex(${idx})">📍 Invia GPS</button>
                                 <button class="overlay-btn" style="background:#475569; padding:8px 12px;" onclick="deleteVetClinic(${idx})">🗑️ Elimina</button>
                             </div>
                         </div>`;
@@ -961,7 +1092,7 @@ function openModule(moduleName, editMode = false) {
             break;
 
        case 'clienti':
-    const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    const rubricaClienti = getRenderableStorageJSON('rubrica_clienti', []);
     
     // Ordina dal cliente che ha speso di più a quello che ha speso di meno
     rubricaClienti.sort((a, b) => (b.totaleAcquisti || 0) - (a.totaleAcquisti || 0));
@@ -1005,7 +1136,7 @@ function openModule(moduleName, editMode = false) {
                     <!-- Blocco tasti principali distanziato -->
                     <div style="display:flex; gap:6px; margin-top:16px; flex-wrap:wrap;">
                         <button class="overlay-btn" style="background:#16a34a; padding:6px 10px; font-size:0.75rem;" onclick="creaRicevutaPerCliente(${idx})">📄 Nuova Ricevuta</button>
-                        <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="mostraRicevuteCliente('${cliente.nome.replace(/'/g, "\\'")}')">📜 Vedi Ricevute</button>
+                        <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="mostraRicevuteClienteByIndex(${idx})">📜 Vedi Ricevute</button>
                         <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteCliente(${idx})">🗑️ Elimina</button>
                     </div>
                 </div>`;
@@ -1031,11 +1162,11 @@ function openModule(moduleName, editMode = false) {
             // Recupera la regione selezionata nell'archivio o usa una di default
             const regioneSelezionataArchivio = window.currentArchivioRegione || "Campania";
 
-            let calendariPersonalizzatiArchivio = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
+            let calendariPersonalizzatiArchivio = getRenderableStorageJSON('calendari_tartufi_custom', {});
             let datiRegioneArchivio = calendariPersonalizzatiArchivio[regioneSelezionataArchivio] || {};
 
             // Recupera la nota regionale salvata (se presente)
-            let noteRegionaliSalvate = JSON.parse(localStorage.getItem('note_regionali_tartufi') || '{}');
+            let noteRegionaliSalvate = getRenderableStorageJSON('note_regionali_tartufi', {});
             let notaCorrenteRegione = noteRegionaliSalvate[regioneSelezionataArchivio] || '';
 
             let archivioHtml = `
@@ -1122,7 +1253,7 @@ function openModule(moduleName, editMode = false) {
 
             archivioHtml += `
                 <div style="margin-top: 15px; margin-bottom: 25px;">
-                    <button class="overlay-btn" style="width: 100%; background: #22c55e; color: #0f172a; font-weight: bold; padding: 12px; font-size: 0.95rem; border-radius: 6px; border: none; cursor: pointer;" onclick="salvaArchivioRegionaleTartufi('${regioneSelezionataArchivio}')">
+                    <button class="overlay-btn" style="width: 100%; background: #22c55e; color: #0f172a; font-weight: bold; padding: 12px; font-size: 0.95rem; border-radius: 6px; border: none; cursor: pointer;" onclick="salvaArchivioRegionaleTartufi(${JSON.stringify(regioneSelezionataArchivio)})">
                         💾 Salva Date e Note in Archivio
                     </button>
                 </div>
@@ -1139,10 +1270,10 @@ function openModule(moduleName, editMode = false) {
         if (matchReg && matchReg[1]) regioneCal = matchReg[1];
     }
 
-    let allCalendari = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
+    let allCalendari = getRenderableStorageJSON('calendari_tartufi_custom', {});
     let datiRegioneCorrente = allCalendari[regioneCal] || {};
 
-    let noteRegionaliSalvate = JSON.parse(localStorage.getItem('note_regionali_tartufi') || '{}');
+    let noteRegionaliSalvate = getRenderableStorageJSON('note_regionali_tartufi', {});
     let notaRegionaleCorrente = noteRegionaliSalvate[regioneCal] || '';
 
     const specieTartufiCal = [
@@ -1214,7 +1345,7 @@ function openModule(moduleName, editMode = false) {
         <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
             <div style="display: flex; gap: 8px; align-items: center;">
-                <button onclick="mostraInfoModulo('${moduleName}')" class="back-map-btn" style="background: #334155; color: #38bdf8; border: 1px solid #475569; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; padding: 0;" title="Guida modulo">❓</button>
+                <button onclick="mostraInfoModulo(${JSON.stringify(moduleName)})" class="back-map-btn" style="background: #334155; color: #38bdf8; border: 1px solid #475569; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; padding: 0;" title="Guida modulo">❓</button>
                 <button onclick="toggleDrawer(); closeActiveModule();" class="back-map-btn" style="color: #f8fafc;">☰ Torna al Menu</button>
             </div>
         </div>
@@ -1246,7 +1377,7 @@ function saveTesserino() {
         return;
     }
 
-    const tDataExisting = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    const tDataExisting = readStorageJSON('tesserino_data', {});
 
     // Funzione helper per il salvataggio sicuro
     const saveData = (base64Content, fileName, fileType) => {
@@ -1299,7 +1430,7 @@ function saveF24WithFile() {
         return;
     }
 
-    const f24DataExisting = JSON.parse(localStorage.getItem('f24_data') || '{}');
+    const f24DataExisting = readStorageJSON('f24_data', {});
 
     const saveData = (base64Content, fileName, fileType) => {
         const data = { 
@@ -1342,7 +1473,7 @@ function savePagoPAWithFile() {
     const file = fileInput ? fileInput.files[0] : null;
     
     const annoCorrente = new Date().getFullYear(); // <--- Anno di riferimento
-    const pDataExisting = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
+    const pDataExisting = readStorageJSON('pagopa_data', {});
 
     const saveData = (base64Content, fileName, fileType) => {
         const data = { 
@@ -1386,7 +1517,7 @@ function saveNewCane() {
     const nascita = document.getElementById('c-nascita').value;
     const microchip = document.getElementById('c-microchip').value.trim();
     if (!nome) { alert("Inserisci almeno il nome del cane."); return; }
-    let dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
+    let dogsList = readStorageJSON('dogs_list', []);
     dogsList.push({ nome, razza, nascita, microchip });
     localStorage.setItem('dogs_list', JSON.stringify(dogsList));
     localStorage.setItem('cane_data', JSON.stringify({ nome, razza, nascita, microchip }));
@@ -1395,7 +1526,7 @@ function saveNewCane() {
 }
 function deleteDog(index) {
     if (confirm("Vuoi davvero rimuovere questo cane?")) {
-        let dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
+        let dogsList = readStorageJSON('dogs_list', []);
         dogsList.splice(index, 1);
         localStorage.setItem('dogs_list', JSON.stringify(dogsList));
         if (dogsList.length > 0) { localStorage.setItem('cane_data', JSON.stringify(dogsList[dogsList.length - 1])); }
@@ -1405,7 +1536,7 @@ function deleteDog(index) {
 }
 
 function creaRicevutaPerCliente(index) {
-    const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    const rubricaClienti = readStorageJSON('rubrica_clienti', []);
     const cliente = rubricaClienti[index];
     if (!cliente) return;
 
@@ -1428,7 +1559,7 @@ function creaRicevutaPerCliente(index) {
 
 function deleteCliente(index) {
     if (confirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
-        let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+        let rubricaClienti = readStorageJSON('rubrica_clienti', []);
         rubricaClienti.splice(index, 1);
         localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
         openModule('clienti');
@@ -1442,7 +1573,7 @@ function savePolizza() {
     const scadenza = document.getElementById('pol-scadenza').value;
     const note = document.getElementById('pol-note').value.trim();
     if (!compagnia || !numero) { alert("Inserisci almeno la compagnia e il numero di polizza."); return; }
-    let polizzeList = JSON.parse(localStorage.getItem('polizze_list') || '[]');
+    let polizzeList = readStorageJSON('polizze_list', []);
     polizzeList.push({ compagnia, numero, tipo, scadenza, note });
     localStorage.setItem('polizze_list', JSON.stringify(polizzeList));
     alert("Polizza salvata con successo!");
@@ -1451,7 +1582,7 @@ function savePolizza() {
 
 function deletePolizza(index) {
     if (confirm("Vuoi davvero rimuovere questa polizza?")) {
-        let polizzeList = JSON.parse(localStorage.getItem('polizze_list') || '[]');
+        let polizzeList = readStorageJSON('polizze_list', []);
         polizzeList.splice(index, 1);
         localStorage.setItem('polizze_list', JSON.stringify(polizzeList));
         openModule('polizze');
@@ -1463,7 +1594,7 @@ function saveRaccoltaGiornaliera() {
     const peso = parseFloat(document.getElementById('reg-peso').value) || 0;
     const note = document.getElementById('reg-note').value.trim();
     if (!data || peso <= 0) { alert("Inserisci una data valida e un peso maggiore di zero."); return; }
-    let storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
+    let storicoRaccolta = readStorageJSON('storico_raccolta_giornaliera', []);
     storicoRaccolta.push({ data, specie, peso, note });
     localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
     alert("Raccolta registrata con successo!");
@@ -1472,7 +1603,7 @@ function saveRaccoltaGiornaliera() {
 
 function deleteRaccoltaGiornaliera(index) {
     if (confirm("Vuoi davvero rimuovere questo record dal registro?")) {
-        let storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
+        let storicoRaccolta = readStorageJSON('storico_raccolta_giornaliera', []);
         storicoRaccolta.splice(index, 1);
         localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
         openModule('registro_giornaliero');
@@ -1524,7 +1655,7 @@ function calcolaRitenutaAcconto() {
 
 function registraVenditaConPrezzoKg() {
     // 1. BLOCCO MANCANZA DATI TESSERINO
-    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    const tData = readStorageJSON('tesserino_data', {});
     if (!tData.nome || !tData.cf || !tData.num) {
         alert("❌ Attenzione: Impossibile procedere.\nMancano i dati anagrafici, il codice fiscale o gli estremi del tesserino di raccolta.");
         openModule('tesserino');
@@ -1532,7 +1663,7 @@ function registraVenditaConPrezzoKg() {
     }
 
     // 2. CONTROLLO VALIDITÀ PAGOPA (Tassa regionale/annuale tesserino)
-    const pagoPaSaved = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
+    const pagoPaSaved = readStorageJSON('pagopa_data', {});
     const annoCorrente = new Date().getFullYear();
     
     if (!pagoPaSaved.effettuato || parseInt(pagoPaSaved.anno) !== annoCorrente) {
@@ -1542,7 +1673,7 @@ function registraVenditaConPrezzoKg() {
     }
 
     // 3. CONTROLLO RICEVUTA F24 (Imposta sostitutiva 100€) - SCELTA AUTOMATICA REGIME
-    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+    const f24SavedData = readStorageJSON('f24_data', {});
     const f24InputVal = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
     const protocolloF24 = f24InputVal || f24SavedData.protocollo;
     let dataPagamentoF24 = f24SavedData.dataPagamento ? new Date(f24SavedData.dataPagamento) : null;
@@ -1611,7 +1742,7 @@ function registraVenditaConPrezzoKg() {
     }
 
     // 7. CALCOLO SOGLIA ANNUA (7000 €)
-    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    let storico = readStorageJSON('storico_vendite', []);
     
     let totaleVenditeAnno = storico.reduce((acc, v) => {
         const dataVendita = v.data ? new Date(v.data.split('/').reverse().join('-')) : new Date();
@@ -1697,7 +1828,7 @@ function registraVenditaConPrezzoKg() {
 
 // Funzione di supporto per la gestione della rubrica con storico acquisti
 function salvaClienteInRubrica(nuovaRicevuta) {
-    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    let rubricaClienti = readStorageJSON('rubrica_clienti', []);
     
     const index = rubricaClienti.findIndex(c => c.nome.toLowerCase() === nuovaRicevuta.acquirente.toLowerCase());
     const importoRicevuta = parseFloat(nuovaRicevuta.totale) || 0;
@@ -1731,9 +1862,11 @@ function salvaClienteInRubrica(nuovaRicevuta) {
 }
 
 function visualizzaRicevutaSalvata(index) {
-    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const storico = readStorageJSON('storico_vendite', []);
     const v = storico[index];
     if(!v) return;
+    const safeReceipt = sanitizeRenderable(v);
+    const importoNumerico = parseFloat(v.importo) || 0;
 
     const isRitenuta = v.regime === 'ritenuta';
     
@@ -1741,20 +1874,20 @@ function visualizzaRicevutaSalvata(index) {
     const dettagliFiscoHtml = isRitenuta ? `
         <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ccc;">
             <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (esonerata dall'imposta sostitutiva)</p>
-            <p><strong>Compenso Lordo:</strong> € ${v.importo}</p>
-            <p><strong>Ritenuta d'Acconto (23%):</strong> € ${v.ritenuta || (v.importo * 0.23).toFixed(2)}</p>
-            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${v.netto || (v.importo * 0.77).toFixed(2)}</p>
+            <p><strong>Compenso Lordo:</strong> € ${safeReceipt.importo}</p>
+            <p><strong>Ritenuta d'Acconto (23%):</strong> € ${safeReceipt.ritenuta || (importoNumerico * 0.23).toFixed(2)}</p>
+            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${safeReceipt.netto || (importoNumerico * 0.77).toFixed(2)}</p>
         </div>
     ` : `
         <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ccc;">
             <p><strong>Regime Fiscale:</strong> Imposta Sostitutiva (Legge 145/2018)</p>
-            <p><strong>Versamento F24 ELIDE (100€):</strong> Protocollo N. ${v.f24}</p>
-            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${v.importo}</p>
+            <p><strong>Versamento F24 ELIDE (100€):</strong> Protocollo N. ${safeReceipt.f24}</p>
+            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${safeReceipt.importo}</p>
         </div>
     `;
 
     // Supporto per retrocompatibilità con vecchie ricevute salvate come v.comune
-    const luogoAreaVisualizzazione = v.luogoRaccolta || v.comune || 'Non specificato';
+    const luogoAreaVisualizzazione = safeReceipt.luogoRaccolta || safeReceipt.comune || 'Non specificato';
 
     let activeView = document.getElementById('active-module-view');
     activeView.querySelector('.module-body-content').innerHTML = `
@@ -1768,26 +1901,26 @@ function visualizzaRicevutaSalvata(index) {
                 </p>
                 
                 <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati del Venditore (Cessionario occasionale)</h3>
-                <p><strong>Nome e Cognome:</strong> ${v.venditoreNome}</p>
-                <p><strong>Codice Fiscale:</strong> ${v.venditoreCf}</p>
-                <p><strong>Tesserino Raccolta N.:</strong> ${v.venditoreTesserino} - <strong>Rilasciato dalla Regione:</strong> ${v.venditoreRegione}</p>
+                <p><strong>Nome e Cognome:</strong> ${safeReceipt.venditoreNome}</p>
+                <p><strong>Codice Fiscale:</strong> ${safeReceipt.venditoreCf}</p>
+                <p><strong>Tesserino Raccolta N.:</strong> ${safeReceipt.venditoreTesserino} - <strong>Rilasciato dalla Regione:</strong> ${safeReceipt.venditoreRegione}</p>
                 
                 <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati dell'Acquirente</h3>
-                <p><strong>Acquirente:</strong> ${v.acquirente}</p>
-                <p><strong>P.IVA / Codice Fiscale:</strong> ${v.acquirenteCf || 'Non inserito'}</p>
-                <p><strong>Indirizzo:</strong> ${v.acquirenteIndirizzo || 'Non inserito'}</p>
-                <p><strong>Email:</strong> ${v.acquirenteEmail || 'Non specificata'}</p>
+                <p><strong>Acquirente:</strong> ${safeReceipt.acquirente}</p>
+                <p><strong>P.IVA / Codice Fiscale:</strong> ${safeReceipt.acquirenteCf || 'Non inserito'}</p>
+                <p><strong>Indirizzo:</strong> ${safeReceipt.acquirenteIndirizzo || 'Non inserito'}</p>
+                <p><strong>Email:</strong> ${safeReceipt.acquirenteEmail || 'Non specificata'}</p>
                 
                 <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dettagli Ricevuta e Tracciabilità</h3>
-                <p><strong>Specie di Tartufo:</strong> ${v.specie}</p>
-                <p><strong>Classificazione Qualità:</strong> ${v.qualita || 'Non specificata'}</p>
-                <p><strong>Peso:</strong> ${v.peso} grammi</p>
+                <p><strong>Specie di Tartufo:</strong> ${safeReceipt.specie}</p>
+                <p><strong>Classificazione Qualità:</strong> ${safeReceipt.qualita || 'Non specificata'}</p>
+                <p><strong>Peso:</strong> ${safeReceipt.peso} grammi</p>
                 <p><strong>Luogo / Area di Raccolta e Provincia:</strong> ${luogoAreaVisualizzazione}</p>
-                <p><strong>Codice Lotto / Tracciabilità:</strong> ${v.lotto}</p>
+                <p><strong>Codice Lotto / Tracciabilità:</strong> ${safeReceipt.lotto}</p>
                 
                 ${dettagliFiscoHtml}
 
-                <p style="margin-top: 10px;"><strong>Data Vendita:</strong> ${v.data}</p>
+                <p style="margin-top: 10px;"><strong>Data Vendita:</strong> ${safeReceipt.data}</p>
 
                 <div style="margin-top: 30px; display: flex; justify-content: space-between; page-break-inside: avoid;">
                     <div style="width: 45%; text-align: center;">
@@ -1803,7 +1936,7 @@ function visualizzaRicevutaSalvata(index) {
         </div>
         <button class="overlay-btn" style="background:#2563eb; margin-top:15px; width:100%;" onclick="window.print()">🖨️ Stampa / Salva PDF Conforme</button>
         <button class="overlay-btn" style="background:#0284c7; margin-top:10px; width:100%;" onclick="condividiRicevuta(${index})">📤 Condividi Ricevuta (WhatsApp)</button>
-        <button class="overlay-btn" style="background:#16a34a; margin-top:10px; width:100%;" onclick="condividiRicevutaEmail(${index})">📧 Condividi / Invia Email (${v.acquirenteEmail || 'Email non inserita'})</button>
+        <button class="overlay-btn" style="background:#16a34a; margin-top:10px; width:100%;" onclick="condividiRicevutaEmail(${index})">📧 Condividi / Invia Email (${safeReceipt.acquirenteEmail || 'Email non inserita'})</button>
         <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
     `;
 }
@@ -1813,7 +1946,7 @@ function eliminaRicevutaConDoppiaConferma(index) {
     if (primaConferma) {
         const secondaConferma = confirm("ATTENZIONE: L'operazione è irreversibile. Vuoi davvero confermare l'eliminazione definitiva?");
         if (secondaConferma) {
-            let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+            let storico = readStorageJSON('storico_vendite', []);
             storico.splice(index, 1);
             localStorage.setItem('storico_vendite', JSON.stringify(storico));
             alert("Ricevuta eliminata con successo.");
@@ -1823,7 +1956,7 @@ function eliminaRicevutaConDoppiaConferma(index) {
 }
 
 function modificaRicevuta(index) {
-    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const storico = readStorageJSON('storico_vendite', []);
     const v = storico[index];
     if (!v) return;
 
@@ -1862,9 +1995,9 @@ function modificaRicevuta(index) {
     }, 50);
 }
 function salvaModificaRicevuta(index) {
-    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
-    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+    let storico = readStorageJSON('storico_vendite', []);
+    const tData = readStorageJSON('tesserino_data', {});
+    const f24SavedData = readStorageJSON('f24_data', {});
     
     const acquirenteNome = document.getElementById('r-acquirente').value.trim();
     if (!acquirenteNome) {
@@ -1909,7 +2042,7 @@ function salvaModificaRicevuta(index) {
     openModule('storico_ricevute');
 }
 async function condividiRicevuta(index) {
-    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const storico = readStorageJSON('storico_vendite', []);
     const v = storico[index];
     if(!v) return;
 
@@ -1966,7 +2099,7 @@ function chiudiDettaglioRicevuta() {
 }
 
 function esportaDatiCSV() {
-    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const storico = readStorageJSON('storico_vendite', []);
     if(storico.length === 0) { 
         alert("Nessuna vendita registrata."); 
         return; 
@@ -2005,6 +2138,13 @@ function mostraRicevuteCliente(nomeCliente) {
     }
 }
 
+function mostraRicevuteClienteByIndex(index) {
+    const rubricaClienti = readStorageJSON('rubrica_clienti', []);
+    const cliente = rubricaClienti[index];
+    if (!cliente || !cliente.nome) return;
+    mostraRicevuteCliente(cliente.nome);
+}
+
 function esportaBackupJSON() {
     const backupData = { 
         tesserino: localStorage.getItem('tesserino_data'), 
@@ -2040,22 +2180,10 @@ function importBackupData(event) {
     reader.onload = function(e) {
         try {
             const data = JSON.parse(e.target.result);
-            if (data.tesserino) localStorage.setItem('tesserino_data', data.tesserino);
-            if (data.pagopa) localStorage.setItem('pagopa_data', data.pagopa);
-            if (data.f24) localStorage.setItem('f24_data', data.f24);
-            if (data.storicoVendite) localStorage.setItem('storico_vendite', data.storicoVendite);
-            if (data.poiList) localStorage.setItem('poi_list', data.poiList);
-            if (data.dogsList) localStorage.setItem('dogs_list', data.dogsList);
-            if (data.caneData) localStorage.setItem('cane_data', data.caneData);
-            if (data.polizzeList) localStorage.setItem('polizze_list', data.polizzeList);
-            if (data.storicoRaccolta) localStorage.setItem('storico_raccolta_giornaliera', data.storicoRaccolta);
-            if (data.rubricaClienti) localStorage.setItem('rubrica_clienti', data.rubricaClienti);
-            if (data.speseList) localStorage.setItem('spese_list', data.speseList);
-            if (data.vetHistoryList) localStorage.setItem('vet_history_list', data.vetHistoryList);
-            if (data.vetClinicsList) localStorage.setItem('vet_clinics_list', data.vetClinicsList);
-            if (data.calendariTartufiCustom) localStorage.setItem('calendari_tartufi_custom', data.calendariTartufiCustom);
-            if (data.noteRegionaliTartufi) localStorage.setItem('note_regionali_tartufi', data.noteRegionaliTartufi);
-            if (data.carCoords) localStorage.setItem('car_coords', data.carCoords);
+            if (!data || typeof data !== 'object' || Array.isArray(data)) {
+                throw new Error('Backup non valido');
+            }
+            restoreBackupEntries(data);
             
             alert("Backup ripristinato con successo!"); 
             location.reload();
@@ -2082,7 +2210,7 @@ function saveVetClinic() {
     const tel = document.getElementById('vc-tel').value.trim();
     const note = document.getElementById('vc-note').value.trim();
     if (!nome || !tel) { alert("Inserisci nome e telefono."); return; }
-    let vetClinics = JSON.parse(localStorage.getItem('vet_clinics_list') || '[]');
+    let vetClinics = readStorageJSON('vet_clinics_list', []);
     vetClinics.push({ nome, tel, note });
     localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
     alert("Clinica salvata!"); openModule('vet-emergency');
@@ -2090,7 +2218,7 @@ function saveVetClinic() {
 
 function deleteVetClinic(index) {
     if (confirm("Rimuovere contatto?")) {
-        let vetClinics = JSON.parse(localStorage.getItem('vet_clinics_list') || '[]');
+        let vetClinics = readStorageJSON('vet_clinics_list', []);
         vetClinics.splice(index, 1);
         localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
         openModule('vet-emergency');
@@ -2105,13 +2233,20 @@ function shareLocationToVet(telNumber) {
     } else { alert("GPS non disponibile."); }
 }
 
+function shareLocationToVetByIndex(index) {
+    const vetClinics = readStorageJSON('vet_clinics_list', []);
+    const clinic = vetClinics[index];
+    if (!clinic || !clinic.tel) return;
+    shareLocationToVet(sanitizePhoneHref(clinic.tel));
+}
+
 function saveVetHistoryItem() {
     const cane = document.getElementById('vh-cane').value;
     const tipo = document.getElementById('vh-tipo').value;
     const data = document.getElementById('vh-data').value;
     const note = document.getElementById('vh-note').value.trim();
     if (!data) { alert("Inserisci la data."); return; }
-    let vetHistory = JSON.parse(localStorage.getItem('vet_history_list') || '[]');
+    let vetHistory = readStorageJSON('vet_history_list', []);
     vetHistory.push({ cane, tipo, data, note });
     localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
     alert("Trattamento registrato!"); openModule('vet');
@@ -2119,7 +2254,7 @@ function saveVetHistoryItem() {
 
 function deleteVetHistoryItem(index) {
     if (confirm("Rimuovere record?")) {
-        let vetHistory = JSON.parse(localStorage.getItem('vet_history_list') || '[]');
+        let vetHistory = readStorageJSON('vet_history_list', []);
         vetHistory.splice(index, 1);
         localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
         openModule('vet');
@@ -2146,19 +2281,63 @@ function shareAppUrl() {
     }
 }
 
+// --- PWA Install ---
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const btn = document.getElementById('btn-installa-app');
+    if (btn) btn.style.display = '';
+});
+
+window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    const btn = document.getElementById('btn-installa-app');
+    if (btn) btn.style.display = 'none';
+});
+
+function installApp() {
+    // Già in esecuzione come PWA installata (standalone / fullscreen / minimal-ui)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches
+        || window.matchMedia('(display-mode: minimal-ui)').matches
+        || window.navigator.standalone === true;
+
+    if (isStandalone) {
+        alert("✅ L'app è già installata sul tuo dispositivo!");
+        return;
+    }
+
+    if (!deferredInstallPrompt) {
+        alert("ℹ️ L'installazione non è disponibile.\nSe usi iOS, apri Safari e usa 'Aggiungi alla schermata Home'.\nSe usi Chrome desktop, controlla la barra degli indirizzi.");
+        return;
+    }
+
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+            console.log('[PWA] Installazione accettata');
+        } else {
+            console.log('[PWA] Installazione rifiutata');
+        }
+        deferredInstallPrompt = null;
+    });
+}
+
 function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tesserino') {
-    if (!base64Data) return;
+    if (!isSafeDataUrl(base64Data)) return;
     
     let activeView = document.getElementById('active-module-view');
     if (!activeView) return;
 
     let contentHTML = `
         <h2>Visualizzazione Documento</h2>
-        <p><strong>${titolo || 'Allegato'}</strong></p>
+        <p><strong>${escapeHtml(titolo || 'Allegato')}</strong></p>
         <div class="module-card" style="text-align: center; background: #fff; padding: 15px; border-radius: 8px;">
             <img src="${base64Data}" style="max-width: 100%; height: auto; border-radius: 6px;" alt="Documento Salvato">
         </div>
-        <button class="overlay-btn" style="background:#475569; margin-top:15px; width:100%;" onclick="openModule('${moduloProvenienza}')">← Torna Indietro</button>
+        <button class="overlay-btn" style="background:#475569; margin-top:15px; width:100%;" onclick="openModule(${JSON.stringify(moduloProvenienza)})">← Torna Indietro</button>
     `;
     
     activeView.querySelector('.module-body-content').innerHTML = contentHTML;
@@ -2274,7 +2453,7 @@ function aggiornaVistaDisclaimer() {
 // 1. Funzione per autocompilare i campi cliente richiamando i dati salvati
 function autocompilaDatiCliente(nomeInserito) {
     if (!nomeInserito || nomeInserito.trim() === '') return;
-    const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    const rubricaClienti = readStorageJSON('rubrica_clienti', []);
     const clienteTrovato = rubricaClienti.find(c => c.nome.toLowerCase() === nomeInserito.trim().toLowerCase());
 
     if (clienteTrovato) {
@@ -2290,39 +2469,8 @@ function autocompilaDatiCliente(nomeInserito) {
     }
 }
 
-// Funzione per condividere la ricevuta via Email (da richiamare nella visualizzazione ricevuta)
-function condividiRicevutaEmail(index) {
-    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-    const v = storico[index];
-    if (!v) {
-        alert("Ricevuta non trovata.");
-        return;
-    }
-
-    // L'email viene inserita nel testo anziché nel parametro mailto principale se vuoi che l'utente la veda lì
-    const emailTesto = v.acquirenteEmail ? v.acquirenteEmail : "Non specificata";
-
-    const oggetto = encodeURIComponent(`Ricevuta di Vendita Occasionale - Lotto ${v.lotto || 'Tartufo'}`);
-    const corpo = encodeURIComponent(
-        `Gentile ${v.acquirente},\n\n` +
-        `Indirizzo Email Acquirente: ${emailTesto}\n\n` +
-        `Di seguito i dettagli della ricevuta di vendita occasionale di tartufi conforme alla Legge 145/2018:\n\n` +
-        `• Data: ${v.data}\n` +
-        `• Specie: ${v.specie}\n` +
-        `• Qualità: ${v.qualita || 'Non specificata'}\n` +
-        `• Peso: ${v.peso} grammi\n` +
-        `• Importo Totale: € ${v.importo}\n` +
-        `• Comune di Raccolta: ${v.comune}\n` +
-        `• Codice Lotto: ${v.lotto}\n\n` +
-        `Cordiali saluti,\n${v.venditoreNome}`
-    );
-
-    // Se non vuoi che inserisca l'email nel campo "A:", rimuovi ${v.acquirenteEmail} prima del punto e virgola
-    window.location.href = `mailto:?subject=${oggetto}&body=${corpo}`;
-}
-
 async function condividiRicevutaEmail(index) {
-    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const storico = readStorageJSON('storico_vendite', []);
     const v = storico[index];
     if (!v) {
         alert("Ricevuta non trovata.");
@@ -2407,7 +2555,7 @@ async function condividiRicevutaEmail(index) {
 }
 
 function salvaNotaCliente(index, testoNota) {
-    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    let rubricaClienti = readStorageJSON('rubrica_clienti', []);
     if (rubricaClienti[index]) {
         rubricaClienti[index].nota = testoNota;
         localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
@@ -2420,7 +2568,7 @@ function salvaNotaClienteDaInput(index) {
     const textarea = document.getElementById(`nota-cliente-${index}`);
     if (!textarea) return;
 
-    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    let rubricaClienti = readStorageJSON('rubrica_clienti', []);
     if (rubricaClienti[index]) {
         rubricaClienti[index].nota = textarea.value.trim();
         localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
@@ -2439,7 +2587,7 @@ function saveSpesa() {
         return;
     }
 
-    let speseList = JSON.parse(localStorage.getItem('spese_list') || '[]');
+    let speseList = readStorageJSON('spese_list', []);
     speseList.push({ data, categoria, importo, note });
     localStorage.setItem('spese_list', JSON.stringify(speseList));
     
@@ -2449,7 +2597,7 @@ function saveSpesa() {
 
 function deleteSpesa(index) {
     if (confirm("Vuoi davvero eliminare questa spesa?")) {
-        let speseList = JSON.parse(localStorage.getItem('spese_list') || '[]');
+        let speseList = readStorageJSON('spese_list', []);
         speseList.splice(index, 1);
         localStorage.setItem('spese_list', JSON.stringify(speseList));
         openModule('spese');
@@ -2457,7 +2605,7 @@ function deleteSpesa(index) {
 }
 
 function salvaArchivioRegionaleTartufi(regione) {
-    let calendariPersonalizzatiArchivio = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
+    let calendariPersonalizzatiArchivio = readStorageJSON('calendari_tartufi_custom', {});
     if (!calendariPersonalizzatiArchivio[regione]) {
         calendariPersonalizzatiArchivio[regione] = {};
     }
@@ -2475,7 +2623,7 @@ function salvaArchivioRegionaleTartufi(regione) {
     // Salvataggio della nota regionale / fermo biologico
     const inputNotaRegionale = document.getElementById('nota-regione-speciale');
     if (inputNotaRegionale) {
-        let noteRegionaliSalvate = JSON.parse(localStorage.getItem('note_regionali_tartufi') || '{}');
+        let noteRegionaliSalvate = readStorageJSON('note_regionali_tartufi', {});
         noteRegionaliSalvate[regione] = inputNotaRegionale.value.trim();
         localStorage.setItem('note_regionali_tartufi', JSON.stringify(noteRegionaliSalvate));
     }
@@ -2614,7 +2762,7 @@ function estraiDateTartufiDaTesto() {
         { id: 7, keywords: ["tuber mesentericum", "tartufo nero ordinario", "tartufo nero di bagnoli"] }
     ];
 
-    let calendariPersonalizzati = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
+    let calendariPersonalizzati = readStorageJSON('calendari_tartufi_custom', {});
     if (!calendariPersonalizzati[regioneCorrente]) {
         calendariPersonalizzati[regioneCorrente] = {};
     }
@@ -2697,12 +2845,9 @@ function estraiDateTartufiDaTesto() {
 // Funzione per scaricare i calendari e le note regionali in formato JSON
 // Funzione per esportare e condividere i calendari e le note regionali in formato JSON
 async function esportaCalendariJSON() {
-    const calendari = localStorage.getItem('calendari_tartufi_custom') || '{}';
-    const note = localStorage.getItem('note_regionali_tartufi') || '{}';
-    
     const exportData = {
-        calendari_tartufi_custom: JSON.parse(calendari),
-        note_regionali_tartufi: JSON.parse(note),
+        calendari_tartufi_custom: readStorageJSON('calendari_tartufi_custom', {}),
+        note_regionali_tartufi: readStorageJSON('note_regionali_tartufi', {}),
         dataExport: new Date().toISOString()
     };
 
@@ -2747,13 +2892,27 @@ function importaCalendariJSON(event) {
     reader.onload = function(e) {
         try {
             const content = JSON.parse(e.target.result);
+            if (!content || typeof content !== 'object' || Array.isArray(content)) {
+                throw new Error('Contenuto backup non valido');
+            }
+            const pendingWrites = [];
             
             if (content.calendari_tartufi_custom) {
-                localStorage.setItem('calendari_tartufi_custom', JSON.stringify(content.calendari_tartufi_custom));
+                if (typeof content.calendari_tartufi_custom !== 'object' || Array.isArray(content.calendari_tartufi_custom)) {
+                    throw new Error('Calendari non validi');
+                }
+                pendingWrites.push(['calendari_tartufi_custom', JSON.stringify(content.calendari_tartufi_custom)]);
             }
             if (content.note_regionali_tartufi) {
-                localStorage.setItem('note_regionali_tartufi', JSON.stringify(content.note_regionali_tartufi));
+                if (typeof content.note_regionali_tartufi !== 'object' || Array.isArray(content.note_regionali_tartufi)) {
+                    throw new Error('Note regionali non valide');
+                }
+                pendingWrites.push(['note_regionali_tartufi', JSON.stringify(content.note_regionali_tartufi)]);
             }
+
+            pendingWrites.forEach(([storageKey, value]) => {
+                localStorage.setItem(storageKey, value);
+            });
 
             alert("✔ Calendari e note regionali importati con successo!");
             openModule('archivio'); // Ricarica il modulo archivio per mostrare i dati aggiornati
