@@ -153,7 +153,7 @@ function updateCompass(currentLat, currentLng) {
     if (targetNavigation === 'car' && carCoordinates) {
         target = carCoordinates; label = '🚗 Auto';
     } else if (typeof targetNavigation === 'string' && targetNavigation.startsWith('poi_')) {
-        const index = parseInt(targetNavigation.split('_')[1]);
+        const index = parseInt(targetNavigation.split('_')[1], 10);
         if (poiList[index]) { target = poiList[index]; label = `📍 ${poiList[index].note || 'Punto'}`; }
     }
     if (target) {
@@ -527,36 +527,6 @@ function autocompilaDatiCliente(nomeInserito) {
 }
 
 // Funzione per condividere la ricevuta via Email (da richiamare nella visualizzazione ricevuta)
-function condividiRicevutaEmail(index) {
-    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
-    const v = storico[index];
-    if (!v) {
-        alert("Ricevuta non trovata.");
-        return;
-    }
-
-    // L'email viene inserita nel testo anziché nel parametro mailto principale se vuoi che l'utente la veda lì
-    const emailTesto = v.acquirenteEmail ? v.acquirenteEmail : "Non specificata";
-
-    const oggetto = encodeURIComponent(`Ricevuta di Vendita Occasionale - Lotto ${v.lotto || 'Tartufo'}`);
-    const corpo = encodeURIComponent(
-        `Gentile ${v.acquirente},\n\n` +
-        `Indirizzo Email Acquirente: ${emailTesto}\n\n` +
-        `Di seguito i dettagli della ricevuta di vendita occasionale di tartufi conforme alla Legge 145/2018:\n\n` +
-        `• Data: ${v.data}\n` +
-        `• Specie: ${v.specie}\n` +
-        `• Qualità: ${v.qualita || 'Non specificata'}\n` +
-        `• Peso: ${v.peso} grammi\n` +
-        `• Importo Totale: € ${v.importo}\n` +
-        `• Comune di Raccolta: ${v.comune}\n` +
-        `• Codice Lotto: ${v.lotto}\n\n` +
-        `Cordiali saluti,\n${v.venditoreNome}`
-    );
-
-    // Se non vuoi che inserisca l'email nel campo "A:", rimuovi ${v.acquirenteEmail} prima del punto e virgola
-    window.location.href = `mailto:?subject=${oggetto}&body=${corpo}`;
-}
-
 async function condividiRicevutaEmail(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const v = storico[index];
@@ -814,9 +784,13 @@ function isSpecieApertaCorrente(periodoStr) {
 function elaboraTestoIncollato() {
     // Esempio di utilizzo collegato a un pulsante o a un evento
     const testo = document.getElementById('inputTestoGrezzo').value;
-    const datiEstratti = estraiSpecieEPeriodiDaTesto(testo);
-    
-    console.log(datiEstratti);
+    if (typeof estraiSpecieEPeriodiDaTesto === 'function') {
+        const datiEstratti = estraiSpecieEPeriodiDaTesto(testo);
+        console.log(datiEstratti);
+    } else {
+        console.warn('estraiSpecieEPeriodiDaTesto non è definita');
+        alert('Funzione di estrazione non disponibile. Aggiornare l\'applicazione.');
+    }
 }
 
 function estraiDateTartufiDaTesto() {

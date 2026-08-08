@@ -218,7 +218,7 @@ const MapManager = {
       target = this.carCoordinates;
       label = '🚗 Auto';
     } else if (typeof this.targetNavigation === 'string' && this.targetNavigation.startsWith('poi_')) {
-      const index = parseInt(this.targetNavigation.split('_')[1]);
+      const index = parseInt(this.targetNavigation.split('_')[1], 10);
       if (this.poiList[index]) {
         target = this.poiList[index];
         label = `📍 ${this.poiList[index].note || 'Punto'}`;
@@ -583,7 +583,9 @@ window.addEventListener('DOMContentLoaded', () => {
   MapManager.init();
 
   // Inizializza PWA
-  PWAManager.init();
+  if (typeof PWAManager !== 'undefined' && typeof PWAManager.init === 'function') {
+    PWAManager.init();
+  }
 
   // Mostra disclaimer
   if (typeof mostraDisclaimerIniziale === 'function') {
