@@ -73,7 +73,14 @@ function viewStoredDocument(storageKey, title, moduleName) {
 }
 
 function normalizeBackupEntry(entryValue, fallbackValue) {
-    const parsedValue = typeof entryValue === 'string' ? JSON.parse(entryValue) : entryValue;
+    let parsedValue = entryValue;
+    if (typeof entryValue === 'string') {
+        try {
+            parsedValue = JSON.parse(entryValue);
+        } catch (error) {
+            throw new Error('Voce backup non valida');
+        }
+    }
 
     if (Array.isArray(fallbackValue) && !Array.isArray(parsedValue)) {
         throw new Error('Formato array non valido');
@@ -108,10 +115,16 @@ function restoreBackupEntries(data) {
         carCoords: { storageKey: 'car_coords', fallbackValue: {} }
     };
 
+    const normalizedEntries = [];
+
     Object.entries(backupSchema).forEach(([backupKey, config]) => {
         if (!Object.prototype.hasOwnProperty.call(data, backupKey) || data[backupKey] === null) return;
         const normalizedValue = normalizeBackupEntry(data[backupKey], config.fallbackValue);
-        localStorage.setItem(config.storageKey, normalizedValue);
+        normalizedEntries.push([config.storageKey, normalizedValue]);
+    });
+
+    normalizedEntries.forEach(([storageKey, normalizedValue]) => {
+        localStorage.setItem(storageKey, normalizedValue);
     });
 }
 
