@@ -533,6 +533,7 @@ function openModule(moduleName, editMode = false) {
            case 'storico_ricevute':
     let storicoVendite = readStorageJSON('storico_vendite', []);
     const filtroCliente = localStorage.getItem('filtro_storico_cliente') || '';
+    const filtroClienteRender = escapeHtml(filtroCliente);
 
     let storicoHtml = `<h2>Archivio Storico Ricevute</h2>`;
 
@@ -540,7 +541,7 @@ function openModule(moduleName, editMode = false) {
     if (filtroCliente) {
         storicoHtml += `
             <div style="background: rgba(2, 132, 199, 0.2); border: 1px solid #0284c7; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                <span style="color: #38bdf8; font-size: 0.9rem;">🔍 Filtrato per cliente: <strong>${filtroCliente}</strong></span>
+                <span style="color: #38bdf8; font-size: 0.9rem;">🔍 Filtrato per cliente: <strong>${filtroClienteRender}</strong></span>
                 <button class="overlay-btn" style="background: #475569; padding: 4px 8px; font-size: 0.75rem;" onclick="localStorage.removeItem('filtro_storico_cliente'); openModule('storico_ricevute');">Mostra Tutte</button>
             </div>`;
         
@@ -566,10 +567,10 @@ function openModule(moduleName, editMode = false) {
             
             const regimeLabel = item.regime === 'ritenuta' ? '<span style="color:#38bdf8; font-size:0.75rem;">[Ritenuta d\'Acconto]</span>' : '<span style="color:#22c55e; font-size:0.75rem;">[Imposta Sostitutiva]</span>';
             
-            let dettaglioImporto = `Importo: € ${item.importo}`;
+            let dettaglioImporto = `Importo: € ${escapeHtml(item.importo)}`;
             if (item.regime === 'ritenuta') {
                 const nettoVisibile = item.netto ? item.netto : (item.importo * 0.77).toFixed(2);
-                dettaglioImporto = `Lordo: € ${item.importo} | <span style="color:#38bdf8;">Netto: € ${nettoVisibile}</span>`;
+                dettaglioImporto = `Lordo: € ${escapeHtml(item.importo)} | <span style="color:#38bdf8;">Netto: € ${escapeHtml(nettoVisibile)}</span>`;
             }
 
             storicoHtml += `
@@ -2422,37 +2423,6 @@ function autocompilaDatiCliente(nomeInserito) {
         if (elEmail && !elEmail.value) elEmail.value = clienteTrovato.email || '';
         if (elNota && !elNota.value) elNota.value = clienteTrovato.nota || '';
     }
-}
-
-// Funzione per condividere la ricevuta via Email (da richiamare nella visualizzazione ricevuta)
-function condividiRicevutaEmail(index) {
-    const storico = readStorageJSON('storico_vendite', []);
-    const v = storico[index];
-    if (!v) {
-        alert("Ricevuta non trovata.");
-        return;
-    }
-
-    // L'email viene inserita nel testo anziché nel parametro mailto principale se vuoi che l'utente la veda lì
-    const emailTesto = v.acquirenteEmail ? v.acquirenteEmail : "Non specificata";
-
-    const oggetto = encodeURIComponent(`Ricevuta di Vendita Occasionale - Lotto ${v.lotto || 'Tartufo'}`);
-    const corpo = encodeURIComponent(
-        `Gentile ${v.acquirente},\n\n` +
-        `Indirizzo Email Acquirente: ${emailTesto}\n\n` +
-        `Di seguito i dettagli della ricevuta di vendita occasionale di tartufi conforme alla Legge 145/2018:\n\n` +
-        `• Data: ${v.data}\n` +
-        `• Specie: ${v.specie}\n` +
-        `• Qualità: ${v.qualita || 'Non specificata'}\n` +
-        `• Peso: ${v.peso} grammi\n` +
-        `• Importo Totale: € ${v.importo}\n` +
-        `• Comune di Raccolta: ${v.comune}\n` +
-        `• Codice Lotto: ${v.lotto}\n\n` +
-        `Cordiali saluti,\n${v.venditoreNome}`
-    );
-
-    // Se non vuoi che inserisca l'email nel campo "A:", rimuovi ${v.acquirenteEmail} prima del punto e virgola
-    window.location.href = `mailto:?subject=${oggetto}&body=${corpo}`;
 }
 
 async function condividiRicevutaEmail(index) {
