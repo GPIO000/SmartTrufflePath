@@ -1072,12 +1072,13 @@ function openModule(moduleName, editMode = false) {
             } else {
                 clinicHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">I tuoi contatti salvati:</h3>`;
                 vetClinics.forEach((clinic, idx) => {
+                    const safeClinic = sanitizeRenderable(clinic);
                     const telHref = sanitizePhoneHref(clinic.tel);
                     clinicHtml += `
                         <div class="module-card" style="border-left: 4px solid #dc2626; margin-bottom: 12px;">
-                            <strong style="color:#f8fafc; font-size:1rem;">🏥 ${clinic.nome}</strong>
-                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">📞 ${clinic.tel}</p>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 ${clinic.note || 'Nessuna nota'}</p>
+                            <strong style="color:#f8fafc; font-size:1rem;">🏥 ${safeClinic.nome}</strong>
+                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">📞 ${safeClinic.tel}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 ${safeClinic.note || 'Nessuna nota'}</p>
                             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                                 <a href="tel:${telHref}" class="overlay-btn" style="background:#dc2626; text-decoration:none; text-align:center; display:inline-block; padding:8px 12px;">📞 Chiama</a>
                                 <button class="overlay-btn" style="background:#0284c7; padding:8px 12px;" onclick="shareLocationToVetByIndex(${idx})">📍 Invia GPS</button>
@@ -1864,6 +1865,7 @@ function visualizzaRicevutaSalvata(index) {
     const v = storico[index];
     if(!v) return;
     const safeReceipt = sanitizeRenderable(v);
+    const importoNumerico = parseFloat(v.importo) || 0;
 
     const isRitenuta = v.regime === 'ritenuta';
     
@@ -1872,8 +1874,8 @@ function visualizzaRicevutaSalvata(index) {
         <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ccc;">
             <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (esonerata dall'imposta sostitutiva)</p>
             <p><strong>Compenso Lordo:</strong> € ${safeReceipt.importo}</p>
-            <p><strong>Ritenuta d'Acconto (23%):</strong> € ${safeReceipt.ritenuta || (v.importo * 0.23).toFixed(2)}</p>
-            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${safeReceipt.netto || (v.importo * 0.77).toFixed(2)}</p>
+            <p><strong>Ritenuta d'Acconto (23%):</strong> € ${safeReceipt.ritenuta || (importoNumerico * 0.23).toFixed(2)}</p>
+            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${safeReceipt.netto || (importoNumerico * 0.77).toFixed(2)}</p>
         </div>
     ` : `
         <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ccc;">
