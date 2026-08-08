@@ -249,6 +249,7 @@ html, body.no-scroll-body {
     background-color: #1e293b;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 0 15px;
     border-bottom: 1px solid #334155;
     position: sticky;

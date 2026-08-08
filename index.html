@@ -2,7 +2,7 @@
 <html lang="it" class="no-scroll-body">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Truffle App</title>
     
     <!-- PWA Meta Tags -->
@@ -92,6 +92,21 @@
 
     <!-- Contenitore viste dinamiche a schermo intero -->
     <div id="active-module-view"></div>
+
+    <!-- Toast container per notifiche non bloccanti -->
+    <div id="toast-container"></div>
+
+    <!-- Dialog personalizzato per alert / confirm / prompt -->
+    <dialog id="app-dialog">
+        <div class="app-dialog-body">
+            <p id="app-dialog-message"></p>
+            <input type="text" id="app-dialog-input" class="mod-input app-dialog-input-field" style="display:none;">
+            <div class="app-dialog-actions">
+                <button id="app-dialog-cancel" class="overlay-btn btn-neutral" style="display:none;">Annulla</button>
+                <button id="app-dialog-ok" class="overlay-btn btn-primary">OK</button>
+            </div>
+        </div>
+    </dialog>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
