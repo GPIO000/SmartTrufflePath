@@ -13,9 +13,11 @@ function showToast(message, type = 'info') {
     toast.textContent = message;
     container.appendChild(toast);
     requestAnimationFrame(() => toast.classList.add('app-toast-visible'));
+    const TRANSITION_MS = 300;
     setTimeout(() => {
         toast.classList.remove('app-toast-visible');
-        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+        const fallback = setTimeout(() => toast.remove(), TRANSITION_MS + 100);
+        toast.addEventListener('transitionend', () => { clearTimeout(fallback); toast.remove(); }, { once: true });
     }, 3500);
 }
 
@@ -84,8 +86,8 @@ function appPrompt(message, defaultValue = '') {
         const onCancel = () => { dialog.close(); cleanup(); resolve(null); };
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
-        setTimeout(() => inputField.focus(), 50);
         dialog.showModal();
+        requestAnimationFrame(() => inputField.focus());
     });
 }
 
