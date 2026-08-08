@@ -2693,9 +2693,10 @@ async function deleteSpesa(index) {
 
 function salvaArchivioRegionaleTartufi(regione) {
     const selectRegioneArchivio = document.getElementById('seleziona-regione-archivio');
-    const regioneEffettiva = (typeof regione === 'string' && regione.trim())
-        ? regione.trim()
-        : (selectRegioneArchivio && typeof selectRegioneArchivio.value === 'string' ? selectRegioneArchivio.value.trim() : '');
+    const regioneDaSelect = (selectRegioneArchivio && typeof selectRegioneArchivio.value === 'string')
+        ? selectRegioneArchivio.value.trim()
+        : '';
+    const regioneEffettiva = regioneDaSelect || ((typeof regione === 'string' && regione.trim()) ? regione.trim() : '');
 
     if (!regioneEffettiva) {
         showToast("Seleziona una regione prima di salvare.", 'error');
