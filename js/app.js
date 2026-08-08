@@ -2281,6 +2281,50 @@ function shareAppUrl() {
     }
 }
 
+// --- PWA Install ---
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const btn = document.getElementById('btn-installa-app');
+    if (btn) btn.style.display = '';
+});
+
+window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    const btn = document.getElementById('btn-installa-app');
+    if (btn) btn.style.display = 'none';
+});
+
+function installApp() {
+    // Già in esecuzione come PWA installata (standalone / fullscreen / minimal-ui)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches
+        || window.matchMedia('(display-mode: minimal-ui)').matches
+        || window.navigator.standalone === true;
+
+    if (isStandalone) {
+        alert("✅ L'app è già installata sul tuo dispositivo!");
+        return;
+    }
+
+    if (!deferredInstallPrompt) {
+        alert("ℹ️ L'installazione non è disponibile.\nSe usi iOS, apri Safari e usa 'Aggiungi alla schermata Home'.\nSe usi Chrome desktop, controlla la barra degli indirizzi.");
+        return;
+    }
+
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+            console.log('[PWA] Installazione accettata');
+        } else {
+            console.log('[PWA] Installazione rifiutata');
+        }
+        deferredInstallPrompt = null;
+    });
+}
+
 function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tesserino') {
     if (!isSafeDataUrl(base64Data)) return;
     
