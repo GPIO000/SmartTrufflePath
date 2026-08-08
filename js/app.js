@@ -2851,19 +2851,24 @@ function importaCalendariJSON(event) {
             if (!content || typeof content !== 'object' || Array.isArray(content)) {
                 throw new Error('Contenuto backup non valido');
             }
+            const pendingWrites = [];
             
             if (content.calendari_tartufi_custom) {
                 if (typeof content.calendari_tartufi_custom !== 'object' || Array.isArray(content.calendari_tartufi_custom)) {
                     throw new Error('Calendari non validi');
                 }
-                localStorage.setItem('calendari_tartufi_custom', JSON.stringify(content.calendari_tartufi_custom));
+                pendingWrites.push(['calendari_tartufi_custom', JSON.stringify(content.calendari_tartufi_custom)]);
             }
             if (content.note_regionali_tartufi) {
                 if (typeof content.note_regionali_tartufi !== 'object' || Array.isArray(content.note_regionali_tartufi)) {
                     throw new Error('Note regionali non valide');
                 }
-                localStorage.setItem('note_regionali_tartufi', JSON.stringify(content.note_regionali_tartufi));
+                pendingWrites.push(['note_regionali_tartufi', JSON.stringify(content.note_regionali_tartufi)]);
             }
+
+            pendingWrites.forEach(([storageKey, value]) => {
+                localStorage.setItem(storageKey, value);
+            });
 
             alert("✔ Calendari e note regionali importati con successo!");
             openModule('archivio'); // Ricarica il modulo archivio per mostrare i dati aggiornati
