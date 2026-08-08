@@ -249,6 +249,7 @@ html, body.no-scroll-body {
     background-color: #1e293b;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 0 15px;
     border-bottom: 1px solid #334155;
     position: sticky;
@@ -301,6 +302,103 @@ html, body.no-scroll-body {
     color: #fff;
     border-radius: 6px;
     font-size: 0.95rem;
+}
+
+
+.small-text  { font-size: 0.8rem; }
+.btn-row     { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.card-gap    { margin-bottom: 12px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.mt-15       { margin-top: 15px; }
+
+/* ── Classi utilità button overlay ─────────────────────────── */
+.btn-success  { background: #16a34a !important; }
+.btn-primary  { background: #2563eb !important; }
+.btn-info     { background: #0284c7 !important; }
+.btn-danger   { background: #dc2626 !important; }
+.btn-sky      { background: #0ea5e9 !important; }
+.btn-neutral  { background: #475569 !important; }
+.border-slate { border: 1px solid #475569; }
+.btn-full     { width: 100%; }
+.btn-round    { width: 32px; height: 32px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+
+/* ── Card con bordo colorato ──────────────────────────────── */
+.card-green-border { border-left: 4px solid #22c55e; }
+
+/* ── Testo colorato ──────────────────────────────────────── */
+.text-success { color: #22c55e; }
+.text-sky     { color: #38bdf8; }
+.text-muted   { color: #94a3b8; }
+.text-subtle  { color: #cbd5e1; }
+.text-accent  { color: #60a5fa; font-size: 1rem; }
+
+/* ── Toast ──────────────────────────────────────────────── */
+#toast-container {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+}
+.app-toast {
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: #fff;
+    background: #334155;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    max-width: 90vw;
+    text-align: center;
+    white-space: pre-line;
+}
+.app-toast.app-toast-visible { opacity: 1; transform: translateY(0); }
+.app-toast-success { background: #16a34a; }
+.app-toast-error   { background: #dc2626; }
+.app-toast-info    { background: #0284c7; }
+
+/* ── Dialog personalizzato ─────────────────────────────── */
+#app-dialog {
+    border: none;
+    border-radius: 12px;
+    background: #1e293b;
+    color: #f8fafc;
+    padding: 0;
+    max-width: 90vw;
+    width: 340px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+#app-dialog::backdrop {
+    background: rgba(0,0,0,0.6);
+}
+.app-dialog-body {
+    padding: 24px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+#app-dialog-message {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #e2e8f0;
+    white-space: pre-line;
+    user-select: text;
+    margin: 0;
+}
+.app-dialog-input-field {
+    margin: 0 !important;
+}
+.app-dialog-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
 }
 
 /* Regole di stampa ottimizzate per ricevute e moduli */

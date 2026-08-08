@@ -1,4 +1,5 @@
-const CACHE_NAME = 'truffle-mobile-first-v22';
+// Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
+const CACHE_NAME = 'truffle-mobile-first-' + '2026-08-08';
 const ASSETS = [
   './',
   './index.html',
@@ -56,7 +57,8 @@ self.addEventListener('fetch', (e) => {
             return networkResponse;
           });
         }).catch(() => {
-          // Fallback silenzioso se manca la mappa offline[span_8](start_span)[span_8](end_span)
+          // Ritorna una Response vuota con status 503 invece di undefined
+          return new Response('', { status: 503, statusText: 'Service Unavailable' });
         });
       })
     );

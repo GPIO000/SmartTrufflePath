@@ -1,13 +1,16 @@
 {
   "id": "./index.html",
-  "name": "Truffle App",
+  "name": "Truffle App – Raccolta Tartufi",
   "short_name": "TruffleApp",
+  "description": "App mobile per la raccolta, gestione fiscale e contabilità dei tartufi. Conforme alla Legge 145/2018.",
+  "lang": "it",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#121212",
   "theme_color": "#1e293b",
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "icon-192.png",
@@ -15,9 +18,21 @@
       "type": "image/png"
     },
     {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
