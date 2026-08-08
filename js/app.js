@@ -18,70 +18,6 @@ let carCoordinates = JSON.parse(localStorage.getItem('car_coords')) || null;
 let poiList = JSON.parse(localStorage.getItem('poi_list') || '[]');
 let poiMapMarkers = {}; 
 let targetNavigation = null;
-
-let deferredInstallPrompt = null;
-let appAlreadyInstalled = false;
-
-function syncInstallButtonState() {
-    const btn = document.getElementById('btn-installa-app');
-    if (!btn) return;
-    if (appAlreadyInstalled) {
-        btn.textContent = '✅ App già installata';
-        btn.disabled = true;
-        btn.style.display = 'block';
-        btn.style.background = '#475569';
-        btn.style.cursor = 'default';
-        return;
-    }
-    if (deferredInstallPrompt) {
-        btn.textContent = '📲 Installa app';
-        btn.disabled = false;
-        btn.style.display = 'block';
-        btn.style.background = '#16a34a';
-        btn.style.cursor = 'pointer';
-    } else {
-        btn.style.display = 'none';
-    }
-}
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    syncInstallButtonState();
-});
-
-window.addEventListener('appinstalled', () => {
-    deferredInstallPrompt = null;
-    appAlreadyInstalled = true;
-    syncInstallButtonState();
-});
-
-window.addEventListener('load', () => {
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    if (isStandalone) {
-        appAlreadyInstalled = true;
-    }
-    syncInstallButtonState();
-});
-
-function installApp() {
-    if (!deferredInstallPrompt || appAlreadyInstalled) return;
-    deferredInstallPrompt.prompt();
-    deferredInstallPrompt.userChoice.then((choiceResult) => {
-        deferredInstallPrompt = null;
-        appAlreadyInstalled = choiceResult.outcome === 'accepted';
-        syncInstallButtonState();
-        console.log(choiceResult.outcome === 'accepted' ? 'Installazione PWA accettata' : 'Installazione PWA rifiutata');
-    });
-}
-
-function updateInstallButtonVisibility() {
-    syncInstallButtonState();
-}
-
-// ============================================
-// GEOLOCALIZZAZIONE E GPS
-// ============================================
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const lat = position.coords.latitude;
@@ -153,7 +89,7 @@ function updateCompass(currentLat, currentLng) {
     if (targetNavigation === 'car' && carCoordinates) {
         target = carCoordinates; label = '🚗 Auto';
     } else if (typeof targetNavigation === 'string' && targetNavigation.startsWith('poi_')) {
-        const index = parseInt(targetNavigation.split('_')[1], 10);
+        const index = parseInt(targetNavigation.split('_')[1]);
         if (poiList[index]) { target = poiList[index]; label = `📍 ${poiList[index].note || 'Punto'}`; }
     }
     if (target) {
@@ -277,7 +213,1000 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = poiHtml;
             break;
-        default:
+        case 'tesserino':
+            const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+            if (tData.nome && !editMode) {
+                let filePreviewHTML = '';
+                let visualizzaBtnHTML = '';
+                if (tData.contenutoBase64) {
+                    if (tData.tipoFile && tData.tipoFile.startsWith('image/')) {
+                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${tData.nomeFile || 'Immagine'}</p><img src="${tData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Tesserino"></div>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${tData.contenutoBase64}', 'Tesserino Digitale', 'tesserino')">👁️ Visualizza Immagine</button>`;
+                    } else {
+                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${tData.nomeFile || 'File PDF'}</p>`;
+                    }
+                } else {
+                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                }
+
+                contentHTML = `
+                    <h2>Anagrafica & Tesserino Digitale</h2>
+                    <p><strong>Normativa:</strong> Legge 145/2018</p>
+                    <div class="module-card" style="border-left: 4px solid #22c55e;">
+                        <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ Tesserino Registrato</p>
+                        <p><strong>Nome:</strong> ${tData.nome}</p>
+                        <p><strong>Codice Fiscale:</strong> ${tData.cf}</p>
+                        <p><strong>Regione / Prov:</strong> ${tData.regione}</p>
+                        <p><strong>N. Tesserino:</strong> ${tData.num}</p>
+                        ${filePreviewHTML}
+                        <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                            ${visualizzaBtnHTML}
+                            <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('tesserino', true)">✏️ Modifica</button>
+                            <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('tesserino_data', 'tesserino')">🗑️ Elimina</button>
+                        </div>
+                    </div>`;
+            } else {
+                contentHTML = `
+                    <h2>Anagrafica & Tesserino Digitale</h2>
+                    <p>Inserisci i dati del tuo tesserino regionale per la raccolta dei tartufi:</p>
+                    <div class="module-card">
+                        <label>Nome e Cognome:</label>
+                        <input type="text" id="t-nome" class="mod-input" value="${tData.nome || ''}" placeholder="Es. Mario Rossi">
+                        <label>Codice Fiscale:</label>
+                        <input type="text" id="t-cf" class="mod-input" value="${tData.cf || ''}" placeholder="Es. RSSMRA80A01H501W">
+                        <label>Regione / Provincia di Rilascio:</label>
+                        <input type="text" id="t-regione" class="mod-input" value="${tData.regione || ''}" placeholder="Es. Molise / Abruzzo">
+                        <label>Numero Tesserino:</label>
+                        <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Numero autorizzazione">
+                        <label>Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
+                        <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
+                        <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="saveTesserino()">Salva Tesserino</button>
+                    </div>`;
+            }
+            break;
+        case 'pagopa':
+            const pData = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
+            if (pData.id && !editMode) {
+                let filePreviewHTML = '';
+                let visualizzaBtnHTML = '';
+                if (pData.contenutoBase64) {
+                    if (pData.tipoFile && pData.tipoFile.startsWith('image/')) {
+                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${pData.nomeFile || 'Immagine'}</p><img src="${pData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Quietanza PagoPA"></div>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${pData.contenutoBase64}', 'Quietanza PagoPA', 'pagopa')">👁️ Visualizza Immagine</button>`;
+                    } else {
+                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${pData.nomeFile || 'File PDF'}</p>`;
+                    }
+                } else {
+                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                }
+
+                contentHTML = `
+                    <h2>Ricevuta PagoPA & PDF</h2>
+                    <div class="module-card" style="border-left: 4px solid #22c55e;">
+                        <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ Quietanza Attiva</p>
+                        <p><strong>ID Transazione:</strong> ${pData.id}</p>
+                        <p><strong>Data Pagamento:</strong> ${pData.data}</p>
+                        ${filePreviewHTML}
+                        <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                            ${visualizzaBtnHTML}
+                            <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('pagopa', true)">✏️ Modifica</button>
+                            <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('pagopa_data', 'pagopa')">🗑️ Elimina</button>
+                        </div>
+                    </div>`;
+            } else {
+                contentHTML = `
+                    <h2>Ricevuta PagoPA & PDF</h2>
+                    <p>Registra la quietanza di pagamento della tassa regionale:</p>
+                    <div class="module-card">
+                        <label>ID Transazione / Codice Avviso:</label>
+                        <input type="text" id="p-id" class="mod-input" value="${pData.id || ''}" placeholder="Es. TRN123456789">
+                        <label>Data Pagamento:</label>
+                        <input type="date" id="p-data" class="mod-input" value="${pData.data || new Date().toISOString().slice(0,10)}">
+                        <label>Carica Ricevuta (Immagine o PDF - Obbligatorio):</label>
+                        <input type="file" id="p-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
+                        <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="savePagoPAWithFile()">Archivia Ricevuta PagoPA</button>
+                    </div>`;
+            }
+            break;
+        case 'ricevute':
+            const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+            const defaultProtocollo = f24SavedData.protocollo || '';
+            
+            const annoCorrenteReg = new Date().getFullYear();
+            let f24ValidoPreview = false;
+            if (f24SavedData.protocollo && f24SavedData.dataPagamento) {
+                const dataP = new Date(f24SavedData.dataPagamento);
+                const scadenzaF24 = new Date(annoCorrenteReg, 1, 16, 23, 59, 59);
+                if (dataP <= scadenzaF24) f24ValidoPreview = true;
+            }
+            const regimeRilevatoTesto = f24ValidoPreview 
+                ? '<span style="color:#22c55e; font-weight:bold;">Imposta Sostitutiva (F24 ELIDE valido)</span>' 
+                : '<span style="color:#38bdf8; font-weight:bold;">Ritenuta d\'Acconto (23% - F24 assente o non valido)</span>';
+
+            contentHTML = `
+                <h2>Ricevuta di Vendita Occasionale</h2>
+                <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
+                <div class="module-card">
+                    <div style="background:#0f172a; padding:12px; border-radius:6px; margin-bottom:15px; border:1px solid #334155;">
+                        <p style="font-size:0.8rem; color:#94a3b8; margin-bottom:4px; text-transform:uppercase;">Regime Fiscale (Selezione Automatica):</p>
+                        <p style="font-size:0.9rem; margin:0;">${regimeRilevatoTesto}</p>
+                    </div>
+
+                    <input type="hidden" id="r-regime" value="${f24ValidoPreview ? 'sostitutiva' : 'ritenuta'}">
+
+                    <label>Acquirente (Privato o Ristorante / Ragione Sociale):</label>
+                    <input type="text" id="r-acquirente" class="mod-input" placeholder="Nome o Ristorante" oninput="autocompilaDatiCliente(this.value)">
+                    
+                    <label>P.IVA / Codice Fiscale Acquirente:</label>
+                    <input type="text" id="r-cf-acquirente" class="mod-input" placeholder="P.IVA o CF acquirente">
+
+                    <label>Indirizzo Acquirente:</label>
+                    <input type="text" id="r-indirizzo-acquirente" class="mod-input" placeholder="Via, Città, CAP">
+
+                    <label>Email Acquirente:</label>
+                    <input type="email" id="r-email-acquirente" class="mod-input" placeholder="email@esempio.it">
+                    
+                    <label>Specie Tartufo:</label>
+                    <select id="r-specie" class="mod-input">
+                        <option value="Tuber magnatum Pico (Pregiato Bianco)">Tuber magnatum Pico (Pregiato Bianco)</option>
+                        <option value="Tuber melanosporum Vitt. (Nero Pregiato)">Tuber melanosporum Vitt. (Nero Pregiato)</option>
+                        <option value="Tuber aestivum Vitt. (Scorzone Estivo)">Tuber aestivum Vitt. (Scorzone Estivo)</option>
+                        <option value="Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)">Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)</option>
+                        <option value="Tuber brumale Vitt. (Moscatuto / Invernale)">Tuber brumale Vitt. (Moscatuto / Invernale)</option>
+                        <option value="Tuber brumale var. moschatum De Ferry (Brumale moscato)">Tuber brumale var. moschatum De Ferry (Brumale moscato)</option>
+                        <option value="Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)">Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)</option>
+                        <option value="Tuber macrosporum Vitt. (Nero Liscio)">Tuber macrosporum Vitt. (Nero Liscio)</option>
+                        <option value="Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)">Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)</option>
+                    </select>
+                    
+                    <label>Classificazione Qualità:</label>
+                    <select id="r-qualita" class="mod-input">
+                        <option value="Prima Scelta">Prima Scelta</option>
+                        <option value="Seconda Scelta">Seconda Scelta</option>
+                        <option value="Terza Scelta">Terza Scelta</option>
+                    </select>
+                    
+                    <label>Peso (grammi):</label>
+                    <input type="number" id="pesoGrammi" class="mod-input" placeholder="Es. 150" oninput="calcolaTotale()">
+
+                    <label>Prezzo al kg (€):</label>
+                    <input type="number" id="prezzoKg" class="mod-input" placeholder="Es. 1500.00" oninput="calcolaTotale()">
+
+                    <label>Importo Complessivo / Corrispettivo (€):</label>
+                    <input type="number" id="importoTotale" class="mod-input" placeholder="Es. 200.00" oninput="calcolaRitenutaAcconto()">
+
+                    <div id="container-ritenuta" style="display:${f24ValidoPreview ? 'none' : 'block'}; background:#0f172a; padding:10px; border-radius:6px; margin:10px 0; border:1px solid #334155;">
+                        <p style="font-size:0.85rem; color:#38bdf8; margin-bottom:6px;"><b>Calcolo Ritenuta d'Acconto (23%):</b></p>
+                        <label>Importo Ritenuta d'Acconto (€):</label>
+                        <input type="number" id="r-importo-ritenuta" class="mod-input" readonly style="background:#1e293b; color:#22c55e; font-weight:bold;">
+                        <label style="margin-top:6px;">Netto a Pagare percepito dal raccoglitore (€):</label>
+                        <input type="number" id="r-netto-pagare" class="mod-input" readonly style="background:#1e293b; color:#22c55e; font-weight:bold;">
+                    </div>
+
+                    <label>Luogo / Area di Raccolta e Provincia <span style="color:#ef4444;">*</span>:</label>
+                    <input type="text" id="r-comune" class="mod-input" placeholder="Es. Comune / Località (Provincia) - Obbligatorio">
+                    
+                    <label>Codice Lotto / Tracciabilità:</label>
+                    <input type="text" id="r-lotto" class="mod-input" value="LOTTO-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-01" placeholder="Codice lotto">
+                    
+                    <div id="container-f24-field" style="display:${f24ValidoPreview ? 'block' : 'none'};">
+                        <label>N. Protocollo F24 ELIDE collegato:</label>
+                        <input type="text" id="r-f24" class="mod-input" value="${defaultProtocollo}" placeholder="Protocollo F24">
+                    </div>
+
+                    <!-- Nuova Sezione: Note Cliente per la Rubrica -->
+                    <label style="margin-top: 10px;">📝 Note Cliente (Rubrica):</label>
+                    <textarea id="r-nota-cliente" class="mod-input" placeholder="Scrivi una nota per questo cliente..." rows="2" style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 6px; font-size: 0.8rem;"></textarea>
+                    
+                    <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="try { registraVenditaConPrezzoKg(); } catch(e) { alert('Errore: ' + e.message); console.error(e); }">Registra e Genera Ricevuta Conforme</button>
+                </div>`;
+            setTimeout(toggleRegimeFiscaleFields, 50);
+            break;
+
+           case 'storico_ricevute':
+    let storicoVendite = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const filtroCliente = localStorage.getItem('filtro_storico_cliente');
+
+    let storicoHtml = `<h2>Archivio Storico Ricevute</h2>`;
+
+    // Se c'è un filtro attivo dalla rubrica, mostra il banner e filtra l'array
+    if (filtroCliente) {
+        storicoHtml += `
+            <div style="background: rgba(2, 132, 199, 0.2); border: 1px solid #0284c7; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <span style="color: #38bdf8; font-size: 0.9rem;">🔍 Filtrato per cliente: <strong>${filtroCliente}</strong></span>
+                <button class="overlay-btn" style="background: #475569; padding: 4px 8px; font-size: 0.75rem;" onclick="localStorage.removeItem('filtro_storico_cliente'); openModule('storico_ricevute');">Mostra Tutte</button>
+            </div>`;
+        
+        // Filtra le ricevute in base al nome dell'acquirente (mantenendo il legame con il loro indice originale)
+        storicoVendite = storicoVendite
+            .map((item, realIndex) => ({ item, realIndex }))
+            .filter(obj => obj.item.acquirente && obj.item.acquirente.toLowerCase() === filtroCliente.toLowerCase());
+    } else {
+        // Mappa normale senza filtro
+        storicoVendite = storicoVendite.map((item, realIndex) => ({ item, realIndex }));
+    }
+
+    storicoHtml += `<p>Elenco cronologico delle ricevute di vendita emesse${filtroCliente ? ' per questo cliente' : ''}:</p>`;
+
+    if (storicoVendite.length === 0) {
+        storicoHtml += `<div class="module-card"><p>Nessuna ricevuta emessa finora${filtroCliente ? ' per questo cliente' : ''}.</p></div>`;
+    } else {
+        // Inverte l'ordine per mostrare prima le più recenti
+        storicoVendite.slice().reverse().forEach((obj, index) => {
+            const item = obj.item;
+            const originalIndex = obj.realIndex;
+            
+            const regimeLabel = item.regime === 'ritenuta' ? '<span style="color:#38bdf8; font-size:0.75rem;">[Ritenuta d\'Acconto]</span>' : '<span style="color:#22c55e; font-size:0.75rem;">[Imposta Sostitutiva]</span>';
+            
+            let dettaglioImporto = `Importo: € ${item.importo}`;
+            if (item.regime === 'ritenuta') {
+                const nettoVisibile = item.netto ? item.netto : (item.importo * 0.77).toFixed(2);
+                dettaglioImporto = `Lordo: € ${item.importo} | <span style="color:#38bdf8;">Netto: € ${nettoVisibile}</span>`;
+            }
+
+            storicoHtml += `
+                <div class="module-card" style="margin-bottom:12px; border-left: 4px solid #3b82f6;">
+                    <strong style="color:#60a5fa; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${item.data} ${regimeLabel}</strong>
+                    <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${item.acquirente}</b></p>
+                    <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${item.specie} (${item.peso}g)</p>
+                    <p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">${dettaglioImporto}</p>
+                    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+                        <button class="overlay-btn" style="background:#2563eb; padding:6px 10px; font-size:0.75rem;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza</button>
+                        <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="modificaRicevuta(${originalIndex})">✏️ Modifica</button>
+                        <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="eliminaRicevutaConDoppiaConferma(${originalIndex})">🗑️ Elimina</button>
+                    </div>
+                </div>`;
+        });
+    }
+    contentHTML = storicoHtml;
+    break;
+
+        case 'f24':
+            const fData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+            if (fData.protocollo && !editMode) {
+                let filePreviewHTML = '';
+                let visualizzaBtnHTML = '';
+                if (fData.contenutoBase64) {
+                    if (fData.tipoFile && fData.tipoFile.startsWith('image/')) {
+                        filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${fData.contenutoBase64}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="visualizzaImmagineSalvata('${fData.contenutoBase64}', 'F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
+                    } else {
+                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
+                    }
+                } else {
+                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                }
+
+                contentHTML = `
+                    <h2>F24 ELIDE - Imposta Sostitutiva</h2>
+                    <div class="module-card" style="border-left: 4px solid #22c55e;">
+                        <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ F24 Registrato</p>
+                        <p><strong>Anno Fiscale:</strong> ${fData.anno}</p>
+                        <p><strong>Protocollo:</strong> ${fData.protocollo}</p>
+                        <p><strong>Data Versamento:</strong> ${fData.dataPagamento || 'Non specificata'}</p>
+                        ${filePreviewHTML}
+                        <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                            ${visualizzaBtnHTML}
+                            <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('f24', true)">✏️ Modifica</button>
+                            <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('f24_data', 'f24')">🗑️ Elimina</button>
+                        </div>
+                    </div>`;
+            } else {
+                contentHTML = `
+                    <h2>F24 ELIDE - Imposta Sostitutiva</h2>
+                    <p>Registra il versamento dell'imposta sostitutiva (100€ annui - Legge 145/2018):</p>
+                    <div class="module-card">
+                        <label>Anno Fiscale di Riferimento:</label>
+                        <input type="text" id="f-anno" class="mod-input" value="${fData.anno || new Date().getFullYear()}" placeholder="Es. 2026">
+                        
+                        <label>Numero di Protocollo Telematico:</label>
+                        <input type="text" id="f-protocollo" class="mod-input" value="${fData.protocollo || ''}" placeholder="Es. 24010112345678901">
+                        
+                        <label>Data di Versamento:</label>
+                        <input type="date" id="f-data-pagamento" class="mod-input" value="${fData.dataPagamento || new Date().toISOString().slice(0,10)}">
+                        
+                        <label>Carica Quietanza F24 (PDF o Immagine - Obbligatorio):</label>
+                        <input type="file" id="f-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
+                        
+                        <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="saveF24WithFile()">Archivia F24 ELIDE</button>
+                    </div>`;
+            }
+            break;
+        case 'canidiary':
+            const dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
+            let dogsHtml = `
+                <h2>Profilo Cani & Diario Ricerca</h2>
+                <p>Gestisci i tuoi cani da tartufo:</p>
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Nuovo Cane</h3>
+                    <label>Nome del Cane:</label>
+                    <input type="text" id="c-nome" class="mod-input" placeholder="Es. Argo">
+                    <label>Razza:</label>
+                    <input type="text" id="c-razza" class="mod-input" value="Lagotto Romagnolo">
+                    <label>Data di Nascita:</label>
+                    <input type="date" id="c-nascita" class="mod-input">
+                    <label>Numero Microchip:</label>
+                    <input type="text" id="c-microchip" class="mod-input" placeholder="Codice microchip">
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveNewCane()">Salva Nuovo Cane</button>
+                </div>`;
+            if (dogsList.length === 0) {
+                dogsHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun cane registrato.</p></div>`;
+            } else {
+                dogsHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">I tuoi cani registrati:</h3>`;
+                dogsList.forEach((dog, idx) => {
+                    dogsHtml += `
+                        <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:1rem;">🐕 ${dog.nome}</strong>
+                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">Razza: ${dog.razza}</p>
+                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Nascita: ${dog.nascita || 'Non specificata'}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">Microchip: ${dog.microchip || 'Non inserito'}</p>
+                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteDog(${idx})">🗑️ Elimina</button>
+                        </div>`;
+                });
+            }
+            contentHTML = dogsHtml;
+            break;
+        case 'polizze':
+            const polizzeList = JSON.parse(localStorage.getItem('polizze_list') || '[]');
+            let polizzeHtml = `
+                <h2>Polizze & Assicurazioni</h2>
+                <p>Gestisci le polizze assicurative (RC Cane, Responsabilità Civile Raccolta, Infortuni):</p>
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Nuova Polizza</h3>
+                    <label>Compagnia Assicurativa:</label>
+                    <input type="text" id="pol-compagnia" class="mod-input" placeholder="Es. Unipol / Generali">
+                    <label>Numero Polizza:</label>
+                    <input type="text" id="pol-numero" class="mod-input" placeholder="Es. IT-99887766">
+                    <label>Tipologia Copertura:</label>
+                    <select id="pol-tipo" class="mod-input">
+                        <option value="🌐 Tutte le Coperture (RCT + Cane + Infortuni + Tutela Legale)">🌐 Tutte le Coperture (RCT + Cane + Infortuni + Tutela Legale)</option>
+                        <option value="🐕 RC Cane da Tartufo / Terzi">RC Cane da Tartufo / Terzi</option>
+                        <option value="🌲 Polizza Completa Tartufaio (RCT + Infortuni)">Polizza Completa Tartufaio (RCT + Infortuni)</option>
+                        <option value="🐾 Cane da Tartufo - Base (Morte e Vet)">Cane da Tartufo - Base (Morte e Vet)</option>
+                        <option value="⭐ Cane da Tartufo - Super (Massimali Alti)">Cane da Tartufo - Super (Massimali Alti)</option>
+                        <option value="⚖️ Tutela Legale Tartufaio">Tutela Legale Tartufaio</option>
+                    </select>
+                    <label>Data Scadenza:</label>
+                    <input type="date" id="pol-scadenza" class="mod-input">
+                    <label>Note / Massimali / Contatto:</label>
+                    <input type="text" id="pol-note" class="mod-input" placeholder="Es. Massimale 1.5M">
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="savePolizza()">Salva Polizza</button>
+                </div>`;
+            if (polizzeList.length === 0) {
+                polizzeHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna polizza registrata.</p></div>`;
+            } else {
+                polizzeHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Le tue polizze attive:</h3>`;
+                
+                const oggi = new Date();
+                
+                polizzeList.forEach((pol, idx) => {
+                    let statoScadenza = '';
+                    let bordoColore = '#3b82f6';
+                    
+                    if (pol.scadenza) {
+                        const dataScad = new Date(pol.scadenza);
+                        const diffTime = dataScad - oggi;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        if (diffDays < 0) {
+                            statoScadenza = `<p style="font-size:0.8rem; color:#ef4444; font-weight:bold; margin: 2px 0;">⚠️ SCADUTA (${pol.scadenza})</p>`;
+                            bordoColore = '#ef4444';
+                        } else if (diffDays <= 30) {
+                            statoScadenza = `<p style="font-size:0.8rem; color:#f59e0b; font-weight:bold; margin: 2px 0;">⚠️ In scadenza tra ${diffDays} giorni (${pol.scadenza})</p>`;
+                            bordoColore = '#f59e0b';
+                        } else {
+                            statoScadenza = `<p style="font-size:0.8rem; color:#22c55e; margin: 2px 0;">⏳ Scadenza: ${pol.scadenza}</p>`;
+                            bordoColore = '#22c55e';
+                        }
+                    } else {
+                        statoScadenza = `<p style="font-size:0.8rem; color:#94a3b8; margin: 2px 0;">⏳ Scadenza: Non specificata</p>`;
+                    }
+
+                    polizzeHtml += `
+                        <div class="module-card" style="border-left: 4px solid ${bordoColore}; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:1rem;">🛡️ ${pol.compagnia}</strong>
+                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">Tipo: ${pol.tipo}</p>
+                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📋 N. ${pol.numero}</p>
+                            ${statoScadenza}
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${pol.note || 'Nessuna nota'}</p>
+                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deletePolizza(${idx})">🗑️ Elimina</button>
+                        </div>`;
+                });
+            }
+            contentHTML = polizzeHtml;
+            break;
+        case 'vet':
+            const dogsListVet = JSON.parse(localStorage.getItem('dogs_list') || '[]');
+            const cDataVet = JSON.parse(localStorage.getItem('cane_data') || '{}');
+            const nomeCaneDefault = cDataVet.nome || (dogsListVet.length > 0 ? dogsListVet[0].nome : 'Il tuo cane');
+            const vetHistory = JSON.parse(localStorage.getItem('vet_history_list') || '[]');
+            let optionsHtml = '';
+            if (dogsListVet.length > 0) {
+                dogsListVet.forEach(dog => {
+                    const selected = dog.nome === nomeCaneDefault ? 'selected' : '';
+                    optionsHtml += `<option value="${dog.nome}" ${selected}>${dog.nome} (${dog.razza})</option>`;
+                });
+            } else { optionsHtml += `<option value="${nomeCaneDefault}">${nomeCaneDefault}</option>`; }
+            let vetHtml = `
+                <h2>Libretto Sanitario & Profilassi</h2>
+                <p>Storico trattamenti, vaccini e visite per il cane:</p>
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Trattamento / Visita</h3>
+                    <label>Seleziona Cane:</label>
+                    <select id="vh-cane" class="mod-input">${optionsHtml}</select>
+                    <label>Tipologia Intervento:</label>
+                    <select id="vh-tipo" class="mod-input">
+                        <option value="💉 Vaccino">Vaccino</option>
+                        <option value="💊 Antiparassitario Intestinale">Antiparassitario Intestinale (Pillola)</option>
+                        <option value="💧 Spot-on">Spot-on (Antipulci / Zecche)</option>
+                        <option value="🎗️ Collare Antiparassitario">Collare Antiparassitario</option>
+                        <option value="🩺 Visita Veterinaria">Visita Veterinaria / Controllo</option>
+                        <option value="🩹 Medicazione / Zecca">Medicazione / Ferita / Zecca</option>
+                        <option value="🏥 Somministrazione Farmaci / Altro">Somministrazione Farmaci / Altro</option>
+                    </select>
+                    <label>Data del Trattamento:</label>
+                    <input type="date" id="vh-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+                    <label>Note / Dettagli:</label>
+                    <input type="text" id="vh-note" class="mod-input" placeholder="Es. Nome farmaco o dosaggio">
+                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" onclick="saveVetHistoryItem()">Registra nel Libretto</button>
+                </div>`;
+            if (vetHistory.length === 0) {
+                vetHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun trattamento registrato.</p></div>`;
+            } else {
+                vetHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Storico Registrazioni:</h3>`;
+                vetHistory.slice().reverse().forEach((item, index) => {
+                    const originalIndex = vetHistory.length - 1 - index;
+                    vetHtml += `
+                        <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:0.95rem;">🐕 ${item.cane}</strong>
+                            <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.tipo}</b></p>
+                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteVetHistoryItem(${originalIndex})">🗑️ Elimina</button>
+                        </div>`;
+                });
+            }
+            contentHTML = vetHtml;
+            break;
+        case 'registro_giornaliero':
+            const storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
+            const elAnno = document.getElementById('filtro-anno');
+            const filtroAnno = elAnno ? elAnno.value : 'tutti';
+            const elSpecie = document.getElementById('filtro-specie');
+            const filtroSpecie = elSpecie ? elSpecie.value : 'tutte';
+
+            let anniDisponibili = [...new Set(storicoRaccolta.map(item => item.data ? item.data.slice(0,4) : ''))].filter(Boolean);
+            if(anniDisponibili.length === 0) anniDisponibili = [new Date().getFullYear().toString()];
+            let opzioniAnniHtml = `<option value="tutti">Tutti gli anni</option>`;
+            anniDisponibili.forEach(a => { opzioniAnniHtml += `<option value="${a}" ${filtroAnno === a ? 'selected' : ''}>${a}</option>`; });
+            const listaSpecie9 = [
+                "Tuber magnatum Pico (Pregiato Bianco)", "Tuber melanosporum Vitt. (Nero Pregiato)",
+                "Tuber aestivum Vitt. (Scorzone Estivo)", "Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)",
+                "Tuber brumale Vitt. (Moscatuto / Invernale)", "Tuber brumale var. moschatum De Ferry (Brumale moscato - Sottospecie)",
+                "Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)", "Tuber macrosporum Vitt. (Nero Liscio)",
+                "Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)"
+            ];
+            let opzioniSpecieHtml = `<option value="tutte">Tutte le specie</option>`;
+            listaSpecie9.forEach(s => { opzioniSpecieHtml += `<option value="${s}" ${filtroSpecie === s ? 'selected' : ''}>${s}</option>`; });
+            let selectSpecieFormHtml = '';
+            listaSpecie9.forEach(s => { selectSpecieFormHtml += `<option value="${s}">${s}</option>`; });
+            let registroHtml = `
+                <h2>Registro Giornaliero Ritrovamenti</h2>
+                <p>Registra i quantitativi raccolti e filtra per anno o specie</p>
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Raccolta</h3>
+                    <label>Data:</label>
+                    <input type="date" id="reg-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+                    <label>Specie Tartufo:</label>
+                    <select id="reg-specie" class="mod-input">${selectSpecieFormHtml}</select>
+                    <label>Peso Totale (grammi):</label>
+                    <input type="number" id="reg-peso" class="mod-input" placeholder="Es. 250">
+                    <label>Note:</label>
+                    <input type="text" id="reg-note" class="mod-input" placeholder="Es. Bosco di castagni">
+                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" onclick="saveRaccoltaGiornaliera()">Salva nel Registro</button>
+                </div>
+                <div class="module-card" style="margin-bottom: 15px; background: #0f172a; border: 1px solid #334155;">
+                    <h3 style="font-size:0.85rem; color:#38bdf8; margin-bottom:8px;">🔍 Filtri Archivio</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <div style="flex:1;"><label style="font-size:0.75rem;">Anno:</label><select id="filtro-anno" class="mod-input" onchange="openModule('registro_giornaliero')">${opzioniAnniHtml}</select></div>
+                        <div style="flex:2;"><label style="font-size:0.75rem;">Specie:</label><select id="filtro-specie" class="mod-input" onchange="openModule('registro_giornaliero')">${opzioniSpecieHtml}</select></div>
+                    </div>
+                </div>`;
+            let datiFiltrati = storicoRaccolta.filter(item => {
+                const annoItem = item.data ? item.data.slice(0,4) : '';
+                return (filtroAnno === 'tutti' || annoItem === filtroAnno) && (filtroSpecie === 'tutte' || item.specie === filtroSpecie);
+            });
+            if (datiFiltrati.length === 0) {
+                registroHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun ritrovamento trovato con i filtri selezionati.</p></div>`;
+            } else {
+                registroHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Storico Filtrato (${datiFiltrati.length}):</h3>`;
+                datiFiltrati.slice().reverse().forEach((item) => {
+                    const originalIndex = storicoRaccolta.indexOf(item);
+                    registroHtml += `
+                        <div class="module-card" style="border-left: 4px solid #10b981; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:0.95rem;">📅 ${item.data}</strong>
+                            <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.specie}</b></p>
+                            <p style="font-size:0.85rem; color:#22c55e; margin: 2px 0;">⚖️ Peso: <b>${item.peso} g</b></p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteRaccoltaGiornaliera(${originalIndex})">🗑️ Elimina</button>
+                        </div>`;
+                });
+            }
+            contentHTML = registroHtml;
+            break;
+        case 'spese':
+            const speseList = JSON.parse(localStorage.getItem('spese_list') || '[]');
+            let totaleSpeseAnno = 0;
+            const annoCorrenteSpese = new Date().getFullYear();
+
+            let speseHtml = `
+                <h2>Gestione Spese Tartufaio</h2>
+                <p>Traccia carburante, attrezzatura, manutenzione e spese veterinarie:</p>
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Nuova Spesa</h3>
+                    <label>Data:</label>
+                    <input type="date" id="spese-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+                    <label>Categoria:</label>
+                    <select id="spese-categoria" class="mod-input">
+                        <option value="⛽ Caosti Auto">⛽ Costi Auto</option>
+                        <option value="🐕 Alimentazione & Cura Cane">🐕 Alimentazione & Cura Cane</option>
+                        <option value="🩺 Visite & Spese Veterinarie">🩺 Visite & Spese Veterinarie</option>
+                        <option value="🛠️ Attrezzatura & Abbigliamento">🛠️ Attrezzatura & Abbigliamento</option>
+                        <option value="🛡️ Assicurazioni & Tasse">🛡️ Assicurazioni & Tasse</option>
+                        <option value="📦 Altro">📦 Altro</option>
+                    </select>
+                    <label>Importo (€):</label>
+                    <input type="number" step="0.01" id="spese-importo" class="mod-input" placeholder="Es. 25.00">
+                    <label>Note / Descrizione:</label>
+                    <input type="text" id="spese-note" class="mod-input" placeholder="Es. Benzina per uscita bosco">
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveSpesa()">Salva Spesa</button>
+                </div>`;
+
+            if (speseList.length === 0) {
+                speseHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna spesa registrata.</p></div>`;
+            } else {
+                speseHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Elenco Spese Registrate:</h3>`;
+                
+                speseList.slice().reverse().forEach((item, index) => {
+                    const originalIndex = speseList.length - 1 - index;
+                    const dataSpesa = item.data ? new Date(item.data) : null;
+                    if (dataSpesa && dataSpesa.getFullYear() === annoCorrenteSpese) {
+                        totaleSpeseAnno += parseFloat(item.importo) || 0;
+                    }
+
+                    speseHtml += `
+                        <div class="module-card" style="border-left: 4px solid #f59e0b; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:0.95rem;">💶 € ${parseFloat(item.importo).toFixed(2)}</strong>
+                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;"><b>${item.categoria}</b></p>
+                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteSpesa(${originalIndex})">🗑️ Elimina</button>
+                        </div>`;
+                });
+
+                speseHtml = `
+                    <div class="module-card" style="background: #0f172a; border: 1px solid #334155; margin-bottom: 15px; text-align: center;">
+                        <p style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase;">Totale Spese Anno Corrente (${annoCorrenteSpese})</p>
+                        <p style="font-size: 1.4rem; color: #f59e0b; font-weight: bold; margin: 4px 0 0 0;">€ ${totaleSpeseAnno.toFixed(2)}</p>
+                    </div>` + speseHtml;
+            }
+            contentHTML = speseHtml;
+            break;
+        case 'bilancio':
+            const venditeSalvateBilancio = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+            const speseSalvateBilancio = JSON.parse(localStorage.getItem('spese_list') || '[]');
+            const annoCorrenteBilancio = new Date().getFullYear();
+            
+            // Variabili per i guadagni
+            let lordoSostitutiva = 0;
+            let nettoSostitutiva = 0;
+            let countSostitutiva = 0;
+
+            let lordoRitenuta = 0;
+            let nettoRitenuta = 0;
+            let totaleRitenuteSubite = 0;
+            let countRitenuta = 0;
+
+            venditeSalvateBilancio.forEach(item => {
+                let dataVendita = new Date();
+                if (item.data) {
+                    const dataStr = item.data.includes('/') ? item.data.split('/').reverse().join('-') : item.data;
+                    const parsedDate = new Date(dataStr);
+                    if (!isNaN(parsedDate.getTime())) {
+                        dataVendita = parsedDate;
+                    }
+                }
+
+                if (dataVendita.getFullYear() === annoCorrenteBilancio) {
+                    const lordo = parseFloat(item.importo) || 0;
+                    const regime = item.regime || 'sostitutiva';
+
+                    if (regime === 'ritenuta') {
+                        const ritenuta = item.ritenuta ? parseFloat(item.ritenuta) : (lordo * 0.23);
+                        const netto = item.netto !== undefined ? parseFloat(item.netto) : (lordo - ritenuta);
+                        
+                        lordoRitenuta += lordo;
+                        nettoRitenuta += netto;
+                        totaleRitenuteSubite += ritenuta;
+                        countRitenuta++;
+                    } else {
+                        lordoSostitutiva += lordo;
+                        nettoSostitutiva += lordo;
+                        countSostitutiva++;
+                    }
+                }
+            });
+
+            // Calcoli totali
+            const totaleNettoGuadagni = nettoSostitutiva + nettoRitenuta;
+            const totaleLordoGuadagni = lordoSostitutiva + lordoRitenuta;
+
+            // Calcolo totale spese per l'anno corrente
+            let sommaTotaleSpeseAnno = 0;
+            speseSalvateBilancio.forEach(item => {
+                const dataSpesa = item.data ? new Date(item.data) : null;
+                if (dataSpesa && !isNaN(dataSpesa.getTime()) && dataSpesa.getFullYear() === annoCorrenteBilancio) {
+                    sommaTotaleSpeseAnno += parseFloat(item.importo) || 0;
+                }
+            });
+
+            // Utile Netto Finale (Netto Guadagni - Spese)
+            const utileNettoEffettivo = totaleNettoGuadagni - sommaTotaleSpeseAnno;
+
+            // Controllo soglia limite normativo
+            const sogliaLimiteBilancio = 7000.00;
+            const differenzaSoglia = sogliaLimiteBilancio - totaleLordoGuadagni;
+            const isSuperato = totaleLordoGuadagni > sogliaLimiteBilancio;
+
+            // Stile comune per le caselle a dimensione uniforme
+            const boxStyleUniforme = "background: #0f172a; border: 1px solid #334155; text-align: center; padding: 15px; margin-bottom: 12px; border-radius: 8px;";
+
+            contentHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">Contabilità & Bilancio Annuo (${annoCorrenteBilancio})</h2>
+                    <button onclick="window.print()" style="background-color: #3b82f6; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
+                        🖨️ Stampa
+                    </button>
+                </div>
+                
+                <!-- Dettaglio 1: Imposta Sostitutiva -->
+                <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
+                    <h3 style="font-size:0.9rem; color:#22c55e; margin-bottom:6px;">🟢 Regime Imposta Sostitutiva</h3>
+                    <p style="font-size:0.85rem; margin:2px 0;">Ricevute: <strong>${countSostitutiva}</strong> | Netto: <strong style="color:#22c55e;">€ ${nettoSostitutiva.toFixed(2)}</strong></p>
+                </div>
+
+                <!-- Dettaglio 2: Ritenuta d'Acconto -->
+                <div class="module-card" style="border-left: 4px solid #38bdf8; margin-bottom: 15px;">
+                    <h3 style="font-size:0.9rem; color:#38bdf8; margin-bottom:6px;">🔵 Regime Ritenuta d'Acconto (23%)</h3>
+                    <p style="font-size:0.85rem; margin:2px 0;">Ricevute: <strong>${countRitenuta}</strong> | Lordo: € ${lordoRitenuta.toFixed(2)}</p>
+                    <p style="font-size:0.85rem; margin:2px 0;">Ritenute subite: <span style="color:#f87171;">- € ${totaleRitenuteSubite.toFixed(2)}</span></p>
+                    <p style="font-size:0.85rem; margin:2px 0;">Netto percepito: <strong style="color:#38bdf8;">€ ${nettoRitenuta.toFixed(2)}</strong></p>
+                </div>
+
+                <!-- 1. TOTALE NETTO DEI GUADAGNI (Dimensioni uguali) -->
+                <div class="module-card" style="${boxStyleUniforme} border-color: #22c55e;">
+                    <p style="font-size: 0.8rem; color: #4ade80; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold; margin: 0;">Totale Netto dei Guadagni</p>
+                    <p style="font-size: 1.6rem; color: #22c55e; font-weight: bold; margin: 6px 0 0 0;">€ ${totaleNettoGuadagni.toFixed(2)}</p>
+                </div>
+
+                <!-- 2. TOTALE SPESE SOSENUTE (Dimensioni uguali) -->
+                <div class="module-card" style="${boxStyleUniforme} border-color: #f59e0b;">
+                    <p style="font-size: 0.8rem; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold; margin: 0;">Totale Spese Sostenute</p>
+                    <p style="font-size: 1.6rem; color: #f59e0b; font-weight: bold; margin: 6px 0 0 0;">€ ${sommaTotaleSpeseAnno.toFixed(2)}</p>
+                </div>
+
+                <!-- Utile Netto Effettivo (Dimensioni uguali) -->
+                <div class="module-card" style="${boxStyleUniforme}">
+                    <p style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Utile Finale (Netto Guadagni - Spese)</p>
+                    <p style="font-size: 1.6rem; color: ${utileNettoEffettivo >= 0 ? '#22c55e' : '#ef4444'}; font-weight: bold; margin: 6px 0 0 0;">€ ${utileNettoEffettivo.toFixed(2)}</p>
+                </div>
+
+                <!-- Controllo Soglia (In rosso come richiesto) -->
+                <div class="module-card" style="background: #450a0a; border: 1px solid #ef4444; text-align: center; padding: 15px; border-radius: 8px;">
+                    <p style="font-size: 0.8rem; color: #fca5a5; text-transform: uppercase; font-weight: bold; margin: 0;">Soglia Occasionalità (sul Lordo): € ${totaleLordoGuadagni.toFixed(2)} / € 7.000,00</p>
+                    <p style="font-size: 1.3rem; font-weight: bold; margin-top: 6px; color: #f87171;">
+                        ${isSuperato ? `SUPERATO di € ${Math.abs(differenzaSoglia).toFixed(2)}` : `Disponibile: € ${differenzaSoglia.toFixed(2)}`}
+                    </p>
+                </div>`;
+            break;
+        case 'export':
+            contentHTML = `
+                <h2>Report & Backup Dati</h2>
+                <div class="module-card">
+                    <p>Esporta i dati contabili o fai un backup completo.</p>
+                    <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="esportaDatiCSV()">Scarica Contabilità in CSV</button>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#16a34a;" onclick="esportaBackupJSON()">Scarica Backup Totale (JSON)</button>
+                    <hr style="border-color:#334155; margin:20px 0;">
+                    <label style="font-weight:bold; color:#f8fafc;">Ripristina Backup da File JSON:</label>
+                    <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" onchange="importBackupData(event)">
+                </div>`;
+            break;
+        case 'emergency':
+            window.location.href = "tel:112";
+            return;
+        case 'vet-emergency':
+            const vetClinics = JSON.parse(localStorage.getItem('vet_clinics_list') || '[]');
+            let clinicHtml = `
+                <h2>Pronto Soccorso & Cliniche Veterinarie H24</h2>
+                <p>Gestisci i numeri d'emergenza dei veterinari:</p>
+                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
+                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Clinica H24</h3>
+                    <label>Nome Clinica o Medico:</label>
+                    <input type="text" id="vc-nome" class="mod-input" placeholder="Es. Clinica Centrale">
+                    <label>Numero di Telefono:</label>
+                    <input type="tel" id="vc-tel" class="mod-input" placeholder="Es. 0874123456">
+                    <label>Note:</label>
+                    <input type="text" id="vc-note" class="mod-input" placeholder="Es. Aperto festivi e notturno">
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveVetClinic()">Salva Contatto Emergenza</button>
+                </div>`;
+            if (vetClinics.length === 0) {
+                clinicHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna clinica salvata.</p></div>`;
+            } else {
+                clinicHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">I tuoi contatti salvati:</h3>`;
+                vetClinics.forEach((clinic, idx) => {
+                    clinicHtml += `
+                        <div class="module-card" style="border-left: 4px solid #dc2626; margin-bottom: 12px;">
+                            <strong style="color:#f8fafc; font-size:1rem;">🏥 ${clinic.nome}</strong>
+                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">📞 ${clinic.tel}</p>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 ${clinic.note || 'Nessuna nota'}</p>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <a href="tel:${clinic.tel}" class="overlay-btn" style="background:#dc2626; text-decoration:none; text-align:center; display:inline-block; padding:8px 12px;">📞 Chiama</a>
+                                <button class="overlay-btn" style="background:#0284c7; padding:8px 12px;" onclick="shareLocationToVet('${clinic.tel}')">📍 Invia GPS</button>
+                                <button class="overlay-btn" style="background:#475569; padding:8px 12px;" onclick="deleteVetClinic(${idx})">🗑️ Elimina</button>
+                            </div>
+                        </div>`;
+                });
+            }
+            contentHTML = clinicHtml;
+            break;
+
+       case 'clienti':
+    const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    
+    // Ordina dal cliente che ha speso di più a quello che ha speso di meno
+    rubricaClienti.sort((a, b) => (b.totaleAcquisti || 0) - (a.totaleAcquisti || 0));
+
+    let clientiHtml = `
+        <h2>Rubrica Clienti & Acquirenti</h2>
+        <p>Elenco dei clienti salvati con storico acquisti:</p>
+    `;
+    if (rubricaClienti.length === 0) {
+        clientiHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun cliente salvato in rubrica.</p></div>`;
+    } else {
+        rubricaClienti.forEach((cliente, idx) => {
+            // Formattazione del totale acquisti in valuta
+            const totaleFormattato = (cliente.totaleAcquisti || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+            
+            clientiHtml += `
+                <div class="module-card" style="border-left: 4px solid #0284c7; margin-bottom: 12px;">
+                    <strong style="color:#f8fafc; font-size:1rem;">👤 ${cliente.nome}</strong>
+                    <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">P.IVA / CF: ${cliente.cf || 'Non inserito'}</p>
+                    <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📍 Indirizzo: ${cliente.indirizzo || 'Non inserito'}</p>
+                    <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📧 Email: ${cliente.email || 'Non specificata'}</p>
+                    
+                    <!-- Sezione Statistiche Spesa -->
+                    <div style="background: rgba(15, 23, 42, 0.6); padding: 8px; border-radius: 6px; margin: 8px 0;">
+                        <p style="font-size:0.85rem; color:#4ade80; margin: 0; font-weight: bold;">💰 Totale Acquisti: ${totaleFormattato}</p>
+                        <p style="font-size:0.75rem; color:#94a3b8; margin: 2px 0 0 0;">📦 Ricevute emesse: ${cliente.numeroAcquisti || 1} | Ultimo: ${cliente.dataUltimoAcquisto || 'N.D.'}</p>
+                    </div>
+
+                    <!-- Sezione Note Cliente con Tasto Salva a pieno larghezza -->
+                    <div style="margin: 8px 0;">
+                        <label style="font-size:0.75rem; color:#94a3b8; display:block; margin-bottom:2px;">📝 Note Cliente:</label>
+                        <textarea 
+                            id="nota-cliente-${idx}"
+                            style="width: 100%; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 6px; font-size: 0.8rem; resize: vertical;" 
+                            rows="2" 
+                            placeholder="Scrivi una nota per questo cliente..."
+                        >${cliente.nota || ''}</textarea>
+                        <button class="overlay-btn" style="width: 100%; background:#eab308; color:#0f172a; font-weight:bold; padding:8px; font-size:0.85rem; margin-top:6px; border-radius:4px; border:none; cursor:pointer;" onclick="salvaNotaClienteDaInput(${idx})">💾 Salva Nota</button>
+                    </div>
+
+                    <!-- Blocco tasti principali distanziato -->
+                    <div style="display:flex; gap:6px; margin-top:16px; flex-wrap:wrap;">
+                        <button class="overlay-btn" style="background:#16a34a; padding:6px 10px; font-size:0.75rem;" onclick="creaRicevutaPerCliente(${idx})">📄 Nuova Ricevuta</button>
+                        <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="mostraRicevuteCliente('${cliente.nome.replace(/'/g, "\\'")}')">📜 Vedi Ricevute</button>
+                        <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteCliente(${idx})">🗑️ Elimina</button>
+                    </div>
+                </div>`;
+        });
+    }
+    contentHTML = clientiHtml;
+    break;
+
+            case 'archivio':
+            // Specie commercializzabili in Italia (Legge 752/1985 e s.m.i.) - ID da 0 a 8
+            const specieTartufiArchivio = [
+                "Tuber magnatum Pico (Tartufo bianco pregiato)",          // ID 0
+                "Tuber melanosporum Vitt. (Nero Pregiato, Nero di Norcia)",       // ID 1
+                "Tuber aestivum Vitt. (Scorzone, Tartufo Estivo)",         // ID 2
+                "Tuber uncinatum Chatin (Scorzone Invernale)",    // ID 3
+                "Tuber brumale Vitt. (Tartufo nero d’inverno)",    // ID 4
+                "Tuber borchii Vitt. Tartufo albidum Pico (Bianchetto)",// ID 5
+                "Tuber macrosporum Vitt. (Nero Liscio)",          // ID 6
+                "Tuber mesentericum Vitt. (Nero Ordinario)",      // ID 7
+                "Tuber brumale var. moschatum De Ferry, (Tartufo moscato)"          // ID 8
+            ];
+
+            // Recupera la regione selezionata nell'archivio o usa una di default
+            const regioneSelezionataArchivio = window.currentArchivioRegione || "Campania";
+
+            let calendariPersonalizzatiArchivio = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
+            let datiRegioneArchivio = calendariPersonalizzatiArchivio[regioneSelezionataArchivio] || {};
+
+            // Recupera la nota regionale salvata (se presente)
+            let noteRegionaliSalvate = JSON.parse(localStorage.getItem('note_regionali_tartufi') || '{}');
+            let notaCorrenteRegione = noteRegionaliSalvate[regioneSelezionataArchivio] || '';
+
+            let archivioHtml = `
+                <h2>📚 Archivio Date per Regione</h2>
+                <p>Gestisci e memorizza i periodi autorizzati per le regioni di interesse.</p>
+
+                <div class="module-card" style="background: #0f172a; border: 1px solid #334155; margin-bottom: 15px;">
+                    <label style="font-size: 0.85rem; color: #94a3b8; display: block; margin-bottom: 5px;">Seleziona Regione da Archiviare:</label>
+                    <select id="seleziona-regione-archivio" class="mod-input" onchange="window.currentArchivioRegione = this.value; openModule('archivio');">
+                        <option value="${regioneSelezionataArchivio}" selected>${regioneSelezionataArchivio}</option>
+                        <option value="Abruzzo">Abruzzo</option>
+                        <option value="Calabria">Calabria</option>
+                        <option value="Campania">Campania</option>
+                        <option value="Emilia-Romagna">Emilia-Romagna</option>
+                        <option value="Lazio">Lazio</option>
+                        <option value="Liguria">Liguria</option>
+                        <option value="Lombardia">Lombardia</option>
+                        <option value="Marche">Marche</option>
+                        <option value="Molise">Molise</option>
+                        <option value="Piemonte">Piemonte</option>
+                        <option value="Puglia">Puglia</option>
+                        <option value="Sardegna">Sardegna</option>
+                        <option value="Sicilia">Sicilia</option>
+                        <option value="Toscana">Toscana</option>
+                        <option value="Umbria">Umbria</option>
+                        <option value="Veneto">Veneto</option>
+                    </select>
+                </div>
+
+                <!-- Box di Estrazione Automatica da Testo Ufficiale -->
+                <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-bottom: 15px; border-radius: 8px; padding: 15px;">
+                    <h3 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px;">📋 Estrazione Automatica Date da Testo</h3>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">
+                        Incolla qui il testo ufficiale della Regione (es. bollettino o legge regionale) contenente le date di raccolta delle specie di tartufo:
+                    </p>
+                    <textarea id="testo-normativa-tartufi" class="mod-input" rows="5" placeholder="Es. Il tartufo bianco pregiato si raccoglie dal 1 ottobre al 31 dicembre. Lo scorzone dal 1 maggio al 31 agosto..." style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 8px; font-size: 0.85rem; width: 100%; box-sizing: border-box;"></textarea>
+                    <button class="overlay-btn" style="margin-top: 10px; width: 100%; background: #0284c7; font-weight: bold; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" onclick="estraiDateTartufiDaTesto()">
+                        🔍 Estrai e Compila Date
+                    </button>
+                </div>
+
+                <!-- Box Note, Fermi Biologici e Decreti Regionali -->
+                <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-bottom: 15px; border-radius: 8px; padding: 15px;">
+                    <h3 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px;">📝 Note, Fermi Biologici & Decreti Regionali</h3>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">
+                        Annota estremi di decreti, limitazioni straordinarie o periodi di fermo biologico per la regione ${regioneSelezionataArchivio}:
+                    </p>
+                    <textarea id="nota-regione-speciale" class="mod-input" rows="3" placeholder="Es. Delibera straordinaria: divieto di raccolta o fermo biologico..." style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 8px; font-size: 0.85rem; width: 100%; box-sizing: border-box;">${notaCorrenteRegione}</textarea>
+                </div>
+            `;
+
+            specieTartufiArchivio.forEach((specie, idSpecie) => {
+                let defaultPeriodo = "Ottobre - Gennaio";
+                if (specie.includes("Aestivum")) defaultPeriodo = "Maggio - Settembre";
+                if (specie.includes("Borchii")) defaultPeriodo = "Gennaio - Aprile";
+                if (specie.includes("Melanosporum")) defaultPeriodo = "Novembre - Marzo";
+
+                let periodoSalvato = datiRegioneArchivio[idSpecie] !== undefined ? datiRegioneArchivio[idSpecie] : defaultPeriodo;
+
+                archivioHtml += `
+                    <div class="module-card" style="border-left: 4px solid #f59e0b; margin-bottom: 10px; background: #1e293b;">
+                        <strong style="color: #f8fafc; font-size: 0.9rem; display: block; margin-bottom: 5px;">🍄 [ID Specie: ${idSpecie}] ${specie}</strong>
+                        <label style="font-size: 0.75rem; color: #94a3b8;">Periodo di raccolta autorizzato:</label>
+                        <input type="text" id="specie-archivio-${idSpecie}" class="mod-input" value="${periodoSalvato}" placeholder="Es. 1 Ottobre - 31 Dicembre" style="margin-top: 3px; font-size: 0.85rem;">
+                    </div>
+                `;
+            });
+
+            // INSERITO QUI IL BLOCCO DI BACKUP & RIPRISTINO CALENDARI:
+            archivioHtml += `
+                <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-bottom: 15px; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                    <h3 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px;">💾 Backup & Ripristino Calendari</h3>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">
+                        Esporta i tuoi calendari regionali personalizzati su file/condividili o ripristinali da un backup precedente:
+                    </p>
+                    <button class="overlay-btn" style="width: 100%; background: #16a34a; font-weight: bold; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-bottom: 10px;" onclick="esportaCalendariJSON()">
+                        📥 Scarica o Condividi Calendari (JSON)
+                    </button>
+                    
+                    <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 4px;">Carica Calendari da File JSON:</label>
+                    <input type="file" id="import-calendari-file" accept=".json" class="mod-input" style="padding: 6px; font-size: 0.8rem;" onchange="importaCalendariJSON(event)">
+                </div>
+            `;
+
+            archivioHtml += `
+                <div style="margin-top: 15px; margin-bottom: 25px;">
+                    <button class="overlay-btn" style="width: 100%; background: #22c55e; color: #0f172a; font-weight: bold; padding: 12px; font-size: 0.95rem; border-radius: 6px; border: none; cursor: pointer;" onclick="salvaArchivioRegionaleTartufi('${regioneSelezionataArchivio}')">
+                        💾 Salva Date e Note in Archivio
+                    </button>
+                </div>
+            `;
+
+            contentHTML = archivioHtml;
+            break;
+
+            case 'calendario': {
+    const gpsTextCal = document.getElementById('gps-status-text');
+    let regioneCal = "Campania"; 
+    if (gpsTextCal && gpsTextCal.innerHTML) {
+        const matchReg = gpsTextCal.innerHTML.match(/<b>(.*?)<\/b>/);
+        if (matchReg && matchReg[1]) regioneCal = matchReg[1];
+    }
+
+    let allCalendari = JSON.parse(localStorage.getItem('calendari_tartufi_custom') || '{}');
+    let datiRegioneCorrente = allCalendari[regioneCal] || {};
+
+    let noteRegionaliSalvate = JSON.parse(localStorage.getItem('note_regionali_tartufi') || '{}');
+    let notaRegionaleCorrente = noteRegionaliSalvate[regioneCal] || '';
+
+    const specieTartufiCal = [
+        "Tuber magnatum Pico (Pregiato Bianco)",
+        "Tuber melanosporum Vitt. (Nero Pregiato)",
+        "Tuber aestivum Vitt. (Scorzone Estivo)",
+        "Tuber uncinatum Chatin (Scorzone Invernale)",
+        "Tuber brumale Vitt. (Moscatuto / Invernale)",
+        "Tuber borchii Vitt. / albidum Pico (Bianchetto)",
+        "Tuber macrosporum Vitt. (Nero Liscio)",
+        "Tuber mesentericum Vitt. (Nero Ordinario)",
+        "Tuber albidum / Altra specie regionale"
+    ];
+
+    let calHtml = `
+        <h2>📅 Calendario Raccolta (GPS)</h2>
+        <p>Regione rilevata: <strong style="color:#38bdf8;">${regioneCal}</strong></p>
+        <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:15px;">Specie con periodo di raccolta attualmente <b>aperto</b>:</p>
+    `;
+
+    let specieAperteTrovate = 0;
+
+    specieTartufiCal.forEach((specie, id) => {
+        let periodo = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : "Ottobre - Gennaio";
+        
+        // Controllo di sicurezza nel caso in cui la funzione di verifica non esista
+        let isOpen = typeof window.isSpecieApertaCorrente === 'function' ? isSpecieApertaCorrente(periodo) : true;
+
+        if (isOpen) {
+            specieAperteTrovate++;
+            calHtml += `
+                <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: #1e293b; padding: 10px; border-radius: 6px;">
+                    <strong style="color: #f8fafc; font-size: 0.85rem; display: block;">🍄 [ID: ${id}] ${specie}</strong>
+                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">🗓️ Periodo consentito: ${periodo}</div>
+                    <div style="font-size: 0.75rem; margin-top: 6px;"><span style="color:#22c55e; font-weight:bold;">🟢 RACCOLTA APERTA</span></div>
+                </div>
+            `;
+        }
+    });
+
+    if (specieAperteTrovate === 0) {
+        calHtml += `
+            <div class="module-card" style="background: #1e293b; border-left: 4px solid #ef4444; padding: 12px; text-align: center; margin-bottom: 15px;">
+                <p style="color: #ef4444; font-weight: bold; margin: 0;">🔴 Nessuna specie aperta in questo periodo per la regione ${regioneCal}.</p>
+            </div>
+        `;
+    }
+
+    if (notaRegionaleCorrente && notaRegionaleCorrente.trim() !== "") {
+        calHtml += `
+            <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-top: 15px; border-radius: 8px; padding: 15px;">
+                <h4 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    📝 Note & Fermi Biologici
+                </h4>
+                <p style="font-size: 0.8rem; color: #cbd5e1; margin: 0; white-space: pre-wrap; line-height: 1.4;">${notaRegionaleCorrente}</p>
+            </div>
+        `;
+    }
+
+    contentHTML = calHtml;
+    break;
+}
+
+    default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
     }
     
@@ -285,7 +1214,7 @@ function openModule(moduleName, editMode = false) {
         <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
             <div style="display: flex; gap: 8px; align-items: center;">
-                <button onclick="mostraInfoModulo('${moduleName}')" class="back-map-btn" style="background: #334155; color: #38bdf8; border: 1px solid #475569; display: inline-flex; align-items: center;">ℹ️</button>
+                <button onclick="mostraInfoModulo('${moduleName}')" class="back-map-btn" style="background: #334155; color: #38bdf8; border: 1px solid #475569; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; padding: 0;" title="Guida modulo">❓</button>
                 <button onclick="toggleDrawer(); closeActiveModule();" class="back-map-btn" style="color: #f8fafc;">☰ Torna al Menu</button>
             </div>
         </div>
@@ -304,15 +1233,850 @@ function clearData(storageKey, moduleName) {
         openModule(moduleName);
     }
 }
+function saveTesserino() {
+    const nomeVal = document.getElementById('t-nome').value.trim();
+    const cfVal = document.getElementById('t-cf').value.trim().toUpperCase();
+    const regioneVal = document.getElementById('t-regione').value.trim();
+    const numVal = document.getElementById('t-num').value.trim();
+    const fileInput = document.getElementById('t-file');
+    const file = fileInput ? fileInput.files[0] : null;
+
+    if (!nomeVal || !cfVal) {
+        alert("Inserisci almeno Nome e Codice Fiscale.");
+        return;
+    }
+
+    const tDataExisting = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+
+    // Funzione helper per il salvataggio sicuro
+    const saveData = (base64Content, fileName, fileType) => {
+        const data = { 
+            nome: nomeVal, 
+            cf: cfVal, 
+            regione: regioneVal, 
+            num: numVal,
+            nomeFile: fileName !== undefined ? fileName : (tDataExisting.nomeFile || null),
+            tipoFile: fileType !== undefined ? fileType : (tDataExisting.tipoFile || null),
+            contenutoBase64: base64Content !== undefined ? base64Content : (tDataExisting.contenutoBase64 || null)
+        };
+        
+        try {
+            localStorage.setItem('tesserino_data', JSON.stringify(data));
+            alert("Dati tesserino salvati con successo!");
+            openModule('tesserino');
+        } catch (e) {
+            alert("Errore: Spazio di archiviazione esaurito! Prova a caricare un'immagine o PDF più piccolo (max 1.5MB).");
+            console.error(e);
+        }
+    };
+
+    if (file) {
+        // Controllo della dimensione del file
+        if (file.size > 1.5 * 1024 * 1024) {
+            alert("Il file è troppo grande. Carica un documento inferiore a 1.5 MB.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            saveData(e.target.result, file.name, file.type);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        // Salva mantenendo il file pre-esistente
+        saveData();
+    }
+}
+function saveF24WithFile() {
+    const annoVal = document.getElementById('f-anno').value.trim();
+    const protocolloVal = document.getElementById('f-protocollo').value.trim();
+    const dataPagamentoVal = document.getElementById('f-data-pagamento').value; // <--- Legge la data inserita
+    const fileInput = document.getElementById('f-file');
+    const file = fileInput ? fileInput.files[0] : null;
+    
+    if (!annoVal || !protocolloVal || !dataPagamentoVal) {
+        alert("Compila tutti i campi obbligatori (Anno, Protocollo e Data di Versamento).");
+        return;
+    }
+
+    const f24DataExisting = JSON.parse(localStorage.getItem('f24_data') || '{}');
+
+    const saveData = (base64Content, fileName, fileType) => {
+        const data = { 
+            anno: annoVal, 
+            protocollo: protocolloVal,
+            dataPagamento: dataPagamentoVal, // <--- Salva la data nel localStorage
+            nomeFile: fileName !== undefined ? fileName : (f24DataExisting.nomeFile || null),
+            tipoFile: fileType !== undefined ? fileType : (f24DataExisting.tipoFile || null),
+            contenutoBase64: base64Content !== undefined ? base64Content : (f24DataExisting.contenutoBase64 || null)
+        };
+        
+        try {
+            localStorage.setItem('f24_data', JSON.stringify(data));
+            alert("Dati F24 ELIDE salvati con successo!");
+            openModule('f24');
+        } catch (e) {
+            alert("Errore: Spazio di archiviazione esaurito! Carica un file più piccolo.");
+            console.error(e);
+        }
+    };
+
+    if (file) {
+        if (file.size > 1.5 * 1024 * 1024) {
+            alert("Il file è troppo grande. Massimo 1.5 MB.");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            saveData(e.target.result, file.name, file.type);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        saveData(f24DataExisting.contenutoBase64, f24DataExisting.nomeFile, f24DataExisting.tipoFile);
+    }
+}
+function savePagoPAWithFile() {
+    const idVal = document.getElementById('p-id').value.trim();
+    const dataVal = document.getElementById('p-data').value.trim();
+    const fileInput = document.getElementById('p-file');
+    const file = fileInput ? fileInput.files[0] : null;
+    
+    const annoCorrente = new Date().getFullYear(); // <--- Anno di riferimento
+    const pDataExisting = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
+
+    const saveData = (base64Content, fileName, fileType) => {
+        const data = { 
+            id: idVal, 
+            data: dataVal,
+            effettuato: true,                 // <--- Fondamentale per sbloccare il controllo
+            anno: annoCorrente,               // <--- Salva l'anno corrente per il confronto
+            nomeFile: fileName !== undefined ? fileName : (pDataExisting.nomeFile || null),
+            tipoFile: fileType !== undefined ? fileType : (pDataExisting.tipoFile || null),
+            contenutoBase64: base64Content !== undefined ? base64Content : (pDataExisting.contenutoBase64 || null)
+        };
+        
+        try {
+            localStorage.setItem('pagopa_data', JSON.stringify(data));
+            alert("Dati PagoPA salvati con successo!");
+            openModule('pagopa');
+        } catch (e) {
+            alert("Errore: Spazio di archiviazione esaurito! Carica un file più piccolo.");
+            console.error(e);
+        }
+    };
+
+    if (file) {
+        if (file.size > 1.5 * 1024 * 1024) {
+            alert("Il file è troppo grande. Massimo 1.5 MB.");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            saveData(e.target.result, file.name, file.type);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        saveData(pDataExisting.contenutoBase64, pDataExisting.nomeFile, pDataExisting.tipoFile);
+    }
+}
+
+function saveNewCane() {
+    const nome = document.getElementById('c-nome').value.trim();
+    const razza = document.getElementById('c-razza').value.trim();
+    const nascita = document.getElementById('c-nascita').value;
+    const microchip = document.getElementById('c-microchip').value.trim();
+    if (!nome) { alert("Inserisci almeno il nome del cane."); return; }
+    let dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
+    dogsList.push({ nome, razza, nascita, microchip });
+    localStorage.setItem('dogs_list', JSON.stringify(dogsList));
+    localStorage.setItem('cane_data', JSON.stringify({ nome, razza, nascita, microchip }));
+    alert("Cane aggiunto con successo!");
+    openModule('canidiary');
+}
+function deleteDog(index) {
+    if (confirm("Vuoi davvero rimuovere questo cane?")) {
+        let dogsList = JSON.parse(localStorage.getItem('dogs_list') || '[]');
+        dogsList.splice(index, 1);
+        localStorage.setItem('dogs_list', JSON.stringify(dogsList));
+        if (dogsList.length > 0) { localStorage.setItem('cane_data', JSON.stringify(dogsList[dogsList.length - 1])); }
+        else { localStorage.removeItem('cane_data'); }
+        openModule('canidiary');
+    }
+}
+
+function creaRicevutaPerCliente(index) {
+    const rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    const cliente = rubricaClienti[index];
+    if (!cliente) return;
+
+    // Apre il modulo per la creazione della ricevuta
+    openModule('ricevute');
+
+    // Popola automaticamente i campi del modulo con i dati del cliente selezionato
+    setTimeout(() => {
+        const elAcquirente = document.getElementById('r-acquirente');
+        const elCf = document.getElementById('r-cf-acquirente');
+        const elIndirizzo = document.getElementById('r-indirizzo-acquirente');
+        const elEmail = document.getElementById('r-email-acquirente');
+
+        if (elAcquirente) elAcquirente.value = cliente.nome || '';
+        if (elCf) elCf.value = cliente.cf || '';
+        if (elIndirizzo) elIndirizzo.value = cliente.indirizzo || '';
+        if (elEmail) elEmail.value = cliente.email || '';
+    }, 50);
+}
+
+function deleteCliente(index) {
+    if (confirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
+        let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+        rubricaClienti.splice(index, 1);
+        localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
+        openModule('clienti');
+    }
+}
+
+function savePolizza() {
+    const compagnia = document.getElementById('pol-compagnia').value.trim();
+    const numero = document.getElementById('pol-numero').value.trim();
+    const tipo = document.getElementById('pol-tipo').value;
+    const scadenza = document.getElementById('pol-scadenza').value;
+    const note = document.getElementById('pol-note').value.trim();
+    if (!compagnia || !numero) { alert("Inserisci almeno la compagnia e il numero di polizza."); return; }
+    let polizzeList = JSON.parse(localStorage.getItem('polizze_list') || '[]');
+    polizzeList.push({ compagnia, numero, tipo, scadenza, note });
+    localStorage.setItem('polizze_list', JSON.stringify(polizzeList));
+    alert("Polizza salvata con successo!");
+    openModule('polizze');
+}
+
+function deletePolizza(index) {
+    if (confirm("Vuoi davvero rimuovere questa polizza?")) {
+        let polizzeList = JSON.parse(localStorage.getItem('polizze_list') || '[]');
+        polizzeList.splice(index, 1);
+        localStorage.setItem('polizze_list', JSON.stringify(polizzeList));
+        openModule('polizze');
+    }
+}
+function saveRaccoltaGiornaliera() {
+    const data = document.getElementById('reg-data').value;
+    const specie = document.getElementById('reg-specie').value;
+    const peso = parseFloat(document.getElementById('reg-peso').value) || 0;
+    const note = document.getElementById('reg-note').value.trim();
+    if (!data || peso <= 0) { alert("Inserisci una data valida e un peso maggiore di zero."); return; }
+    let storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
+    storicoRaccolta.push({ data, specie, peso, note });
+    localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
+    alert("Raccolta registrata con successo!");
+    openModule('registro_giornaliero');
+}
+
+function deleteRaccoltaGiornaliera(index) {
+    if (confirm("Vuoi davvero rimuovere questo record dal registro?")) {
+        let storicoRaccolta = JSON.parse(localStorage.getItem('storico_raccolta_giornaliera') || '[]');
+        storicoRaccolta.splice(index, 1);
+        localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
+        openModule('registro_giornaliero');
+    }
+}
+function calcolaTotale() {
+    const grammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
+    const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
+    
+    if (grammi > 0 && prezzoKg > 0) {
+        const totale = (grammi / 1000) * prezzoKg;
+        document.getElementById('importoTotale').value = totale.toFixed(2);
+        calcolaRitenutaAcconto();
+    }
+}
+
+function toggleRegimeFiscaleFields() {
+    const regime = document.getElementById('r-regime').value;
+    const containerF24 = document.getElementById('container-f24-field');
+    const containerRitenuta = document.getElementById('container-ritenuta');
+    
+    if (regime === 'ritenuta') {
+        if (containerF24) containerF24.style.display = 'none';
+        if (containerRitenuta) containerRitenuta.style.display = 'block';
+        calcolaRitenutaAcconto();
+    } else {
+        if (containerF24) containerF24.style.display = 'block';
+        if (containerRitenuta) containerRitenuta.style.display = 'none';
+    }
+}
+
+function calcolaRitenutaAcconto() {
+    const regime = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
+    if (regime !== 'ritenuta') return;
+    
+    const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
+    
+    // Correzione: calcolo coerente con la ritenuta applicata sul 78% (17.94 su 100)
+    const baseImponibileRitenuta = importoTotale * 0.78;
+    const ritenuta = baseImponibileRitenuta * 0.23;
+    const netto = importoTotale - ritenuta;
+    
+    const elRitenuta = document.getElementById('r-importo-ritenuta');
+    const elNetto = document.getElementById('r-netto-pagare');
+    
+    if (elRitenuta) elRitenuta.value = ritenuta.toFixed(2);
+    if (elNetto) elNetto.value = netto.toFixed(2);
+}
+
+function registraVenditaConPrezzoKg() {
+    // 1. BLOCCO MANCANZA DATI TESSERINO
+    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    if (!tData.nome || !tData.cf || !tData.num) {
+        alert("❌ Attenzione: Impossibile procedere.\nMancano i dati anagrafici, il codice fiscale o gli estremi del tesserino di raccolta.");
+        openModule('tesserino');
+        return;
+    }
+
+    // 2. CONTROLLO VALIDITÀ PAGOPA (Tassa regionale/annuale tesserino)
+    const pagoPaSaved = JSON.parse(localStorage.getItem('pagopa_data') || '{}');
+    const annoCorrente = new Date().getFullYear();
+    
+    if (!pagoPaSaved.effettuato || parseInt(pagoPaSaved.anno) !== annoCorrente) {
+        alert("❌ Attenzione: Ricevuta PagoPA non valida o assente per l'anno in corso.\nÈ necessario regolarizzare il pagamento della tassa tesserino prima di registrare vendite.");
+        openModule('pagopa');
+        return;
+    }
+
+    // 3. CONTROLLO RICEVUTA F24 (Imposta sostitutiva 100€) - SCELTA AUTOMATICA REGIME
+    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+    const f24InputVal = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
+    const protocolloF24 = f24InputVal || f24SavedData.protocollo;
+    let dataPagamentoF24 = f24SavedData.dataPagamento ? new Date(f24SavedData.dataPagamento) : null;
+
+    let f24Valido = false;
+    if (protocolloF24 && dataPagamentoF24 && !isNaN(dataPagamentoF24.getTime())) {
+        const scadenzaF24 = new Date(annoCorrente, 1, 16, 23, 59, 59); // 1 = Febbraio
+        if (dataPagamentoF24 <= scadenzaF24) {
+            f24Valido = true;
+        }
+    }
+
+    let regimeScelto = f24Valido ? 'sostitutiva' : 'ritenuta';
+
+    // 4. CONTROLLO OBBLIGATORIETÀ LUOGO / AREA DI RACCOLTA E PROVINCIA (Tracciabilità)
+    const luogoRaccoltaInput = document.getElementById('r-comune');
+    const luogoAreaRaccolta = luogoRaccoltaInput ? luogoRaccoltaInput.value.trim() : '';
+    
+    if (!luogoAreaRaccolta) {
+        alert("❌ Dato obbligatorio mancante!\nIl campo 'Luogo / Area di Raccolta e Provincia' è fondamentale per gli adempimenti della tracciabilità e non può essere lasciato vuoto.");
+        if (luogoRaccoltaInput) luogoRaccoltaInput.focus();
+        return;
+    }
+
+    // 5. GESTIONE ACQUIRENTE
+    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
+    const acquirenteCf = document.getElementById('r-cf-acquirente').value.trim();
+    const acquirenteIndirizzo = document.getElementById('r-indirizzo-acquirente') ? document.getElementById('r-indirizzo-acquirente').value.trim() : '';
+    const acquirenteEmail = document.getElementById('r-email-acquirente') ? document.getElementById('r-email-acquirente').value.trim() : '';
+    
+    if (!acquirenteNome) {
+        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
+        return;
+    }
+
+    // 6. CALCOLI FINANZIARI
+    const pesoGrammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
+    const qualitaScelta = document.getElementById('r-qualita').value;
+    const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const dataOdierna = new Date().toLocaleDateString();
+    
+    let importoRitenuta = '0.00';
+    let importoNetto = importoTotale.toFixed(2);
+
+    if (regimeScelto === 'ritenuta') {
+        const baseImponibileRitenuta = importoTotale * 0.78;
+        const calcoloRitenuta = baseImponibileRitenuta * 0.23;
+        importoRitenuta = calcoloRitenuta.toFixed(2);
+        importoNetto = (importoTotale - calcoloRitenuta).toFixed(2);
+    }
+
+    // 6.1 ACQUISIZIONE NOTA E AGGIORNAMENTO AUTOMATICO RUBRICA CLIENTI
+    const notaClienteInput = document.getElementById('r-nota-cliente');
+    const notaClienteValore = notaClienteInput ? notaClienteInput.value.trim() : '';
+
+    if (typeof salvaClienteInRubrica === 'function') {
+        salvaClienteInRubrica({
+            acquirente: acquirenteNome,
+            cfAcquirente: acquirenteCf,
+            indirizzoAcquirente: acquirenteIndirizzo,
+            emailAcquirente: acquirenteEmail,
+            totale: importoTotale,
+            data: dataOdierna,
+            nota: notaClienteValore // Passa correttamente la nota alla rubrica
+        });
+    }
+
+    // 7. CALCOLO SOGLIA ANNUA (7000 €)
+    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    
+    let totaleVenditeAnno = storico.reduce((acc, v) => {
+        const dataVendita = v.data ? new Date(v.data.split('/').reverse().join('-')) : new Date();
+        const annoVendita = dataVendita.getFullYear();
+        if (annoVendita === annoCorrente) {
+            return acc + (parseFloat(v.importo) || 0);
+        }
+        return acc;
+    }, 0);
+
+    const sogliaBlocco = 7000.00;
+    const nuovoTotaleAnno = totaleVenditeAnno + importoTotale;
+    const quantoManca = Math.max(0, sogliaBlocco - nuovoTotaleAnno);
+
+    if (nuovoTotaleAnno > sogliaBlocco) {
+        alert(`❌ ATTENZIONE: Soglia di blocco di € 7.000 superata!\nIl totale annuo delle vendite raggiungerebbe € ${nuovoTotaleAnno.toFixed(2)}. Registrazione bloccata per limiti normativi.`);
+        return;
+    }
+
+    // 8. MESSAGGIO DI RIEPILOGO CON TRACCIABILITÀ E PRESA VISIONE
+    const tipoRicevutaTesto = regimeScelto === 'sostitutiva' 
+        ? "Imposta Sostitutiva (F24)" 
+        : "Ritenuta d'Acconto (23% sul 78%)";
+
+    const messaggioRiepilogo = 
+        `📋 RIEPILOGO NUOVA RICEVUTA\n` +
+        `----------------------------------------\n` +
+        `• Luogo / Area di Raccolta e Provincia: ${luogoAreaRaccolta} [OBBLIGATORIO - TRACCIABILITÀ]\n` +
+        `• Tipo Regime (Automatico): ${tipoRicevutaTesto}\n` +
+        `• Importo Totale (Lordo): € ${importoTotale.toFixed(2)}\n` +
+        `• Ritenuta applicata: € ${importoRitenuta}\n` +
+        `• Importo Netto: € ${importoNetto}\n` +
+        `----------------------------------------\n` +
+        `• Totale vendite annue: € ${nuovoTotaleAnno.toFixed(2)} / € 7.000,00\n` +
+        `• Mancante alla soglia di blocco: € ${quantoManca.toFixed(2)}\n\n` +
+        `Premi OK per confermare la presa visione e registrare la vendita, oppure Annulla per interrompere.`;
+
+    if (!window.confirm(messaggioRiepilogo)) {
+        return; 
+    }
+   
+    // 9. REGISTRAZIONE NELLO STORICO VENDITE (Le note del cliente restano escluse dalla ricevuta stampata)
+    const vendita = {
+        venditoreNome: tData.nome, 
+        venditoreCf: tData.cf, 
+        venditoreTesserino: tData.num || 'N.D.', 
+        venditoreRegione: tData.regione || 'N.D.',
+        acquirente: acquirenteNome, 
+        acquirenteCf: acquirenteCf,
+        acquirenteIndirizzo: acquirenteIndirizzo,
+        acquirenteEmail: acquirenteEmail,
+        specie: document.getElementById('r-specie').value, 
+        qualita: qualitaScelta,
+        peso: pesoGrammi, 
+        importo: importoTotale.toFixed(2),
+        regime: regimeScelto,
+        ritenuta: importoRitenuta,
+        netto: importoNetto,
+        luogoRaccolta: luogoAreaRaccolta, 
+        lotto: document.getElementById('r-lotto').value.trim(), 
+        f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto 23% su 78%)', 
+        data: dataOdierna
+    };
+    
+    storico.push(vendita);
+    localStorage.setItem('storico_vendite', JSON.stringify(storico));
+    
+    const nuovoIndice = storico.length - 1;
+
+    alert(`✔ Ricevuta registrata con successo!\n\nApertura automatica della ricevuta in corso...`);
+    
+    // 10. APERTURA DIRETTA DELLA VISUALIZZAZIONE
+    if (typeof openModule === 'function') {
+        openModule('storico_ricevute');
+    }
+    
+    setTimeout(() => {
+        if (typeof visualizzaRicevutaSalvata === 'function') {
+            visualizzaRicevutaSalvata(nuovoIndice);
+        }
+    }, 100);
+}
+
+// Funzione di supporto per la gestione della rubrica con storico acquisti
+function salvaClienteInRubrica(nuovaRicevuta) {
+    let rubricaClienti = JSON.parse(localStorage.getItem('rubrica_clienti') || '[]');
+    
+    const index = rubricaClienti.findIndex(c => c.nome.toLowerCase() === nuovaRicevuta.acquirente.toLowerCase());
+    const importoRicevuta = parseFloat(nuovaRicevuta.totale) || 0;
+
+    if (index !== -1) {
+        rubricaClienti[index].totaleAcquisti = (parseFloat(rubricaClienti[index].totaleAcquisti) || 0) + importoRicevuta;
+        rubricaClienti[index].numeroAcquisti = (rubricaClienti[index].numeroAcquisti || 0) + 1;
+        rubricaClienti[index].dataUltimoAcquisto = nuovaRicevuta.data;
+        if (nuovaRicevuta.cfAcquirente) rubricaClienti[index].cf = nuovaRicevuta.cfAcquirente;
+        if (nuovaRicevuta.indirizzoAcquirente) rubricaClienti[index].indirizzo = nuovaRicevuta.indirizzoAcquirente;
+        if (nuovaRicevuta.emailAcquirente) rubricaClienti[index].email = nuovaRicevuta.emailAcquirente;
+        
+        // Aggiorna la nota se compilata in fase di ricevuta
+        if (nuovaRicevuta.nota) {
+            rubricaClienti[index].nota = nuovaRicevuta.nota;
+        }
+    } else {
+        rubricaClienti.push({
+            nome: nuovaRicevuta.acquirente,
+            cf: nuovaRicevuta.cfAcquirente || '',
+            indirizzo: nuovaRicevuta.indirizzoAcquirente || '',
+            email: nuovaRicevuta.emailAcquirente || '',
+            totaleAcquisti: importoRicevuta,
+            numeroAcquisti: 1,
+            dataUltimoAcquisto: nuovaRicevuta.data,
+            nota: nuovaRicevuta.nota || '' 
+        });
+    }
+
+    localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
+}
+
+function visualizzaRicevutaSalvata(index) {
+    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const v = storico[index];
+    if(!v) return;
+
+    const isRitenuta = v.regime === 'ritenuta';
+    
+    // Dati fiscali pronti per essere inseriti alla fine dei dettagli
+    const dettagliFiscoHtml = isRitenuta ? `
+        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ccc;">
+            <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (esonerata dall'imposta sostitutiva)</p>
+            <p><strong>Compenso Lordo:</strong> € ${v.importo}</p>
+            <p><strong>Ritenuta d'Acconto (23%):</strong> € ${v.ritenuta || (v.importo * 0.23).toFixed(2)}</p>
+            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${v.netto || (v.importo * 0.77).toFixed(2)}</p>
+        </div>
+    ` : `
+        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ccc;">
+            <p><strong>Regime Fiscale:</strong> Imposta Sostitutiva (Legge 145/2018)</p>
+            <p><strong>Versamento F24 ELIDE (100€):</strong> Protocollo N. ${v.f24}</p>
+            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${v.importo}</p>
+        </div>
+    `;
+
+    // Supporto per retrocompatibilità con vecchie ricevute salvate come v.comune
+    const luogoAreaVisualizzazione = v.luogoRaccolta || v.comune || 'Non specificato';
+
+    let activeView = document.getElementById('active-module-view');
+    activeView.querySelector('.module-body-content').innerHTML = `
+        <div id="ricevuta-${index}">
+            <h2>RICEVUTA VENDITA OCCASIONALE N. ${index + 1}</h2>
+            <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
+            <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
+                <p style="font-size: 0.72rem; color: #444; text-align: justify; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 8px; line-height: 1.3;">
+                    <strong>DICHIARAZIONE DI CESSIONE OCCASIONALE E TRACCIABILITÀ:</strong> 
+                    Operazione effettuata nell'ambito della raccolta hobbistica/occasionale dei tartufi, esonerata dall'obbligo di emissione di fattura elettronica e di certificazione fiscale ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 e s.m.i., nonché in conformità alle disposizioni di cui alla Legge 30 dicembre 2018, n. 145. Si attesta inoltre la piena tracciabilità del prodotto alimentare ai sensi degli artt. 18 e 19 del Regolamento (CE) n. 178/2002.
+                </p>
+                
+                <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati del Venditore (Cessionario occasionale)</h3>
+                <p><strong>Nome e Cognome:</strong> ${v.venditoreNome}</p>
+                <p><strong>Codice Fiscale:</strong> ${v.venditoreCf}</p>
+                <p><strong>Tesserino Raccolta N.:</strong> ${v.venditoreTesserino} - <strong>Rilasciato dalla Regione:</strong> ${v.venditoreRegione}</p>
+                
+                <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dati dell'Acquirente</h3>
+                <p><strong>Acquirente:</strong> ${v.acquirente}</p>
+                <p><strong>P.IVA / Codice Fiscale:</strong> ${v.acquirenteCf || 'Non inserito'}</p>
+                <p><strong>Indirizzo:</strong> ${v.acquirenteIndirizzo || 'Non inserito'}</p>
+                <p><strong>Email:</strong> ${v.acquirenteEmail || 'Non specificata'}</p>
+                
+                <h3 style="margin: 15px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Dettagli Ricevuta e Tracciabilità</h3>
+                <p><strong>Specie di Tartufo:</strong> ${v.specie}</p>
+                <p><strong>Classificazione Qualità:</strong> ${v.qualita || 'Non specificata'}</p>
+                <p><strong>Peso:</strong> ${v.peso} grammi</p>
+                <p><strong>Luogo / Area di Raccolta e Provincia:</strong> ${luogoAreaVisualizzazione}</p>
+                <p><strong>Codice Lotto / Tracciabilità:</strong> ${v.lotto}</p>
+                
+                ${dettagliFiscoHtml}
+
+                <p style="margin-top: 10px;"><strong>Data Vendita:</strong> ${v.data}</p>
+
+                <div style="margin-top: 30px; display: flex; justify-content: space-between; page-break-inside: avoid;">
+                    <div style="width: 45%; text-align: center;">
+                        <div style="border-bottom: 1px solid #000; height: 40px; margin-bottom: 5px;"></div>
+                        <p style="font-size: 0.85rem;">Firma dell'Acquirente</p>
+                    </div>
+                    <div style="width: 45%; text-align: center;">
+                        <div style="border-bottom: 1px solid #000; height: 40px; margin-bottom: 5px;"></div>
+                        <p style="font-size: 0.85rem;">Firma del Venditore (Cessionario)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="overlay-btn" style="background:#2563eb; margin-top:15px; width:100%;" onclick="window.print()">🖨️ Stampa / Salva PDF Conforme</button>
+        <button class="overlay-btn" style="background:#0284c7; margin-top:10px; width:100%;" onclick="condividiRicevuta(${index})">📤 Condividi Ricevuta (WhatsApp)</button>
+        <button class="overlay-btn" style="background:#16a34a; margin-top:10px; width:100%;" onclick="condividiRicevutaEmail(${index})">📧 Condividi / Invia Email (${v.acquirenteEmail || 'Email non inserita'})</button>
+        <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
+    `;
+}
+
+function eliminaRicevutaConDoppiaConferma(index) {
+    const primaConferma = confirm("Sei sicuro di voler eliminare questa ricevuta dallo storico?");
+    if (primaConferma) {
+        const secondaConferma = confirm("ATTENZIONE: L'operazione è irreversibile. Vuoi davvero confermare l'eliminazione definitiva?");
+        if (secondaConferma) {
+            let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+            storico.splice(index, 1);
+            localStorage.setItem('storico_vendite', JSON.stringify(storico));
+            alert("Ricevuta eliminata con successo.");
+            openModule('storico_ricevute');
+        }
+    }
+}
+
+function modificaRicevuta(index) {
+    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const v = storico[index];
+    if (!v) return;
+
+    openModule('ricevute');
+
+    setTimeout(() => {
+        const elRegime = document.getElementById('r-regime');
+        const elAcquirente = document.getElementById('r-acquirente');
+        const elCf = document.getElementById('r-cf-acquirente');
+        const elSpecie = document.getElementById('r-specie');
+        const elQualita = document.getElementById('r-qualita');
+        const elPeso = document.getElementById('pesoGrammi');
+        const elPrezzoKg = document.getElementById('prezzoKg');
+        const elImporto = document.getElementById('importoTotale');
+        const elComune = document.getElementById('r-comune');
+        const elLotto = document.getElementById('r-lotto');
+        const elF24 = document.getElementById('r-f24');
+
+        if (elRegime) { elRegime.value = v.regime || 'sostitutiva'; toggleRegimeFiscaleFields(); }
+        if (elAcquirente) elAcquirente.value = v.acquirente || '';
+        if (elCf) elCf.value = v.acquirenteCf || '';
+        if (elSpecie) elSpecie.value = v.specie || '';
+        if (elQualita) elQualita.value = v.qualita || 'Prima Scelta';
+        if (elPeso) elPeso.value = v.peso || '';
+        if (elImporto) { elImporto.value = v.importo || ''; calcolaRitenutaAcconto(); }
+        if (elComune) elComune.value = v.comune || '';
+        if (elLotto) elLotto.value = v.lotto || '';
+        if (elF24) elF24.value = v.f24 || '';
+
+        const btnRegistra = document.querySelector('#active-module-view button[onclick="registraVenditaConPrezzoKg()"]');
+
+        if (btnRegistra) {
+            btnRegistra.innerText = "Aggiorna Ricevuta Esistente";
+            btnRegistra.setAttribute('onclick', `salvaModificaRicevuta(${index})`);
+        }
+    }, 50);
+}
+function salvaModificaRicevuta(index) {
+    let storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const tData = JSON.parse(localStorage.getItem('tesserino_data') || '{}');
+    const f24SavedData = JSON.parse(localStorage.getItem('f24_data') || '{}');
+    
+    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
+    if (!acquirenteNome) {
+        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
+        return;
+    }
+
+    let regimeScelto = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
+    const f24InputVal = document.getElementById('r-f24') ? document.getElementById('r-f24').value.trim() : '';
+    const protocolloF24 = f24InputVal || f24SavedData.protocollo;
+
+    if (regimeScelto === 'sostitutiva' && !protocolloF24) {
+        regimeScelto = 'ritenuta';
+    }
+
+    const importoCorrente = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const importoRitenuta = regimeScelto === 'ritenuta' ? (importoCorrente * 0.23).toFixed(2) : '0.00';
+    const importoNetto = regimeScelto === 'ritenuta' ? (importoCorrente * 0.77).toFixed(2) : importoCorrente.toFixed(2);
+
+    storico[index] = {
+        venditoreNome: tData.nome || storico[index].venditoreNome, 
+        venditoreCf: tData.cf || storico[index].venditoreCf, 
+        venditoreTesserino: tData.num || storico[index].venditoreTesserino, 
+        venditoreRegione: tData.regione || storico[index].venditoreRegione,
+        acquirente: acquirenteNome, 
+        acquirenteCf: document.getElementById('r-cf-acquirente').value.trim(),
+        specie: document.getElementById('r-specie').value, 
+        qualita: document.getElementById('r-qualita').value,
+        peso: document.getElementById('pesoGrammi').value, 
+        importo: importoCorrente.toFixed(2),
+        regime: regimeScelto,
+        ritenuta: importoRitenuta,
+        netto: importoNetto,
+        comune: document.getElementById('r-comune').value.trim(), 
+        lotto: document.getElementById('r-lotto').value.trim(), 
+        f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto)', 
+        data: storico[index].data
+    };
+
+    localStorage.setItem('storico_vendite', JSON.stringify(storico));
+    alert("Ricevuta aggiornata con successo!");
+    openModule('storico_ricevute');
+}
+async function condividiRicevuta(index) {
+    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const v = storico[index];
+    if(!v) return;
+
+    const testoMessaggio = `📄 RICEVUTA VENDITA OCCASIONALE N. ${index + 1}\n` +
+        `Data: ${v.data}\n` +
+        `Venditore: ${v.venditoreNome} (CF: ${v.venditoreCf})\n` +
+        `Acquirente: ${v.acquirente}\n` +
+        `Specie: ${v.specie} (${v.peso}g)\n` +
+        `Importo: € ${v.importo}\n` +
+        `Comune: ${v.comune} | Lotto: ${v.lotto}`;
+
+    if (navigator.share) {
+        try {
+            if (typeof html2pdf !== 'undefined') {
+                const element = document.querySelector('.module-card');
+                const options = {
+                    margin: 10,
+                    filename: `Ricevuta_${index + 1}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                
+                const pdfBlob = await html2pdf().from(element).set(options).output('blob');
+                const file = new File([pdfBlob], `Ricevuta_${index + 1}.pdf`, { type: 'application/pdf' });
+
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        title: `Ricevuta N. ${index + 1}`,
+                        text: testoMessaggio,
+                        files: [file]
+                    });
+                    return;
+                }
+            }
+            
+            await navigator.share({
+                title: `Ricevuta N. ${index + 1}`,
+                text: testoMessaggio
+            });
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.log("Condivisione annullata o non riuscita", err);
+            }
+        }
+    } else {
+        const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(testoMessaggio)}`;
+        window.location.href = whatsappUrl;
+    }
+}
+
+function chiudiDettaglioRicevuta() {
+    openModule('storico_ricevute');
+}
+
+function esportaDatiCSV() {
+    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    if(storico.length === 0) { 
+        alert("Nessuna vendita registrata."); 
+        return; 
+    }
+    
+    let csvContent = "data:text/csv;charset=utf-8,Data,Acquirente,Specie,Peso (g),Importo (€),Regime\n";
+    
+    storico.forEach(r => {
+        const row = [
+            `"${r.data || ''}"`,
+            `"${(r.acquirente || '').replace(/"/g, '""')}"`,
+            `"${(r.specie || '').replace(/"/g, '""')}"`,
+            r.peso || 0,
+            r.importo || 0,
+            `"${r.regime || 'sostitutiva'}"`
+        ];
+        csvContent += row.join(",") + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `contabilita_tartufi_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function mostraRicevuteCliente(nomeCliente) {
+    // Salva il filtro attivo nel localStorage
+    localStorage.setItem('filtro_storico_cliente', nomeCliente);
+    
+    // Apre il modulo dello storico ricevute
+    if (typeof openModule === 'function') {
+        openModule('storico_ricevute');
+    }
+}
+
+function esportaBackupJSON() {
+    const backupData = { 
+        tesserino: localStorage.getItem('tesserino_data'), 
+        pagopa: localStorage.getItem('pagopa_data'),
+        f24: localStorage.getItem('f24_data'),
+        storicoVendite: localStorage.getItem('storico_vendite'), 
+        poiList: localStorage.getItem('poi_list'),
+        dogsList: localStorage.getItem('dogs_list'),
+        caneData: localStorage.getItem('cane_data'),
+        polizzeList: localStorage.getItem('polizze_list'),
+        storicoRaccolta: localStorage.getItem('storico_raccolta_giornaliera'),
+        rubricaClienti: localStorage.getItem('rubrica_clienti'),
+        speseList: localStorage.getItem('spese_list'),
+        vetHistoryList: localStorage.getItem('vet_history_list'),
+        vetClinicsList: localStorage.getItem('vet_clinics_list'),
+        calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
+        noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
+        carCoords: localStorage.getItem('car_coords')
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr); 
+    downloadAnchor.setAttribute("download", "backup_truffle_completo.json");
+    document.body.appendChild(downloadAnchor); 
+    downloadAnchor.click(); 
+    downloadAnchor.remove();
+}
+
+function importBackupData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.tesserino) localStorage.setItem('tesserino_data', data.tesserino);
+            if (data.pagopa) localStorage.setItem('pagopa_data', data.pagopa);
+            if (data.f24) localStorage.setItem('f24_data', data.f24);
+            if (data.storicoVendite) localStorage.setItem('storico_vendite', data.storicoVendite);
+            if (data.poiList) localStorage.setItem('poi_list', data.poiList);
+            if (data.dogsList) localStorage.setItem('dogs_list', data.dogsList);
+            if (data.caneData) localStorage.setItem('cane_data', data.caneData);
+            if (data.polizzeList) localStorage.setItem('polizze_list', data.polizzeList);
+            if (data.storicoRaccolta) localStorage.setItem('storico_raccolta_giornaliera', data.storicoRaccolta);
+            if (data.rubricaClienti) localStorage.setItem('rubrica_clienti', data.rubricaClienti);
+            if (data.speseList) localStorage.setItem('spese_list', data.speseList);
+            if (data.vetHistoryList) localStorage.setItem('vet_history_list', data.vetHistoryList);
+            if (data.vetClinicsList) localStorage.setItem('vet_clinics_list', data.vetClinicsList);
+            if (data.calendariTartufiCustom) localStorage.setItem('calendari_tartufi_custom', data.calendariTartufiCustom);
+            if (data.noteRegionaliTartufi) localStorage.setItem('note_regionali_tartufi', data.noteRegionaliTartufi);
+            if (data.carCoords) localStorage.setItem('car_coords', data.carCoords);
+            
+            alert("Backup ripristinato con successo!"); 
+            location.reload();
+        } catch(err) { 
+            alert("Errore durante la lettura del file di backup."); 
+        }
+    };
+    reader.readAsText(file);
+}
+
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
     const backdrop = document.getElementById('drawer-backdrop');
-    if (drawer && backdrop) { drawer.classList.toggle('drawer-open'); backdrop.classList.toggle('active'); updateInstallButtonVisibility(); }
+    if (drawer && backdrop) { drawer.classList.toggle('drawer-open'); backdrop.classList.toggle('active'); }
 }
+
 function centerOnUser() {
     if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], 16); userMarker.openPopup(); }
     else { alert("Posizione GPS non disponibile."); }
 }
+
 function saveVetClinic() {
     const nome = document.getElementById('vc-nome').value.trim();
     const tel = document.getElementById('vc-tel').value.trim();
@@ -413,11 +2177,11 @@ function mostraDisclaimerIniziale() {
     
     // Testi delle 5 pagine del disclaimer
     const pagineDisclaimer = [
-        `<strong>1. Natura dello Strumento</strong><br>Questa applicazione è concepita e fornita esclusivamente come strumento informale di supporto hobbistico, tracciabilità interna e geolocalizzazione personale per l'attività di raccolta dei tartufi. Non costituisce in alcun modo un servizio professionale o ufficiale, né sostituisce le fonti normative primarie, gli organi competenti o il parere di un professionista abilitato.`,
-        `<strong>2. Esclusione di Consulenza Fiscale e Professionale</strong><br><span style="color: #f87171;">Il software non costituisce in alcun modo un servizio di consulenza finanziaria, fiscale, legale o tecnica.</span> Le funzioni di ricevuta, contabilità, soglie di occasionalità e regimi fiscali sono fornite a scopo orientativo/organizzativo.`,
-        `<strong>3. Responsabilità Esclusiva dell'Utente</strong><br>L'utente è l'unico e il solo responsabile della conformità fiscale, della correttezza e veridicità dei dati inseriti, della completezza dei documenti archiviati e del loro utilizzo.`,
-        `<strong>4. Geolocalizzazione e Sicurezza all'Aperto</strong><br>Le indicazioni di orientamento, le coordinate GPS, la bussola e la memorizzazione dei punti di interesse o dei parcheggi dipendono dal dispositivo, dai permessi concessi e dalla copertura GPS.`,
-        `<strong>5. Manleva</strong><br>Gli sviluppatori, i creatori e i distributori del software declinano espressamente ogni responsabilità civile e penale per imprecisioni, errori di calcolo, omissioni o malfunzionamenti.`
+        `<strong>1. Natura dello Strumento</strong><br>Questa applicazione è concepita e fornita esclusivamente come strumento informale di supporto hobbistico, tracciabilità interna e geolocalizzazione per la raccolta dei tartufi.`,
+        `<strong>2. Esclusione di Consulenza Fiscale e Professionale</strong><br><span style="color: #f87171;">Il software non costituisce in alcun modo un servizio di consulenza finanziaria, fiscale, legale o professionale, né sostituisce l'assistenza diretta di un commercialista abilitato o di un professionista iscritto agli albi competenti.</span> Le funzioni di calcolo, archiviazione di ricevute e gestione contabile hanno carattere puramente indicativo e di supporto organizzativo privato.`,
+        `<strong>3. Responsabilità Esclusiva dell'Utente</strong><br>L'utente è l'unico e il solo responsabile della conformità fiscale, della correttezza e veridicità dei dati inseriti, della conservazione e gestione dei documenti di pagamento, nonché del puntuale rispetto di tutte le normative vigenti, statali e regionali, in materia di raccolta e commercializzazione dei tartufi.`,
+        `<strong>4. Geolocalizzazione e Sicurezza all'Aperto</strong><br>Le indicazioni di orientamento, le coordinate GPS, la bussola e la memorizzazione dei punti di interesse o dei parcheggi dipendono da fattori esterni. Gli sviluppatori non garantiscono l'accuratezza o la continuità del segnale e declinano ogni responsabilità per eventuali situazioni di smarrimento, ritardi, incidenti o pericoli derivanti dall'esplorazione di aree boschive o impervie.`,
+        `<strong>5. Manleva</strong><br>Gli sviluppatori, i creatori e i distributori del software declinano espressamente ogni responsabilità civile e penale per imprecisioni, errori di calcolo, omissioni, perdite di dati, blocco delle funzionalità o per qualsivoglia sanzione amministrativa, fiscale o giudiziaria derivante, direttamente o indirettamente, dall'utilizzo di questa applicazione.`
     ];
 
     let paginaCorrente = 0;
@@ -441,7 +2205,7 @@ function mostraDisclaimerIniziale() {
                     ${pagineDisclaimer[0]}
                 </div>
                 <div id="disclaimer-buttons-container">
-                    <button id="btn-avanti-disclaimer" style="background: #3b82f6; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer;">
+                    <button id="btn-avanti-disclaimer" style="background: #3b82f6; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
                         Avanti
                     </button>
                 </div>
@@ -460,7 +2224,7 @@ function aggiornaVistaDisclaimer() {
             if (paginaCorrente < pagineDisclaimer.length - 1) {
                 // Pagine intermedie: mostra solo il tasto "Avanti"
                 buttonsContainer.innerHTML = `
-                    <button id="btn-avanti-disclaimer" style="background: #3b82f6; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer;">
+                    <button id="btn-avanti-disclaimer" style="background: #3b82f6; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
                         Avanti
                     </button>
                 `;
@@ -471,10 +2235,10 @@ function aggiornaVistaDisclaimer() {
             } else {
                 // Ultima pagina: mostra i tasti originali della funzione
                 buttonsContainer.innerHTML = `
-                    <button id="btn-accetta-disclaimer" style="background: #22c55e; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-bottom: 8px;">
+                    <button id="btn-accetta-disclaimer" style="background: #22c55e; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
                         Accetta e Continua
                     </button>
-                    <button id="btn-abbandona-app" style="background: #334155; color: #f87171; border: 1px solid #475569; padding: 10px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 0.95rem; cursor: pointer;">
+                    <button id="btn-abbandona-app" style="background: #334155; color: #f87171; border: 1px solid #475569; padding: 10px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer; margin-top: 8px;">
                         Abbandona
                     </button>
                 `;
@@ -527,6 +2291,36 @@ function autocompilaDatiCliente(nomeInserito) {
 }
 
 // Funzione per condividere la ricevuta via Email (da richiamare nella visualizzazione ricevuta)
+function condividiRicevutaEmail(index) {
+    const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
+    const v = storico[index];
+    if (!v) {
+        alert("Ricevuta non trovata.");
+        return;
+    }
+
+    // L'email viene inserita nel testo anziché nel parametro mailto principale se vuoi che l'utente la veda lì
+    const emailTesto = v.acquirenteEmail ? v.acquirenteEmail : "Non specificata";
+
+    const oggetto = encodeURIComponent(`Ricevuta di Vendita Occasionale - Lotto ${v.lotto || 'Tartufo'}`);
+    const corpo = encodeURIComponent(
+        `Gentile ${v.acquirente},\n\n` +
+        `Indirizzo Email Acquirente: ${emailTesto}\n\n` +
+        `Di seguito i dettagli della ricevuta di vendita occasionale di tartufi conforme alla Legge 145/2018:\n\n` +
+        `• Data: ${v.data}\n` +
+        `• Specie: ${v.specie}\n` +
+        `• Qualità: ${v.qualita || 'Non specificata'}\n` +
+        `• Peso: ${v.peso} grammi\n` +
+        `• Importo Totale: € ${v.importo}\n` +
+        `• Comune di Raccolta: ${v.comune}\n` +
+        `• Codice Lotto: ${v.lotto}\n\n` +
+        `Cordiali saluti,\n${v.venditoreNome}`
+    );
+
+    // Se non vuoi che inserisca l'email nel campo "A:", rimuovi ${v.acquirenteEmail} prima del punto e virgola
+    window.location.href = `mailto:?subject=${oggetto}&body=${corpo}`;
+}
+
 async function condividiRicevutaEmail(index) {
     const storico = JSON.parse(localStorage.getItem('storico_vendite') || '[]');
     const v = storico[index];
@@ -784,13 +2578,9 @@ function isSpecieApertaCorrente(periodoStr) {
 function elaboraTestoIncollato() {
     // Esempio di utilizzo collegato a un pulsante o a un evento
     const testo = document.getElementById('inputTestoGrezzo').value;
-    if (typeof estraiSpecieEPeriodiDaTesto === 'function') {
-        const datiEstratti = estraiSpecieEPeriodiDaTesto(testo);
-        console.log(datiEstratti);
-    } else {
-        console.warn('estraiSpecieEPeriodiDaTesto non è definita');
-        alert('Funzione di estrazione non disponibile. Aggiornare l\'applicazione.');
-    }
+    const datiEstratti = estraiSpecieEPeriodiDaTesto(testo);
+    
+    console.log(datiEstratti);
 }
 
 function estraiDateTartufiDaTesto() {
@@ -976,22 +2766,22 @@ function importaCalendariJSON(event) {
 }
 function mostraInfoModulo(moduleName) {
     const guideTesti = {
-        'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione, condividere o eliminare i punti.",
-        'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto o un PDF del documento (max 1.5 MB).",
-        'pagopa': "ℹ️ **Guida - Ricevuta PagoPA & PDF**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria. Questo dato è indispensabile per sbloccare la registrazione delle vendite occasionali.",
-        'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto in base ai dati salvati.",
-        'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\nConsulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o condividerle.",
+        'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
+        'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto o un PDF del documento (max 1.5MB) per averlo sempre a portata di mano.",
+        'pagopa': "ℹ️ **Guida - Ricevuta PagoPA & PDF**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
+        'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto (Imposta Sostitutiva o Ritenuta d'Acconto) in base alla presenza di un F24 valido.",
+        'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\Consulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
         'canidiary': "ℹ️ **Guida - Profilo Cani & Diario**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo razza, data di nascita e numero di microchip.",
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
         'vet': "ℹ️ **Guida - Libretto Sanitario & Profilassi**\n\nRegistra lo storico dei trattamenti veterinari, dei vaccini e della somministrazione di antiparassitari per i tuoi cani.",
-        'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia.",
+        'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
-        'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità.",
+        'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
         'export': "ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV, scarica un backup completo in formato JSON o ripristina i dati da un file di salvataggio precedente.",
         'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
         'clienti': "ℹ️ **Guida - Rubrica Clienti & Acquirenti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico e gestisci le note dedicate.",
-        'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo regionale.",
+        'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
         'calendario': "ℹ️ **Guida - Calendario Raccolta (GPS)**\n\nVerifica in base alla tua posizione GPS attuale quali specie di tartufo hanno il periodo di raccolta attualmente aperto o chiuso."
     };
 
