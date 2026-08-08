@@ -3,6 +3,94 @@ const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
 
+// ── Dialog / Toast personalizzati ────────────────────────────────────────────
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `app-toast app-toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('app-toast-visible'));
+    setTimeout(() => {
+        toast.classList.remove('app-toast-visible');
+        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+    }, 3500);
+}
+
+function appAlert(message) {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('app-dialog');
+        const msg = document.getElementById('app-dialog-message');
+        const inputField = document.getElementById('app-dialog-input');
+        const cancelBtn = document.getElementById('app-dialog-cancel');
+        const okBtn = document.getElementById('app-dialog-ok');
+        if (!dialog) { window.alert(message); resolve(); return; }
+        msg.textContent = message;
+        inputField.style.display = 'none';
+        cancelBtn.style.display = 'none';
+        okBtn.textContent = 'OK';
+        const onOk = () => { dialog.close(); okBtn.removeEventListener('click', onOk); resolve(); };
+        okBtn.addEventListener('click', onOk);
+        dialog.showModal();
+    });
+}
+
+function appConfirm(message) {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('app-dialog');
+        const msg = document.getElementById('app-dialog-message');
+        const inputField = document.getElementById('app-dialog-input');
+        const cancelBtn = document.getElementById('app-dialog-cancel');
+        const okBtn = document.getElementById('app-dialog-ok');
+        if (!dialog) { resolve(window.confirm(message)); return; }
+        msg.textContent = message;
+        inputField.style.display = 'none';
+        cancelBtn.style.display = '';
+        cancelBtn.textContent = 'Annulla';
+        okBtn.textContent = 'OK';
+        const cleanup = () => {
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+        };
+        const onOk = () => { dialog.close(); cleanup(); resolve(true); };
+        const onCancel = () => { dialog.close(); cleanup(); resolve(false); };
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        dialog.showModal();
+    });
+}
+
+function appPrompt(message, defaultValue = '') {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('app-dialog');
+        const msg = document.getElementById('app-dialog-message');
+        const inputField = document.getElementById('app-dialog-input');
+        const cancelBtn = document.getElementById('app-dialog-cancel');
+        const okBtn = document.getElementById('app-dialog-ok');
+        if (!dialog) { resolve(window.prompt(message, defaultValue)); return; }
+        msg.textContent = message;
+        inputField.style.display = '';
+        inputField.value = defaultValue;
+        cancelBtn.style.display = '';
+        cancelBtn.textContent = 'Annulla';
+        okBtn.textContent = 'OK';
+        const cleanup = () => {
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+        };
+        const onOk = () => { const val = inputField.value; dialog.close(); cleanup(); resolve(val); };
+        const onCancel = () => { dialog.close(); cleanup(); resolve(null); };
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        setTimeout(() => inputField.focus(), 50);
+        dialog.showModal();
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function cloneFallbackValue(value) {
     if (Array.isArray(value)) return [...value];
     if (value && typeof value === 'object') return { ...value };
@@ -66,7 +154,7 @@ function getStoredDocumentData(storageKey) {
 function viewStoredDocument(storageKey, title, moduleName) {
     const base64Data = getStoredDocumentData(storageKey);
     if (!base64Data) {
-        alert("Documento non disponibile o non valido.");
+        showToast("Documento non disponibile.", 'error');
         return;
     }
     visualizzaImmagineSalvata(base64Data, title, moduleName);
@@ -127,10 +215,6 @@ function restoreBackupEntries(data) {
         localStorage.setItem(storageKey, normalizedValue);
     });
 }
-
-setTimeout(() => {
-    map.invalidateSize();
-}, 300);
 
 setTimeout(() => {
     map.invalidateSize();
@@ -232,32 +316,32 @@ function saveCarPosition() {
         localStorage.setItem('car_coords', JSON.stringify(carCoordinates));
         if (carMarker) { carMarker.setLatLng([pos.lat, pos.lng]); }
         else { carMarker = L.marker([pos.lat, pos.lng]).addTo(map).bindPopup("<b>🚗 La tua Auto</b>"); }
-        alert("🚗 Posizione dell'auto salvata con successo!");
-    } else { alert("Segnale GPS non ancora disponibile per marcare l'auto."); }
+        showToast("🚗 Posizione auto salvata!", 'success');
+    } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
 
-function deleteCarPosition() {
+async function deleteCarPosition() {
     if (carCoordinates) {
-        if (confirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
+        if (await appConfirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
             if (carMarker) { map.removeLayer(carMarker); carMarker = null; }
             carCoordinates = null;
             localStorage.removeItem('car_coords');
             if (targetNavigation === 'car') targetNavigation = null;
-            alert("🚗 Posizione dell'auto rimossa con successo!");
+            showToast("🚗 Posizione auto rimossa.", 'info');
         }
-    } else { alert("Nessuna posizione dell'auto attualmente salvata."); }
+    } else { showToast("Nessuna posizione auto salvata.", 'info'); }
 }
 function returnToCar() {
     if (carCoordinates) {
         targetNavigation = 'car';
         map.setView([carCoordinates.lat, carCoordinates.lng], 18);
         if (carMarker) carMarker.openPopup();
-    } else { alert("Nessun parcheggio salvato. Clicca prima su 'Auto'."); }
+    } else { showToast("Nessun parcheggio salvato.", 'info'); }
 }
-function savePoiPosition() {
+async function savePoiPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
-        const note = prompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "Tartufaia");
+        const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "Tartufaia");
         if (note === null) return;
         const newPoi = {
             lat: pos.lat, lng: pos.lng,
@@ -271,8 +355,8 @@ function savePoiPosition() {
         targetNavigation = `poi_${newIndex}`;
         map.setView([pos.lat, pos.lng], 18);
         if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
-        alert("📍 Punto salvato con successo e impostato sulla bussola!");
-    } else { alert("Segnale GPS non ancora disponibile per marcare il punto."); }
+        showToast("📍 Punto salvato!", 'success');
+    } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
 function navigateToPoi(index) {
     if (poiList[index]) {
@@ -280,7 +364,7 @@ function navigateToPoi(index) {
         map.setView([poiList[index].lat, poiList[index].lng], 18);
         if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
         closeActiveModule();
-        alert(`🧭 Destinazione impostata sulla bussola: ${poiList[index].note}`);
+        showToast(`🧭 Destinazione: ${poiList[index].note}`, 'success');
     }
 }
 function sharePoi(index) {
@@ -292,8 +376,8 @@ function sharePoi(index) {
     }
 }
 
-function deletePoi(index) {
-    if (confirm("Vuoi davvero eliminare questo punto salvato?")) {
+async function deletePoi(index) {
+    if (await appConfirm("Vuoi davvero eliminare questo punto salvato?")) {
         if (poiMapMarkers[index]) { map.removeLayer(poiMapMarkers[index]); delete poiMapMarkers[index]; }
         poiList.splice(index, 1);
         localStorage.setItem('poi_list', JSON.stringify(poiList));
@@ -306,10 +390,11 @@ function triggerSOS() {
         const pos = userMarker.getLatLng();
         const msg = `EMERGENZA TARTUFAIA! Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
         window.location.href = `sms:?body=${encodeURIComponent(msg)}`;
-    } else { alert("Impossibile rilevare le coordinate GPS."); }
+    } else { showToast("Impossibile rilevare le coordinate GPS.", 'error'); }
 }
 function openModule(moduleName, editMode = false) {
-    toggleDrawer();
+    const drawer = document.getElementById('app-drawer');
+    if (drawer && drawer.classList.contains('drawer-open')) toggleDrawer();
     let activeView = document.getElementById('active-module-view');
     if (!activeView) {
         activeView = document.createElement('div');
@@ -326,14 +411,14 @@ function openModule(moduleName, editMode = false) {
                 poiList.forEach((poi, idx) => {
                     const safePoi = sanitizeRenderable(poi);
                     poiHtml += `
-                        <div class="module-card" style="margin-bottom:12px;">
-                            <strong style="color:#60a5fa; font-size:1rem;">📍 ${safePoi.note}</strong>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin:4px 0;">Data: ${safePoi.date}</p>
-                            <p style="font-size:0.8rem; color:#cbd5e1;">Lat: ${poi.lat.toFixed(4)}, Lng: ${poi.lng.toFixed(4)}</p>
-                            <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
-                                <button class="overlay-btn" style="background:#16a34a;" onclick="navigateToPoi(${idx})">🧭 Vai</button>
-                                <button class="overlay-btn" style="background:#0284c7;" onclick="sharePoi(${idx})">📤 Condividi</button>
-                                <button class="overlay-btn" style="background:#dc2626;" onclick="deletePoi(${idx})">🗑️ Elimina</button>
+                        <div class="module-card card-gap">
+                            <strong class="text-accent">📍 ${safePoi.note}</strong>
+                            <p class="text-muted small-text" style="margin:4px 0;">Data: ${safePoi.date}</p>
+                            <p class="text-subtle small-text">Lat: ${poi.lat.toFixed(4)}, Lng: ${poi.lng.toFixed(4)}</p>
+                            <div class="btn-row">
+                                <button class="overlay-btn btn-success" onclick="navigateToPoi(${idx})">🧭 Vai</button>
+                                <button class="overlay-btn btn-info" onclick="sharePoi(${idx})">📤 Condividi</button>
+                                <button class="overlay-btn btn-danger" onclick="deletePoi(${idx})">🗑️ Elimina</button>
                             </div>
                         </div>`;
                 });
@@ -348,7 +433,7 @@ function openModule(moduleName, editMode = false) {
                 if (getStoredDocumentData('tesserino_data')) {
                     if (tData.tipoFile && tData.tipoFile.startsWith('image/')) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${tData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('tesserino_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Tesserino"></div>`;
-                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="viewStoredDocument('tesserino_data', 'Tesserino Digitale', 'tesserino')">👁️ Visualizza Immagine</button>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn btn-info" onclick="viewStoredDocument('tesserino_data', 'Tesserino Digitale', 'tesserino')">👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${tData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -359,7 +444,7 @@ function openModule(moduleName, editMode = false) {
                 contentHTML = `
                     <h2>Anagrafica & Tesserino Digitale</h2>
                     <p><strong>Normativa:</strong> Legge 145/2018</p>
-                    <div class="module-card" style="border-left: 4px solid #22c55e;">
+                    <div class="module-card card-green-border">
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ Tesserino Registrato</p>
                         <p><strong>Nome:</strong> ${tData.nome}</p>
                         <p><strong>Codice Fiscale:</strong> ${tData.cf}</p>
@@ -368,8 +453,8 @@ function openModule(moduleName, editMode = false) {
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
-                            <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('tesserino', true)">✏️ Modifica</button>
-                            <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('tesserino_data', 'tesserino')">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-primary" onclick="openModule('tesserino', true)">✏️ Modifica</button>
+                            <button class="overlay-btn btn-danger" onclick="clearData('tesserino_data', 'tesserino')">🗑️ Elimina</button>
                         </div>
                     </div>`;
             } else {
@@ -387,7 +472,7 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Numero autorizzazione">
                         <label>Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
                         <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
-                        <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="saveTesserino()">Salva Tesserino</button>
+                        <button class="overlay-btn btn-primary btn-full mt-15" onclick="saveTesserino()">Salva Tesserino</button>
                     </div>`;
             }
             break;
@@ -399,7 +484,7 @@ function openModule(moduleName, editMode = false) {
                 if (getStoredDocumentData('pagopa_data')) {
                     if (pData.tipoFile && pData.tipoFile.startsWith('image/')) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${pData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('pagopa_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Quietanza PagoPA"></div>`;
-                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="viewStoredDocument('pagopa_data', 'Quietanza PagoPA', 'pagopa')">👁️ Visualizza Immagine</button>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn btn-info" onclick="viewStoredDocument('pagopa_data', 'Quietanza PagoPA', 'pagopa')">👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${pData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -409,15 +494,15 @@ function openModule(moduleName, editMode = false) {
 
                 contentHTML = `
                     <h2>Ricevuta PagoPA & PDF</h2>
-                    <div class="module-card" style="border-left: 4px solid #22c55e;">
+                    <div class="module-card card-green-border">
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ Quietanza Attiva</p>
                         <p><strong>ID Transazione:</strong> ${pData.id}</p>
                         <p><strong>Data Pagamento:</strong> ${pData.data}</p>
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
-                            <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('pagopa', true)">✏️ Modifica</button>
-                            <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('pagopa_data', 'pagopa')">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-primary" onclick="openModule('pagopa', true)">✏️ Modifica</button>
+                            <button class="overlay-btn btn-danger" onclick="clearData('pagopa_data', 'pagopa')">🗑️ Elimina</button>
                         </div>
                     </div>`;
             } else {
@@ -431,7 +516,7 @@ function openModule(moduleName, editMode = false) {
                         <input type="date" id="p-data" class="mod-input" value="${pData.data || new Date().toISOString().slice(0,10)}">
                         <label>Carica Ricevuta (Immagine o PDF - Obbligatorio):</label>
                         <input type="file" id="p-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
-                        <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="savePagoPAWithFile()">Archivia Ricevuta PagoPA</button>
+                        <button class="overlay-btn btn-primary btn-full mt-15" onclick="savePagoPAWithFile()">Archivia Ricevuta PagoPA</button>
                     </div>`;
             }
             break;
@@ -525,7 +610,7 @@ function openModule(moduleName, editMode = false) {
                     <label style="margin-top: 10px;">📝 Note Cliente (Rubrica):</label>
                     <textarea id="r-nota-cliente" class="mod-input" placeholder="Scrivi una nota per questo cliente..." rows="2" style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 6px; font-size: 0.8rem;"></textarea>
                     
-                    <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="try { registraVenditaConPrezzoKg(); } catch(e) { alert('Errore: ' + e.message); console.error(e); }">Registra e Genera Ricevuta Conforme</button>
+                    <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="try { registraVenditaConPrezzoKg(); } catch(e) { showToast('Errore: ' + e.message, 'error'); console.error(e); }">Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             setTimeout(toggleRegimeFiscaleFields, 50);
             break;
@@ -579,10 +664,10 @@ function openModule(moduleName, editMode = false) {
                     <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${safeItem.acquirente}</b></p>
                     <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${safeItem.specie} (${safeItem.peso}g)</p>
                     <p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">${dettaglioImporto}</p>
-                    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
-                        <button class="overlay-btn" style="background:#2563eb; padding:6px 10px; font-size:0.75rem;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza</button>
-                        <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="modificaRicevuta(${originalIndex})">✏️ Modifica</button>
-                        <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="eliminaRicevutaConDoppiaConferma(${originalIndex})">🗑️ Elimina</button>
+                    <div class="btn-row">
+                        <button class="overlay-btn btn-primary" style="padding:6px 10px; font-size:0.75rem;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza</button>
+                        <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" onclick="modificaRicevuta(${originalIndex})">✏️ Modifica</button>
+                        <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="eliminaRicevutaConDoppiaConferma(${originalIndex})">🗑️ Elimina</button>
                     </div>
                 </div>`;
         });
@@ -598,7 +683,7 @@ function openModule(moduleName, editMode = false) {
                 if (getStoredDocumentData('f24_data')) {
                     if (fData.tipoFile && fData.tipoFile.startsWith('image/')) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('f24_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
-                        visualizzaBtnHTML = `<button class="overlay-btn" style="background:#0284c7;" onclick="viewStoredDocument('f24_data', 'F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn btn-info" onclick="viewStoredDocument('f24_data', 'F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -608,7 +693,7 @@ function openModule(moduleName, editMode = false) {
 
                 contentHTML = `
                     <h2>F24 ELIDE - Imposta Sostitutiva</h2>
-                    <div class="module-card" style="border-left: 4px solid #22c55e;">
+                    <div class="module-card card-green-border">
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ F24 Registrato</p>
                         <p><strong>Anno Fiscale:</strong> ${fData.anno}</p>
                         <p><strong>Protocollo:</strong> ${fData.protocollo}</p>
@@ -616,8 +701,8 @@ function openModule(moduleName, editMode = false) {
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
-                            <button class="overlay-btn" style="background:#2563eb;" onclick="openModule('f24', true)">✏️ Modifica</button>
-                            <button class="overlay-btn" style="background:#dc2626;" onclick="clearData('f24_data', 'f24')">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-primary" onclick="openModule('f24', true)">✏️ Modifica</button>
+                            <button class="overlay-btn btn-danger" onclick="clearData('f24_data', 'f24')">🗑️ Elimina</button>
                         </div>
                     </div>`;
             } else {
@@ -637,7 +722,7 @@ function openModule(moduleName, editMode = false) {
                         <label>Carica Quietanza F24 (PDF o Immagine - Obbligatorio):</label>
                         <input type="file" id="f-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
                         
-                        <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="saveF24WithFile()">Archivia F24 ELIDE</button>
+                        <button class="overlay-btn btn-primary btn-full mt-15" onclick="saveF24WithFile()">Archivia F24 ELIDE</button>
                     </div>`;
             }
             break;
@@ -669,7 +754,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">Razza: ${dog.razza}</p>
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Nascita: ${dog.nascita || 'Non specificata'}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">Microchip: ${dog.microchip || 'Non inserito'}</p>
-                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteDog(${idx})">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteDog(${idx})">🗑️ Elimina</button>
                         </div>`;
                 });
             }
@@ -738,7 +823,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📋 N. ${pol.numero}</p>
                             ${statoScadenza}
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${pol.note || 'Nessuna nota'}</p>
-                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deletePolizza(${idx})">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deletePolizza(${idx})">🗑️ Elimina</button>
                         </div>`;
                 });
             }
@@ -791,7 +876,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.tipo}</b></p>
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
-                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteVetHistoryItem(${originalIndex})">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteVetHistoryItem(${originalIndex})">🗑️ Elimina</button>
                         </div>`;
                 });
             }
@@ -857,7 +942,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.specie}</b></p>
                             <p style="font-size:0.85rem; color:#22c55e; margin: 2px 0;">⚖️ Peso: <b>${item.peso} g</b></p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
-                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteRaccoltaGiornaliera(${originalIndex})">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteRaccoltaGiornaliera(${originalIndex})">🗑️ Elimina</button>
                         </div>`;
                 });
             }
@@ -909,7 +994,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;"><b>${item.categoria}</b></p>
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
-                            <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteSpesa(${originalIndex})">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteSpesa(${originalIndex})">🗑️ Elimina</button>
                         </div>`;
                 });
 
@@ -1043,7 +1128,7 @@ function openModule(moduleName, editMode = false) {
                 <h2>Report & Backup Dati</h2>
                 <div class="module-card">
                     <p>Esporta i dati contabili o fai un backup completo.</p>
-                    <button class="overlay-btn" style="margin-top:15px; width:100%; background:#2563eb;" onclick="esportaDatiCSV()">Scarica Contabilità in CSV</button>
+                    <button class="overlay-btn btn-primary btn-full mt-15" onclick="esportaDatiCSV()">Scarica Contabilità in CSV</button>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#16a34a;" onclick="esportaBackupJSON()">Scarica Backup Totale (JSON)</button>
                     <hr style="border-color:#334155; margin:20px 0;">
                     <label style="font-weight:bold; color:#f8fafc;">Ripristina Backup da File JSON:</label>
@@ -1081,9 +1166,9 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">📞 ${safeClinic.tel}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 ${safeClinic.note || 'Nessuna nota'}</p>
                             <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                                <a href="tel:${telHref}" class="overlay-btn" style="background:#dc2626; text-decoration:none; text-align:center; display:inline-block; padding:8px 12px;">📞 Chiama</a>
-                                <button class="overlay-btn" style="background:#0284c7; padding:8px 12px;" onclick="shareLocationToVetByIndex(${idx})">📍 Invia GPS</button>
-                                <button class="overlay-btn" style="background:#475569; padding:8px 12px;" onclick="deleteVetClinic(${idx})">🗑️ Elimina</button>
+                                <a href="tel:${telHref}" class="overlay-btn btn-danger" style="text-decoration:none; text-align:center; display:inline-block; padding:8px 12px;">📞 Chiama</a>
+                                <button class="overlay-btn btn-info" style="padding:8px 12px;" onclick="shareLocationToVetByIndex(${idx})">📍 Invia GPS</button>
+                                <button class="overlay-btn btn-neutral" style="padding:8px 12px;" onclick="deleteVetClinic(${idx})">🗑️ Elimina</button>
                             </div>
                         </div>`;
                 });
@@ -1135,9 +1220,9 @@ function openModule(moduleName, editMode = false) {
 
                     <!-- Blocco tasti principali distanziato -->
                     <div style="display:flex; gap:6px; margin-top:16px; flex-wrap:wrap;">
-                        <button class="overlay-btn" style="background:#16a34a; padding:6px 10px; font-size:0.75rem;" onclick="creaRicevutaPerCliente(${idx})">📄 Nuova Ricevuta</button>
-                        <button class="overlay-btn" style="background:#0284c7; padding:6px 10px; font-size:0.75rem;" onclick="mostraRicevuteClienteByIndex(${idx})">📜 Vedi Ricevute</button>
-                        <button class="overlay-btn" style="background:#dc2626; padding:6px 10px; font-size:0.75rem;" onclick="deleteCliente(${idx})">🗑️ Elimina</button>
+                        <button class="overlay-btn btn-success" style="padding:6px 10px; font-size:0.75rem;" onclick="creaRicevutaPerCliente(${idx})">📄 Nuova Ricevuta</button>
+                        <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" onclick="mostraRicevuteClienteByIndex(${idx})">📜 Vedi Ricevute</button>
+                        <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteCliente(${idx})">🗑️ Elimina</button>
                     </div>
                 </div>`;
         });
@@ -1342,11 +1427,11 @@ function openModule(moduleName, editMode = false) {
     }
     
     activeView.innerHTML = `
-        <div class="module-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="module-header-bar">
             <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <button onclick="mostraInfoModulo(${JSON.stringify(moduleName)})" class="back-map-btn" style="background: #334155; color: #38bdf8; border: 1px solid #475569; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; padding: 0;" title="Guida modulo">❓</button>
-                <button onclick="toggleDrawer(); closeActiveModule();" class="back-map-btn" style="color: #f8fafc;">☰ Torna al Menu</button>
+            <div class="header-actions">
+                <button onclick="mostraInfoModulo(${JSON.stringify(moduleName)})" class="back-map-btn btn-neutral btn-round text-sky border-slate" title="Guida modulo">❓</button>
+                <button onclick="toggleDrawer(); closeActiveModule();" class="back-map-btn">☰ Torna al Menu</button>
             </div>
         </div>
         <div class="module-body-content">${contentHTML}</div>
@@ -1358,8 +1443,8 @@ function closeActiveModule() {
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
 }
-function clearData(storageKey, moduleName) {
-    if (confirm("Vuoi davvero eliminare questi dati?")) {
+async function clearData(storageKey, moduleName) {
+    if (await appConfirm("Vuoi davvero eliminare questi dati?")) {
         localStorage.removeItem(storageKey);
         openModule(moduleName);
     }
@@ -1373,7 +1458,7 @@ function saveTesserino() {
     const file = fileInput ? fileInput.files[0] : null;
 
     if (!nomeVal || !cfVal) {
-        alert("Inserisci almeno Nome e Codice Fiscale.");
+        showToast("Inserisci almeno Nome e Codice Fiscale.", 'error');
         return;
     }
 
@@ -1393,10 +1478,10 @@ function saveTesserino() {
         
         try {
             localStorage.setItem('tesserino_data', JSON.stringify(data));
-            alert("Dati tesserino salvati con successo!");
+            showToast("Dati tesserino salvati!", 'success');
             openModule('tesserino');
         } catch (e) {
-            alert("Errore: Spazio di archiviazione esaurito! Prova a caricare un'immagine o PDF più piccolo (max 1.5MB).");
+            showToast("Spazio esaurito. Carica un file più piccolo.", 'error');
             console.error(e);
         }
     };
@@ -1404,7 +1489,7 @@ function saveTesserino() {
     if (file) {
         // Controllo della dimensione del file
         if (file.size > 1.5 * 1024 * 1024) {
-            alert("Il file è troppo grande. Carica un documento inferiore a 1.5 MB.");
+            showToast("File troppo grande. Max 1.5 MB.", 'error');
             return;
         }
 
@@ -1426,7 +1511,7 @@ function saveF24WithFile() {
     const file = fileInput ? fileInput.files[0] : null;
     
     if (!annoVal || !protocolloVal || !dataPagamentoVal) {
-        alert("Compila tutti i campi obbligatori (Anno, Protocollo e Data di Versamento).");
+        showToast("Compila tutti i campi obbligatori.", 'error');
         return;
     }
 
@@ -1444,17 +1529,17 @@ function saveF24WithFile() {
         
         try {
             localStorage.setItem('f24_data', JSON.stringify(data));
-            alert("Dati F24 ELIDE salvati con successo!");
+            showToast("Dati F24 ELIDE salvati!", 'success');
             openModule('f24');
         } catch (e) {
-            alert("Errore: Spazio di archiviazione esaurito! Carica un file più piccolo.");
+            showToast("Spazio esaurito. Carica un file più piccolo.", 'error');
             console.error(e);
         }
     };
 
     if (file) {
         if (file.size > 1.5 * 1024 * 1024) {
-            alert("Il file è troppo grande. Massimo 1.5 MB.");
+            showToast("File troppo grande. Max 1.5 MB.", 'error');
             return;
         }
         const reader = new FileReader();
@@ -1488,17 +1573,17 @@ function savePagoPAWithFile() {
         
         try {
             localStorage.setItem('pagopa_data', JSON.stringify(data));
-            alert("Dati PagoPA salvati con successo!");
+            showToast("Dati PagoPA salvati!", 'success');
             openModule('pagopa');
         } catch (e) {
-            alert("Errore: Spazio di archiviazione esaurito! Carica un file più piccolo.");
+            showToast("Spazio esaurito. Carica un file più piccolo.", 'error');
             console.error(e);
         }
     };
 
     if (file) {
         if (file.size > 1.5 * 1024 * 1024) {
-            alert("Il file è troppo grande. Massimo 1.5 MB.");
+            showToast("File troppo grande. Max 1.5 MB.", 'error');
             return;
         }
         const reader = new FileReader();
@@ -1516,16 +1601,16 @@ function saveNewCane() {
     const razza = document.getElementById('c-razza').value.trim();
     const nascita = document.getElementById('c-nascita').value;
     const microchip = document.getElementById('c-microchip').value.trim();
-    if (!nome) { alert("Inserisci almeno il nome del cane."); return; }
+    if (!nome) { showToast("Inserisci il nome del cane.", 'error'); return; }
     let dogsList = readStorageJSON('dogs_list', []);
     dogsList.push({ nome, razza, nascita, microchip });
     localStorage.setItem('dogs_list', JSON.stringify(dogsList));
     localStorage.setItem('cane_data', JSON.stringify({ nome, razza, nascita, microchip }));
-    alert("Cane aggiunto con successo!");
+    showToast("Cane aggiunto!", 'success');
     openModule('canidiary');
 }
-function deleteDog(index) {
-    if (confirm("Vuoi davvero rimuovere questo cane?")) {
+async function deleteDog(index) {
+    if (await appConfirm("Vuoi davvero rimuovere questo cane?")) {
         let dogsList = readStorageJSON('dogs_list', []);
         dogsList.splice(index, 1);
         localStorage.setItem('dogs_list', JSON.stringify(dogsList));
@@ -1557,8 +1642,8 @@ function creaRicevutaPerCliente(index) {
     }, 50);
 }
 
-function deleteCliente(index) {
-    if (confirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
+async function deleteCliente(index) {
+    if (await appConfirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
         let rubricaClienti = readStorageJSON('rubrica_clienti', []);
         rubricaClienti.splice(index, 1);
         localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
@@ -1572,16 +1657,16 @@ function savePolizza() {
     const tipo = document.getElementById('pol-tipo').value;
     const scadenza = document.getElementById('pol-scadenza').value;
     const note = document.getElementById('pol-note').value.trim();
-    if (!compagnia || !numero) { alert("Inserisci almeno la compagnia e il numero di polizza."); return; }
+    if (!compagnia || !numero) { showToast("Inserisci compagnia e numero polizza.", 'error'); return; }
     let polizzeList = readStorageJSON('polizze_list', []);
     polizzeList.push({ compagnia, numero, tipo, scadenza, note });
     localStorage.setItem('polizze_list', JSON.stringify(polizzeList));
-    alert("Polizza salvata con successo!");
+    showToast("Polizza salvata!", 'success');
     openModule('polizze');
 }
 
-function deletePolizza(index) {
-    if (confirm("Vuoi davvero rimuovere questa polizza?")) {
+async function deletePolizza(index) {
+    if (await appConfirm("Vuoi davvero rimuovere questa polizza?")) {
         let polizzeList = readStorageJSON('polizze_list', []);
         polizzeList.splice(index, 1);
         localStorage.setItem('polizze_list', JSON.stringify(polizzeList));
@@ -1593,16 +1678,16 @@ function saveRaccoltaGiornaliera() {
     const specie = document.getElementById('reg-specie').value;
     const peso = parseFloat(document.getElementById('reg-peso').value) || 0;
     const note = document.getElementById('reg-note').value.trim();
-    if (!data || peso <= 0) { alert("Inserisci una data valida e un peso maggiore di zero."); return; }
+    if (!data || peso <= 0) { showToast("Data e peso obbligatori.", 'error'); return; }
     let storicoRaccolta = readStorageJSON('storico_raccolta_giornaliera', []);
     storicoRaccolta.push({ data, specie, peso, note });
     localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
-    alert("Raccolta registrata con successo!");
+    showToast("Raccolta registrata!", 'success');
     openModule('registro_giornaliero');
 }
 
-function deleteRaccoltaGiornaliera(index) {
-    if (confirm("Vuoi davvero rimuovere questo record dal registro?")) {
+async function deleteRaccoltaGiornaliera(index) {
+    if (await appConfirm("Vuoi davvero rimuovere questo record dal registro?")) {
         let storicoRaccolta = readStorageJSON('storico_raccolta_giornaliera', []);
         storicoRaccolta.splice(index, 1);
         localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
@@ -1653,11 +1738,11 @@ function calcolaRitenutaAcconto() {
     if (elNetto) elNetto.value = netto.toFixed(2);
 }
 
-function registraVenditaConPrezzoKg() {
+async function registraVenditaConPrezzoKg() {
     // 1. BLOCCO MANCANZA DATI TESSERINO
     const tData = readStorageJSON('tesserino_data', {});
     if (!tData.nome || !tData.cf || !tData.num) {
-        alert("❌ Attenzione: Impossibile procedere.\nMancano i dati anagrafici, il codice fiscale o gli estremi del tesserino di raccolta.");
+        await appAlert("❌ Attenzione: Impossibile procedere.\nMancano i dati anagrafici, il codice fiscale o gli estremi del tesserino di raccolta.");
         openModule('tesserino');
         return;
     }
@@ -1667,7 +1752,7 @@ function registraVenditaConPrezzoKg() {
     const annoCorrente = new Date().getFullYear();
     
     if (!pagoPaSaved.effettuato || parseInt(pagoPaSaved.anno) !== annoCorrente) {
-        alert("❌ Attenzione: Ricevuta PagoPA non valida o assente per l'anno in corso.\nÈ necessario regolarizzare il pagamento della tassa tesserino prima di registrare vendite.");
+        await appAlert("❌ Attenzione: Ricevuta PagoPA non valida o assente per l'anno in corso.\nÈ necessario regolarizzare il pagamento della tassa tesserino prima di registrare vendite.");
         openModule('pagopa');
         return;
     }
@@ -1693,7 +1778,7 @@ function registraVenditaConPrezzoKg() {
     const luogoAreaRaccolta = luogoRaccoltaInput ? luogoRaccoltaInput.value.trim() : '';
     
     if (!luogoAreaRaccolta) {
-        alert("❌ Dato obbligatorio mancante!\nIl campo 'Luogo / Area di Raccolta e Provincia' è fondamentale per gli adempimenti della tracciabilità e non può essere lasciato vuoto.");
+        await appAlert("❌ Dato obbligatorio mancante!\nIl campo 'Luogo / Area di Raccolta e Provincia' è fondamentale per gli adempimenti della tracciabilità e non può essere lasciato vuoto.");
         if (luogoRaccoltaInput) luogoRaccoltaInput.focus();
         return;
     }
@@ -1705,7 +1790,7 @@ function registraVenditaConPrezzoKg() {
     const acquirenteEmail = document.getElementById('r-email-acquirente') ? document.getElementById('r-email-acquirente').value.trim() : '';
     
     if (!acquirenteNome) {
-        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
+        await appAlert("Inserisci il nome o la ragione sociale dell'acquirente.");
         return;
     }
 
@@ -1758,7 +1843,7 @@ function registraVenditaConPrezzoKg() {
     const quantoManca = Math.max(0, sogliaBlocco - nuovoTotaleAnno);
 
     if (nuovoTotaleAnno > sogliaBlocco) {
-        alert(`❌ ATTENZIONE: Soglia di blocco di € 7.000 superata!\nIl totale annuo delle vendite raggiungerebbe € ${nuovoTotaleAnno.toFixed(2)}. Registrazione bloccata per limiti normativi.`);
+        await appAlert(`❌ ATTENZIONE: Soglia di blocco di € 7.000 superata!\nIl totale annuo delle vendite raggiungerebbe € ${nuovoTotaleAnno.toFixed(2)}. Registrazione bloccata per limiti normativi.`);
         return;
     }
 
@@ -1780,7 +1865,7 @@ function registraVenditaConPrezzoKg() {
         `• Mancante alla soglia di blocco: € ${quantoManca.toFixed(2)}\n\n` +
         `Premi OK per confermare la presa visione e registrare la vendita, oppure Annulla per interrompere.`;
 
-    if (!window.confirm(messaggioRiepilogo)) {
+    if (!(await appConfirm(messaggioRiepilogo))) {
         return; 
     }
    
@@ -1812,7 +1897,7 @@ function registraVenditaConPrezzoKg() {
     
     const nuovoIndice = storico.length - 1;
 
-    alert(`✔ Ricevuta registrata con successo!\n\nApertura automatica della ricevuta in corso...`);
+    showToast("✔ Ricevuta registrata!", 'success');
     
     // 10. APERTURA DIRETTA DELLA VISUALIZZAZIONE
     if (typeof openModule === 'function') {
@@ -1934,22 +2019,22 @@ function visualizzaRicevutaSalvata(index) {
                 </div>
             </div>
         </div>
-        <button class="overlay-btn" style="background:#2563eb; margin-top:15px; width:100%;" onclick="window.print()">🖨️ Stampa / Salva PDF Conforme</button>
-        <button class="overlay-btn" style="background:#0284c7; margin-top:10px; width:100%;" onclick="condividiRicevuta(${index})">📤 Condividi Ricevuta (WhatsApp)</button>
-        <button class="overlay-btn" style="background:#16a34a; margin-top:10px; width:100%;" onclick="condividiRicevutaEmail(${index})">📧 Condividi / Invia Email (${safeReceipt.acquirenteEmail || 'Email non inserita'})</button>
-        <button class="overlay-btn" style="background:#475569; margin-top:10px; width:100%;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
+        <button class="overlay-btn btn-primary btn-full mt-15" onclick="window.print()">🖨️ Stampa / Salva PDF Conforme</button>
+        <button class="overlay-btn btn-info btn-full" style="margin-top:10px;" onclick="condividiRicevuta(${index})">📤 Condividi Ricevuta (WhatsApp)</button>
+        <button class="overlay-btn btn-success btn-full" style="margin-top:10px;" onclick="condividiRicevutaEmail(${index})">📧 Condividi / Invia Email (${safeReceipt.acquirenteEmail || 'Email non inserita'})</button>
+        <button class="overlay-btn btn-neutral btn-full" style="margin-top:10px;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
     `;
 }
 
-function eliminaRicevutaConDoppiaConferma(index) {
-    const primaConferma = confirm("Sei sicuro di voler eliminare questa ricevuta dallo storico?");
+async function eliminaRicevutaConDoppiaConferma(index) {
+    const primaConferma = await appConfirm("Sei sicuro di voler eliminare questa ricevuta dallo storico?");
     if (primaConferma) {
-        const secondaConferma = confirm("ATTENZIONE: L'operazione è irreversibile. Vuoi davvero confermare l'eliminazione definitiva?");
+        const secondaConferma = await appConfirm("ATTENZIONE: L'operazione è irreversibile. Vuoi davvero confermare l'eliminazione definitiva?");
         if (secondaConferma) {
             let storico = readStorageJSON('storico_vendite', []);
             storico.splice(index, 1);
             localStorage.setItem('storico_vendite', JSON.stringify(storico));
-            alert("Ricevuta eliminata con successo.");
+            showToast("Ricevuta eliminata.", 'info');
             openModule('storico_ricevute');
         }
     }
@@ -2001,7 +2086,7 @@ function salvaModificaRicevuta(index) {
     
     const acquirenteNome = document.getElementById('r-acquirente').value.trim();
     if (!acquirenteNome) {
-        alert("Inserisci il nome o la ragione sociale dell'acquirente.");
+        showToast("Inserisci il nome dell'acquirente.", 'error');
         return;
     }
 
@@ -2038,7 +2123,7 @@ function salvaModificaRicevuta(index) {
     };
 
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
-    alert("Ricevuta aggiornata con successo!");
+    showToast("Ricevuta aggiornata!", 'success');
     openModule('storico_ricevute');
 }
 async function condividiRicevuta(index) {
@@ -2101,7 +2186,7 @@ function chiudiDettaglioRicevuta() {
 function esportaDatiCSV() {
     const storico = readStorageJSON('storico_vendite', []);
     if(storico.length === 0) { 
-        alert("Nessuna vendita registrata."); 
+        showToast("Nessuna vendita registrata.", 'info'); 
         return; 
     }
     
@@ -2185,10 +2270,10 @@ function importBackupData(event) {
             }
             restoreBackupEntries(data);
             
-            alert("Backup ripristinato con successo!"); 
+            showToast("Backup ripristinato!", 'success'); 
             location.reload();
         } catch(err) { 
-            alert("Errore durante la lettura del file di backup."); 
+            showToast("Errore lettura backup.", 'error'); 
         }
     };
     reader.readAsText(file);
@@ -2202,22 +2287,22 @@ function toggleDrawer() {
 
 function centerOnUser() {
     if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], 16); userMarker.openPopup(); }
-    else { alert("Posizione GPS non disponibile."); }
+    else { showToast("Posizione GPS non disponibile.", 'error'); }
 }
 
 function saveVetClinic() {
     const nome = document.getElementById('vc-nome').value.trim();
     const tel = document.getElementById('vc-tel').value.trim();
     const note = document.getElementById('vc-note').value.trim();
-    if (!nome || !tel) { alert("Inserisci nome e telefono."); return; }
+    if (!nome || !tel) { showToast("Inserisci nome e telefono.", 'error'); return; }
     let vetClinics = readStorageJSON('vet_clinics_list', []);
     vetClinics.push({ nome, tel, note });
     localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
-    alert("Clinica salvata!"); openModule('vet-emergency');
+    showToast("Clinica salvata!", 'success'); openModule('vet-emergency');
 }
 
-function deleteVetClinic(index) {
-    if (confirm("Rimuovere contatto?")) {
+async function deleteVetClinic(index) {
+    if (await appConfirm("Rimuovere contatto?")) {
         let vetClinics = readStorageJSON('vet_clinics_list', []);
         vetClinics.splice(index, 1);
         localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
@@ -2230,7 +2315,7 @@ function shareLocationToVet(telNumber) {
         const pos = userMarker.getLatLng();
         const msg = `EMERGENZA VETERINARIA! Coordinate GPS: Lat: ${pos.lat.toFixed(6)}, Lng: ${pos.lng.toFixed(6)}`;
         window.location.href = `sms:${telNumber}?body=${encodeURIComponent(msg)}`;
-    } else { alert("GPS non disponibile."); }
+    } else { showToast("GPS non disponibile.", 'error'); }
 }
 
 function shareLocationToVetByIndex(index) {
@@ -2245,15 +2330,15 @@ function saveVetHistoryItem() {
     const tipo = document.getElementById('vh-tipo').value;
     const data = document.getElementById('vh-data').value;
     const note = document.getElementById('vh-note').value.trim();
-    if (!data) { alert("Inserisci la data."); return; }
+    if (!data) { showToast("Inserisci la data.", 'error'); return; }
     let vetHistory = readStorageJSON('vet_history_list', []);
     vetHistory.push({ cane, tipo, data, note });
     localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
-    alert("Trattamento registrato!"); openModule('vet');
+    showToast("Trattamento registrato!", 'success'); openModule('vet');
 }
 
-function deleteVetHistoryItem(index) {
-    if (confirm("Rimuovere record?")) {
+async function deleteVetHistoryItem(index) {
+    if (await appConfirm("Rimuovere record?")) {
         let vetHistory = readStorageJSON('vet_history_list', []);
         vetHistory.splice(index, 1);
         localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
@@ -2274,9 +2359,9 @@ function shareAppUrl() {
         });
     } else {
         navigator.clipboard.writeText(window.location.href).then(() => {
-            alert("Link copiato negli appunti!");
+            showToast("Link copiato!", 'success');
         }).catch(() => {
-            alert("Impossibile condividere o copiare il link.");
+            showToast("Impossibile condividere.", 'error');
         });
     }
 }
@@ -2305,12 +2390,12 @@ function installApp() {
         || window.navigator.standalone === true;
 
     if (isStandalone) {
-        alert("✅ L'app è già installata sul tuo dispositivo!");
+        showToast("L'app è già installata.", 'info');
         return;
     }
 
     if (!deferredInstallPrompt) {
-        alert("ℹ️ L'installazione non è disponibile.\nSe usi iOS, apri Safari e usa 'Aggiungi alla schermata Home'.\nSe usi Chrome desktop, controlla la barra degli indirizzi.");
+        showToast("Installazione non disponibile. Su iOS usa Safari > 'Aggiungi alla schermata Home'.", 'info');
         return;
     }
 
@@ -2473,7 +2558,7 @@ async function condividiRicevutaEmail(index) {
     const storico = readStorageJSON('storico_vendite', []);
     const v = storico[index];
     if (!v) {
-        alert("Ricevuta non trovata.");
+        showToast("Ricevuta non trovata.", 'error');
         return;
     }
 
@@ -2550,7 +2635,7 @@ async function condividiRicevutaEmail(index) {
         }
     } else {
         // Fallback per desktop o browser che non supportano navigator.share con file
-        alert(`Il tuo browser non supporta l'allegato automatico via Web. L'indirizzo email dell'acquirente è: ${emailDestinatarioTesto}`);
+        await appAlert(`Browser non supporta l'allegato automatico.\nEmail: ${emailDestinatarioTesto}`);
     }
 }
 
@@ -2572,7 +2657,7 @@ function salvaNotaClienteDaInput(index) {
     if (rubricaClienti[index]) {
         rubricaClienti[index].nota = textarea.value.trim();
         localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
-        alert("📝 Nota del cliente salvata con successo!");
+        showToast("Nota salvata!", 'success');
         openModule('clienti');
     }
 }
@@ -2583,7 +2668,7 @@ function saveSpesa() {
     const note = document.getElementById('spese-note').value.trim();
 
     if (!data || isNaN(importo) || importo <= 0) {
-        alert("Inserisci una data valida e un importo superiore a zero.");
+        showToast("Data e importo obbligatori.", 'error');
         return;
     }
 
@@ -2591,12 +2676,12 @@ function saveSpesa() {
     speseList.push({ data, categoria, importo, note });
     localStorage.setItem('spese_list', JSON.stringify(speseList));
     
-    alert("Spesa registrata con successo!");
+    showToast("Spesa registrata!", 'success');
     openModule('spese');
 }
 
-function deleteSpesa(index) {
-    if (confirm("Vuoi davvero eliminare questa spesa?")) {
+async function deleteSpesa(index) {
+    if (await appConfirm("Vuoi davvero eliminare questa spesa?")) {
         let speseList = readStorageJSON('spese_list', []);
         speseList.splice(index, 1);
         localStorage.setItem('spese_list', JSON.stringify(speseList));
@@ -2628,7 +2713,7 @@ function salvaArchivioRegionaleTartufi(regione) {
         localStorage.setItem('note_regionali_tartufi', JSON.stringify(noteRegionaliSalvate));
     }
 
-    alert(`✔ Date, note e periodi per la regione ${regione} salvati con successo nell'archivio unificato!`);
+    showToast("Calendario salvato!", 'success');
     openModule('archivio');
 }
 
@@ -2737,7 +2822,7 @@ function estraiDateTartufiDaTesto() {
     
     let testo = textarea.value.trim();
     if (!testo) {
-        alert("Inserisci o incolla prima il testo della normativa regionale nel riquadro.");
+        showToast("Inserisci prima il testo della normativa.", 'error');
         return;
     }
 
@@ -2837,9 +2922,9 @@ function estraiDateTartufiDaTesto() {
             aggiornaCalendarioGPS();
         }
 
-        alert(`🔍 Estrazione completata con successo!\nAggiornati ${modificheEffettuate} periodi di raccolta per la regione: ${regioneCorrente}.`);
+        showToast(`🔍 Aggiornati ${modificheEffettuate} periodi.`, 'success');
     } else {
-        alert("⚠️ Impossibile estrarre automaticamente le date. Verifica che il testo contenga i nomi corretti e la struttura 'dal ... al ...'.");
+        showToast("Impossibile estrarre le date. Verifica il testo.", 'error');
     }
 }
 // Funzione per scaricare i calendari e le note regionali in formato JSON
@@ -2914,16 +2999,16 @@ function importaCalendariJSON(event) {
                 localStorage.setItem(storageKey, value);
             });
 
-            alert("✔ Calendari e note regionali importati con successo!");
+            showToast("Calendari importati!", 'success');
             openModule('archivio'); // Ricarica il modulo archivio per mostrare i dati aggiornati
         } catch (err) {
-            alert("❌ Errore durante la lettura del file JSON. Assicurati che sia un file di backup valido.");
+            showToast("File JSON non valido.", 'error');
             console.error(err);
         }
     };
     reader.readAsText(file);
 }
-function mostraInfoModulo(moduleName) {
+async function mostraInfoModulo(moduleName) {
     const guideTesti = {
         'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto o un PDF del documento (max 1.5MB) per averlo sempre a portata di mano.",
@@ -2945,5 +3030,5 @@ function mostraInfoModulo(moduleName) {
     };
 
     const messaggio = guideTesti[moduleName] || "ℹ️ Guida non disponibile per questo modulo.";
-    alert(messaggio);
+    await appAlert(messaggio);
 }
