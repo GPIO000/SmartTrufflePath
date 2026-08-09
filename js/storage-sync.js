@@ -3,15 +3,21 @@
   const DB_VERSION = 1;
   const STORE_KV = 'kv';
   const DRIVE_CONFIG_KEY = 'drive_backup_config';
+  const DRIVE_TOKEN_SESSION_KEY = 'drive_backup_token_session';
   const DRIVE_STATUS_KEY = 'drive_backup_status';
+  const BACKUP_DEBOUNCE_MS = 15000;
   const DEFAULT_DRIVE_CONFIG = {
     enabled: false,
-    accessToken: '',
     minIntervalMinutes: 60
   };
 
   let dbPromise = null;
   let localStorageOriginals = null;
+  const rawLocalStorageApi = {
+    setItem: localStorage.setItem.bind(localStorage),
+    removeItem: localStorage.removeItem.bind(localStorage),
+    clear: localStorage.clear.bind(localStorage)
+  };
   let initialized = false;
   let backupTimer = null;
   let lastBackupAt = 0;
@@ -86,9 +92,21 @@
 
   function getDriveBackupConfig() {
     const saved = safeParseJSON(localStorage.getItem(DRIVE_CONFIG_KEY), {});
+    const sessionToken = (sessionStorage.getItem(DRIVE_TOKEN_SESSION_KEY) || '').trim();
+    const legacyToken = typeof saved.accessToken === 'string' ? saved.accessToken.trim() : '';
+    const accessToken = sessionToken || legacyToken;
+    if (!sessionToken && legacyToken) {
+      sessionStorage.setItem(DRIVE_TOKEN_SESSION_KEY, legacyToken);
+      const migrated = {
+        enabled: Boolean(saved.enabled),
+        minIntervalMinutes: Number(saved.minIntervalMinutes) > 0 ? Number(saved.minIntervalMinutes) : DEFAULT_DRIVE_CONFIG.minIntervalMinutes
+      };
+      rawLocalStorageApi.setItem(DRIVE_CONFIG_KEY, JSON.stringify(migrated));
+      putEntry(DRIVE_CONFIG_KEY, JSON.stringify(migrated)).catch(() => {});
+    }
     return {
       enabled: Boolean(saved.enabled),
-      accessToken: typeof saved.accessToken === 'string' ? saved.accessToken.trim() : '',
+      accessToken,
       minIntervalMinutes: Number(saved.minIntervalMinutes) > 0 ? Number(saved.minIntervalMinutes) : DEFAULT_DRIVE_CONFIG.minIntervalMinutes
     };
   }
@@ -101,9 +119,11 @@
     };
     const normalized = {
       enabled: Boolean(merged.enabled),
-      accessToken: typeof merged.accessToken === 'string' ? merged.accessToken.trim() : '',
       minIntervalMinutes: Number(merged.minIntervalMinutes) > 0 ? Number(merged.minIntervalMinutes) : DEFAULT_DRIVE_CONFIG.minIntervalMinutes
     };
+    const normalizedToken = typeof merged.accessToken === 'string' ? merged.accessToken.trim() : '';
+    if (normalizedToken) sessionStorage.setItem(DRIVE_TOKEN_SESSION_KEY, normalizedToken);
+    else sessionStorage.removeItem(DRIVE_TOKEN_SESSION_KEY);
 
     const save = JSON.stringify(normalized);
     if (localStorageOriginals) {
@@ -203,7 +223,7 @@
     if (backupTimer) clearTimeout(backupTimer);
     backupTimer = setTimeout(() => {
       triggerDriveBackupNow(false).catch(() => {});
-    }, 15000);
+    }, BACKUP_DEBOUNCE_MS);
   }
 
   function patchLocalStorage() {
@@ -239,7 +259,7 @@
     if (!entries || entries.length === 0) return false;
     entries.forEach((entry) => {
       if (!entry || typeof entry.key !== 'string') return;
-      localStorage.setItem(entry.key, String(entry.value ?? ''));
+      rawLocalStorageApi.setItem(entry.key, String(entry.value ?? ''));
     });
     return true;
   }
