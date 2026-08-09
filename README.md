@@ -18,8 +18,8 @@
 * **Sicurezza & Emergenze**: 
   * Pulsante **SOS** rapido per l'invio immediato di SMS con le coordinate GPS correnti.
   * Sezione di pronto soccorso cinofilo H24 (esche avvelenate/vipere) e numeri utili (112, CNSAS, Forestali).
-* **Backup & Ripristino**: Possibilità di esportare ed importare l'intero database dell'applicazione tramite file **JSON**.
-* **Architettura PWA (Progressive Web App)**: Funzionamento garantito *Offline-First* grazie all'uso di un Service Worker dedicato e memorizzazione dei dati tramite `localStorage`.
+* **Backup & Ripristino**: Possibilità di esportare/importare backup JSON e configurare backup automatico su Google Drive (tramite token OAuth utente).
+* **Architettura PWA (Progressive Web App)**: Funzionamento *Offline-First* con Service Worker e persistenza dati su `IndexedDB` (sincronizzata con storage locale runtime).
 
 ---
 
@@ -28,7 +28,7 @@
 * **Frontend**: HTML5, CSS3 (Layout No-Scroll responsive)
 * **Librerie & Mapping**: 
   * [Leaflet.js](https://leafletjs.com/) (Mappe interattive OpenStreetMap)
-* **Storage & Offline**: HTML5 `localStorage` & Service Worker API
+* **Storage & Offline**: `IndexedDB`, local storage runtime e Service Worker API
 
 ---
 

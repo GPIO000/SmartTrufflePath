@@ -114,8 +114,18 @@
     <!-- html2pdf JS (Necessario per la condivisione e il download diretto del PDF) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <!-- Script Principale dell'App (Conferma percorso cartella js) -->
-    <script src="./js/app.js"></script>
+    <!-- Bootstrap storage IndexedDB -->
+    <script src="./js/storage-sync.js"></script>
+    <script>
+        const storageInit = (window.TruffleStorage && typeof window.TruffleStorage.init === 'function')
+            ? window.TruffleStorage.init()
+            : Promise.resolve();
+        storageInit.finally(() => {
+            const appScript = document.createElement('script');
+            appScript.src = './js/app.js';
+            document.body.appendChild(appScript);
+        });
+    </script>
 
     <!-- Registrazione Service Worker per PWA -->
     <script>

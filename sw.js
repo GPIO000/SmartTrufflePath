@@ -1,8 +1,9 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'truffle-mobile-first-' + '2026-08-08';
+const CACHE_NAME = 'truffle-mobile-first-' + '2026-08-09';
 const ASSETS = [
   './',
   './index.html',
+  './js/storage-sync.js',
   './js/app.js',
   './css/style.css',
   './manifest.json',

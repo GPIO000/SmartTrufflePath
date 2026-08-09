@@ -1135,6 +1135,18 @@ function openModule(moduleName, editMode = false) {
                     <hr style="border-color:#334155; margin:20px 0;">
                     <label style="font-weight:bold; color:#f8fafc;">Ripristina Backup da File JSON:</label>
                     <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" onchange="importBackupData(event)">
+                    <hr style="border-color:#334155; margin:20px 0;">
+                    <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#38bdf8;">Backup automatico su Google Drive</h3>
+                    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                        <input type="checkbox" id="drive-backup-enabled">
+                        <span>Attiva backup automatico</span>
+                    </label>
+                    <label style="font-size:0.8rem; color:#cbd5e1;">Access token OAuth Google Drive</label>
+                    <input type="password" id="drive-backup-token" class="mod-input" placeholder="Incolla token Bearer">
+                    <label style="font-size:0.8rem; color:#cbd5e1; margin-top:8px;">Intervallo minimo (minuti)</label>
+                    <input type="number" min="1" id="drive-backup-interval" class="mod-input" value="60">
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveDriveBackupSettings()">Salva Configurazione Drive</button>
+                    <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" onclick="runDriveBackupNow()">Esegui Backup Drive Adesso</button>
                 </div>`;
             break;
         case 'emergency':
@@ -1439,6 +1451,9 @@ function openModule(moduleName, editMode = false) {
         <div class="module-body-content">${contentHTML}</div>
     `;
     activeView.style.display = 'flex';
+    if (moduleName === 'export') {
+        setTimeout(syncDriveBackupSettingsUI, 0);
+    }
 }
 
 function closeActiveModule() {
@@ -2279,6 +2294,56 @@ function importBackupData(event) {
         }
     };
     reader.readAsText(file);
+}
+
+function getDriveBackupStorageApi() {
+    return window.TruffleStorage && typeof window.TruffleStorage.getDriveBackupConfig === 'function'
+        ? window.TruffleStorage
+        : null;
+}
+
+function syncDriveBackupSettingsUI() {
+    const api = getDriveBackupStorageApi();
+    if (!api) return;
+    const config = api.getDriveBackupConfig();
+    const enabledEl = document.getElementById('drive-backup-enabled');
+    const tokenEl = document.getElementById('drive-backup-token');
+    const intervalEl = document.getElementById('drive-backup-interval');
+    if (enabledEl) enabledEl.checked = Boolean(config.enabled);
+    if (tokenEl) tokenEl.value = config.accessToken || '';
+    if (intervalEl) intervalEl.value = String(config.minIntervalMinutes || 60);
+}
+
+function saveDriveBackupSettings() {
+    const api = getDriveBackupStorageApi();
+    if (!api || typeof api.setDriveBackupConfig !== 'function') {
+        showToast("Storage avanzato non disponibile su questo browser.", 'error');
+        return;
+    }
+    const enabledEl = document.getElementById('drive-backup-enabled');
+    const tokenEl = document.getElementById('drive-backup-token');
+    const intervalEl = document.getElementById('drive-backup-interval');
+    const minIntervalMinutes = Math.max(1, parseInt(intervalEl && intervalEl.value ? intervalEl.value : '60', 10) || 60);
+    api.setDriveBackupConfig({
+        enabled: Boolean(enabledEl && enabledEl.checked),
+        accessToken: tokenEl ? tokenEl.value.trim() : '',
+        minIntervalMinutes
+    });
+    showToast("Configurazione backup Drive salvata.", 'success');
+}
+
+async function runDriveBackupNow() {
+    const api = getDriveBackupStorageApi();
+    if (!api || typeof api.triggerDriveBackupNow !== 'function') {
+        showToast("Storage avanzato non disponibile su questo browser.", 'error');
+        return;
+    }
+    const result = await api.triggerDriveBackupNow();
+    if (result && result.ok) {
+        showToast("Backup Drive completato.", 'success');
+    } else {
+        showToast("Backup Drive non completato. Verifica token e connessione.", 'error');
+    }
 }
 
 function toggleDrawer() {
