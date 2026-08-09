@@ -13,6 +13,14 @@ const ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
 
+function serviceUnavailableResponse() {
+  return new Response('Service Unavailable', {
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+  });
+}
+
 // Installazione Service Worker e salvataggio in cache
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -57,8 +65,7 @@ self.addEventListener('fetch', (e) => {
             return networkResponse;
           });
         }).catch(() => {
-          // Ritorna una Response vuota con status 503 invece di undefined
-          return new Response('', { status: 503, statusText: 'Service Unavailable' });
+          return serviceUnavailableResponse();
         });
       })
     );
@@ -76,10 +83,10 @@ self.addEventListener('fetch', (e) => {
         // Fallback di sicurezza offline per pagine HTML
         if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
           return caches.match('./index.html').then((offlinePage) => {
-            return offlinePage || new Response('', { status: 503, statusText: 'Service Unavailable' });
+            return offlinePage || serviceUnavailableResponse();
           });
         }
-        return new Response('', { status: 503, statusText: 'Service Unavailable' });
+        return serviceUnavailableResponse();
       });
     })
   );
