@@ -75,7 +75,9 @@ self.addEventListener('fetch', (e) => {
       }).catch(() => {
         // Fallback di sicurezza offline per pagine HTML
         if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
-          return caches.match('./index.html');
+          return caches.match('./index.html').then((offlinePage) => {
+            return offlinePage || new Response('', { status: 503, statusText: 'Service Unavailable' });
+          });
         }
         return new Response('', { status: 503, statusText: 'Service Unavailable' });
       });
