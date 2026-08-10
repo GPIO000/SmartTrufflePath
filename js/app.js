@@ -1,4 +1,7 @@
+import * as TruffleStorage from './storage-sync.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
+
+window.TruffleStorage = TruffleStorage;
 
 try {
     if (window.TruffleStorage && typeof window.TruffleStorage.init === 'function') {
@@ -269,7 +272,7 @@ function invokeActionHandler(actionName, event, args = []) {
     if (typeof handler !== 'function') return;
     Promise.resolve(handler(event, ...args)).catch((error) => {
         console.error('Errore azione UI:', actionName, error);
-        showToast('Errore durante l'azione richiesta.', 'error');
+        showToast("Errore durante l'azione richiesta.", 'error');
     });
 }
 
@@ -2481,11 +2484,11 @@ function saveDriveBackupSettings() {
 
 async function runDriveBackupNow() {
     const api = getDriveBackupStorageApi();
-    if (!api || typeof api.triggerDriveBackupNow !== 'function') {
+    if (!api || typeof api.triggerDriveBackupNowImmediate !== 'function') {
         showToast("Storage avanzato non disponibile su questo browser.", 'error');
         return;
     }
-    const result = await api.triggerDriveBackupNow();
+    const result = await api.triggerDriveBackupNowImmediate();
     if (result && result.ok) {
         showToast("Backup Drive completato.", 'success');
     } else {
@@ -3037,11 +3040,7 @@ function isSpecieApertaCorrente(periodoStr) {
 }
 
 function elaboraTestoIncollato() {
-    // Esempio di utilizzo collegato a un pulsante o a un evento
-    const testo = document.getElementById('inputTestoGrezzo').value;
-    const datiEstratti = estraiSpecieEPeriodiDaTesto(testo);
-    
-    console.log(datiEstratti);
+    estraiDateTartufiDaTesto();
 }
 
 function estraiDateTartufiDaTesto() {
@@ -3146,8 +3145,8 @@ function estraiDateTartufiDaTesto() {
     if (modificheEffettuate > 0) {
         localStorage.setItem('calendari_tartufi_custom', JSON.stringify(calendariPersonalizzati));
         
-        if (typeof aggiornaCalendarioGPS === 'function') {
-            aggiornaCalendarioGPS();
+        if (typeof window.aggiornaCalendarioGPS === 'function') {
+            window.aggiornaCalendarioGPS();
         }
 
         showToast(`🔍 Aggiornati ${modificheEffettuate} periodi.`, 'success');

@@ -22,5 +22,15 @@ export default [
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
     }
-  }
+  },
+  {
+    files: ['js/app.js'],
+    rules: {
+      'no-case-declarations': 'off',
+      'no-unused-vars': 'off',
+      'no-useless-assignment': 'off',
+      'no-useless-escape': 'off',
+      'preserve-caught-error': 'off'
+    }
+  },
 ];

@@ -1,4 +1,3 @@
-(() => {
   const DB_NAME = 'truffle-storage-db';
   const DB_VERSION = 1;
   const STORE_KV = 'kv';
@@ -85,7 +84,7 @@
     try {
       const parsed = JSON.parse(value);
       return parsed && typeof parsed === 'object' ? parsed : fallbackValue;
-    } catch (error) {
+    } catch {
       return fallbackValue;
     }
   }
@@ -288,11 +287,8 @@
     initialized = true;
   }
 
-  window.TruffleStorage = {
-    init,
-    getDriveBackupConfig,
-    setDriveBackupConfig,
-    triggerDriveBackupNow: () => triggerDriveBackupNow(true),
-    collectBackupPayload
-  };
-})();
+export { init, getDriveBackupConfig, setDriveBackupConfig, collectBackupPayload };
+
+export function triggerDriveBackupNowImmediate() {
+  return triggerDriveBackupNow(true);
+}
