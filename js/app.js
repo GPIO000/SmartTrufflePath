@@ -1745,11 +1745,9 @@ function openModule(moduleName, editMode = false) {
     
     activeView.innerHTML = `
         <div class="module-header-bar">
-            <button ${actionAttrs('closeActiveModule')} class="back-map-btn">← Torna alla Mappa</button>
-            <div class="header-actions">
-                <button ${actionAttrs('mostraInfoModulo', [moduleName])} class="back-map-btn btn-neutral btn-round text-sky border-slate" title="Guida modulo" aria-label="Apri la guida del modulo">❓</button>
-                <button ${actionAttrs('closeDrawerAndModule')} class="back-map-btn">☰ Torna al Menu</button>
-            </div>
+            <button ${actionAttrs('closeActiveModule')} class="back-map-btn module-nav-btn module-nav-btn-left">← Torna alla Mappa</button>
+            <button ${actionAttrs('mostraInfoModulo', [moduleName])} class="back-map-btn btn-neutral btn-round text-sky border-slate module-help-btn" title="Guida modulo" aria-label="Apri la guida del modulo">❓</button>
+            <button ${actionAttrs('closeDrawerAndModule')} class="back-map-btn module-nav-btn module-nav-btn-right">☰ Torna al Menu</button>
         </div>
         <div class="module-body-content">${contentHTML}</div>
     `;

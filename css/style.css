@@ -335,9 +335,9 @@ textarea:focus-visible {
 .module-header-bar {
     min-height: 58px;
     background: linear-gradient(180deg, rgba(29, 39, 28, 0.98), rgba(22, 31, 23, 0.95));
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
     padding: 10px 16px;
     border-bottom: 1px solid var(--border-soft);
@@ -355,6 +355,23 @@ textarea:focus-visible {
     font-size: 0.98rem;
     font-weight: 700;
     cursor: pointer;
+}
+
+.module-nav-btn {
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.module-nav-btn-left {
+    justify-self: start;
+}
+
+.module-nav-btn-right {
+    justify-self: end;
+}
+
+.module-help-btn {
+    justify-self: center;
 }
 
 .module-body-content {
@@ -475,6 +492,8 @@ textarea:focus-visible {
     padding: 0;
     max-width: 90vw;
     width: 340px;
+    margin: auto;
+    inset: 0;
     box-shadow: var(--shadow-strong);
 }
 
