@@ -1128,6 +1128,7 @@ function openModule(moduleName, editMode = false) {
             const defaultVetNote = vetDraft.note || '';
             const defaultHeatDate = vetDraft.heatData || new Date().toISOString().slice(0,10);
             const defaultHeatNote = vetDraft.heatNote || '';
+            localStorage.removeItem('vet_form_draft');
             let optionsHtml = '';
             if (dogsListVet.length > 0) {
                 dogsListVet.forEach(dog => {
@@ -1777,9 +1778,6 @@ function openModule(moduleName, editMode = false) {
         <div class="module-body-content">${contentHTML}</div>
     `;
     activeView.style.display = 'flex';
-    if (moduleName === 'vet') {
-        localStorage.removeItem('vet_form_draft');
-    }
     if (moduleName === 'export') {
         setTimeout(syncDriveBackupSettingsUI, 0);
     }
