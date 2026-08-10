@@ -1645,7 +1645,11 @@ function openModule(moduleName, editMode = false) {
     let specieAperteTrovate = 0;
 
     specieTartufiCal.forEach((specie, id) => {
-        let periodo = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : "Ottobre - Gennaio";
+        let defaultPeriodoCal = "Ottobre - Gennaio";
+        if (specie.includes("aestivum") || specie.includes("Aestivum") || specie.includes("Scorzone Estivo")) defaultPeriodoCal = "Maggio - Settembre";
+        if (specie.includes("borchii") || specie.includes("Borchii") || specie.includes("Bianchetto")) defaultPeriodoCal = "Gennaio - Aprile";
+        if (specie.includes("melanosporum") || specie.includes("Melanosporum") || specie.includes("Nero Pregiato")) defaultPeriodoCal = "Novembre - Marzo";
+        let periodo = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : defaultPeriodoCal;
         
         // Controllo di sicurezza nel caso in cui la funzione di verifica non esista
         let isOpen = typeof window.isSpecieApertaCorrente === 'function' ? isSpecieApertaCorrente(periodo) : true;
