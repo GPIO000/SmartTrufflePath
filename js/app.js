@@ -209,6 +209,11 @@ const ACTION_HANDLERS = {
     saveF24WithFile: () => saveF24WithFile(),
     saveNewCane: () => saveNewCane(),
     deleteDog: (_event, index) => deleteDog(index),
+    setVetSelectedDog: (event) => {
+        localStorage.setItem('vet_selected_dog', event.target.value);
+        openModule('vet');
+    },
+    saveHeatCycle: () => saveHeatCycle(),
     savePolizza: () => savePolizza(),
     deletePolizza: (_event, index) => deletePolizza(index),
     saveVetHistoryItem: () => saveVetHistoryItem(),
@@ -302,6 +307,21 @@ bindDelegatedActions();
 
 function sanitizePhoneHref(phoneNumber) {
     return String(phoneNumber ?? '').replace(/[^0-9+]/g, '');
+}
+
+function addMonthsToIsoDate(dateString, months) {
+    if (!dateString) return '';
+    const date = new Date(`${dateString}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setMonth(date.getMonth() + months);
+    return date.toISOString().slice(0, 10);
+}
+
+function formatItalianDate(dateString) {
+    if (!dateString) return 'Non disponibile';
+    const date = new Date(`${dateString}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString('it-IT');
 }
 
 function isSafeDataUrl(value) {
@@ -604,7 +624,7 @@ function openModule(moduleName, editMode = false) {
                 }
 
                 contentHTML = `
-                    <h2>Dati Personali & Tesserino Digitale</h2>
+                    <h2>Dati Anagrafici & Tesserino Digitale</h2>
                     <p><strong>Normativa:</strong> Legge 145/2018</p>
                     <div class="module-card card-green-border">
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ Dati Personali Registrati</p>
@@ -613,9 +633,9 @@ function openModule(moduleName, editMode = false) {
                         <p><strong>Indirizzo:</strong> ${tData.indirizzo || 'Non inserito'}</p>
                         <p><strong>Regione / Prov:</strong> ${tData.regione}</p>
                         <p><strong>N. Tesserino:</strong> ${tData.num}</p>
+                        <p><strong>Documento allegato:</strong> ${tData.nomeFile || 'Nessun file caricato'}</p>
                         ${tData.iban ? `<p style="margin-top:8px; padding-top:8px; border-top:1px dashed #334155;"><strong>IBAN:</strong> ${tData.iban}</p>` : ''}
-                        ${tData.banca ? `<p><strong>Banca:</strong> ${tData.banca}</p>` : ''}
-                        ${tData.intestatario ? `<p><strong>Intestatario c/c:</strong> ${tData.intestatario}</p>` : ''}
+                        ${tData.banca ? `<p><strong>Banca / Istituto:</strong> ${tData.banca}</p>` : ''}
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
@@ -625,7 +645,7 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             } else {
                 contentHTML = `
-                    <h2>Dati Personali & Tesserino Digitale</h2>
+                    <h2>Dati Anagrafici & Tesserino Digitale</h2>
                     <p>Inserisci i tuoi dati personali e gli estremi del tesserino regionale per la raccolta dei tartufi:</p>
                     <div class="module-card">
                         <label>Nome e Cognome:</label>
@@ -638,15 +658,13 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="t-regione" class="mod-input" value="${tData.regione || ''}" placeholder="Es. Molise / Abruzzo">
                         <label>Numero Tesserino:</label>
                         <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Numero autorizzazione">
+                        <label style="margin-top:10px;">Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
+                        <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
                         <p style="margin-top:14px; margin-bottom:6px; color:#94a3b8; font-size:0.8rem; text-transform:uppercase; border-top:1px dashed #334155; padding-top:10px;">💳 Coordinate Bancarie (per bonifico)</p>
                         <label>IBAN:</label>
                         <input type="text" id="t-iban" class="mod-input" value="${tData.iban || ''}" placeholder="Es. IT60 X054 2811 1010 0000 0123 456">
-                        <label>Banca / Istituto di Credito:</label>
+                        <label>Banca / Istituto di Credito (facoltativo):</label>
                         <input type="text" id="t-banca" class="mod-input" value="${tData.banca || ''}" placeholder="Es. Banca Intesa Sanpaolo">
-                        <label>Intestatario Conto Corrente:</label>
-                        <input type="text" id="t-intestatario" class="mod-input" value="${tData.intestatario || ''}" placeholder="Es. Mario Rossi">
-                        <label style="margin-top:10px;">Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
-                        <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
                         <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveTesserino')}>Salva Dati Personali</button>
                     </div>`;
             }
@@ -979,14 +997,20 @@ function openModule(moduleName, editMode = false) {
         case 'canidiary':
             const dogsList = getRenderableStorageJSON('dogs_list', []);
             let dogsHtml = `
-                <h2>Profilo Cani & Diario Ricerca</h2>
-                <p>Gestisci i tuoi cani da tartufo:</p>
+                <h2>Anagrafica Cane</h2>
+                <p>Gestisci l'anagrafica dei tuoi cani da tartufo:</p>
                 <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
                     <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Nuovo Cane</h3>
                     <label>Nome del Cane:</label>
                     <input type="text" id="c-nome" class="mod-input" placeholder="Es. Argo">
                     <label>Razza:</label>
                     <input type="text" id="c-razza" class="mod-input" value="Lagotto Romagnolo">
+                    <label>Sesso:</label>
+                    <select id="c-sesso" class="mod-input">
+                        <option value="">Seleziona sesso</option>
+                        <option value="Maschio">Maschio</option>
+                        <option value="Femmina">Femmina</option>
+                    </select>
                     <label>Data di Nascita:</label>
                     <input type="date" id="c-nascita" class="mod-input">
                     <label>Numero Microchip:</label>
@@ -1002,6 +1026,7 @@ function openModule(moduleName, editMode = false) {
                         <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
                             <strong style="color:#f8fafc; font-size:1rem;">🐕 ${dog.nome}</strong>
                             <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">Razza: ${dog.razza}</p>
+                            <p style="font-size:0.8rem; color:#f59e0b; margin: 2px 0;">Sesso: ${dog.sesso || 'Non specificato'}</p>
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Nascita: ${dog.nascita || 'Non specificata'}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">Microchip: ${dog.microchip || 'Non inserito'}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteDog', [idx])}>🗑️ Elimina</button>
@@ -1082,22 +1107,31 @@ function openModule(moduleName, editMode = false) {
         case 'vet':
             const dogsListVet = getRenderableStorageJSON('dogs_list', []);
             const cDataVet = getRenderableStorageJSON('cane_data', {});
-            const nomeCaneDefault = cDataVet.nome || (dogsListVet.length > 0 ? dogsListVet[0].nome : 'Il tuo cane');
+            const vetSelectedDog = localStorage.getItem('vet_selected_dog') || '';
+            const hasStoredSelection = dogsListVet.some(dog => dog.nome === vetSelectedDog);
+            const nomeCaneDefault = (hasStoredSelection ? vetSelectedDog : '') || cDataVet.nome || (dogsListVet.length > 0 ? dogsListVet[0].nome : 'Il tuo cane');
             const vetHistory = getRenderableStorageJSON('vet_history_list', []);
+            const selectedDogDetails = dogsListVet.find(dog => dog.nome === nomeCaneDefault) || cDataVet;
+            const isFemaleDogSelected = selectedDogDetails?.sesso === 'Femmina';
             let optionsHtml = '';
             if (dogsListVet.length > 0) {
                 dogsListVet.forEach(dog => {
                     const selected = dog.nome === nomeCaneDefault ? 'selected' : '';
-                    optionsHtml += `<option value="${dog.nome}" ${selected}>${dog.nome} (${dog.razza})</option>`;
+                    optionsHtml += `<option value="${dog.nome}" ${selected}>${dog.nome} (${dog.razza}${dog.sesso ? ` - ${dog.sesso}` : ''})</option>`;
                 });
             } else { optionsHtml += `<option value="${nomeCaneDefault}">${nomeCaneDefault}</option>`; }
+            const heatEntries = vetHistory
+                .filter(item => item.cane === nomeCaneDefault && item.tipo === '🔥 Calore')
+                .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+            const latestHeatEntry = heatEntries[0] || null;
+            const nextHeatDate = latestHeatEntry?.prossimoCalore || addMonthsToIsoDate(latestHeatEntry?.data, 6);
             let vetHtml = `
                 <h2>Libretto Sanitario & Profilassi</h2>
                 <p>Storico trattamenti, vaccini e visite per il cane:</p>
                 <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
                     <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Trattamento / Visita</h3>
                     <label>Seleziona Cane:</label>
-                    <select id="vh-cane" class="mod-input">${optionsHtml}</select>
+                    <select id="vh-cane" class="mod-input" ${eventActionAttrs('change', 'setVetSelectedDog')}>${optionsHtml}</select>
                     <label>Tipologia Intervento:</label>
                     <select id="vh-tipo" class="mod-input">
                         <option value="💉 Vaccino">Vaccino</option>
@@ -1114,6 +1148,24 @@ function openModule(moduleName, editMode = false) {
                     <input type="text" id="vh-note" class="mod-input" placeholder="Es. Nome farmaco o dosaggio">
                     <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveVetHistoryItem')}>Registra nel Libretto</button>
                 </div>`;
+            if (isFemaleDogSelected) {
+                vetHtml += `
+                    <div class="module-card" style="margin-bottom: 20px; background: #0f172a; border: 1px solid #7c3aed;">
+                        <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">🌸 Diario Calore</h3>
+                        <p style="font-size:0.85rem; color:#cbd5e1; margin-bottom:10px;">Registra i cicli di ${selectedDogDetails?.nome || nomeCaneDefault} e monitora il prossimo calore previsto.</p>
+                        <label>Data inizio calore:</label>
+                        <input type="date" id="heat-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+                        <label>Note sul ciclo:</label>
+                        <input type="text" id="heat-note" class="mod-input" placeholder="Es. durata, sintomi, osservazioni">
+                        <button class="overlay-btn" style="margin-top:12px; width:100%; background:#7c3aed;" ${actionAttrs('saveHeatCycle')}>Salva Diario Calore</button>
+                        <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #475569;">
+                            <p style="font-size:0.82rem; color:#94a3b8; margin:0 0 4px;">Ultimo calore registrato</p>
+                            <p style="margin:0 0 8px; color:#f8fafc;">${latestHeatEntry ? formatItalianDate(latestHeatEntry.data) : 'Nessun ciclo registrato'}</p>
+                            <p style="font-size:0.82rem; color:#94a3b8; margin:0 0 4px;">Prossimo calore previsto</p>
+                            <p style="margin:0; color:#f472b6; font-weight:bold;">${nextHeatDate ? formatItalianDate(nextHeatDate) : 'Disponibile dopo il primo inserimento'}</p>
+                        </div>
+                    </div>`;
+            }
             if (vetHistory.length === 0) {
                 vetHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun trattamento registrato.</p></div>`;
             } else {
@@ -1126,6 +1178,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.tipo}</b></p>
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                            ${item.tipo === '🔥 Calore' && item.prossimoCalore ? `<p style="font-size:0.8rem; color:#f472b6; margin-bottom: 8px;">🌸 Prossimo calore previsto: ${formatItalianDate(item.prossimoCalore)}</p>` : ''}
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteVetHistoryItem', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
@@ -1732,7 +1785,6 @@ function saveTesserino() {
     const numVal = document.getElementById('t-num').value.trim();
     const ibanVal = (document.getElementById('t-iban') || {}).value?.trim() || '';
     const bancaVal = (document.getElementById('t-banca') || {}).value?.trim() || '';
-    const intestatarioVal = (document.getElementById('t-intestatario') || {}).value?.trim() || '';
     const fileInput = document.getElementById('t-file');
     const file = fileInput ? fileInput.files[0] : null;
 
@@ -1753,7 +1805,6 @@ function saveTesserino() {
             num: numVal,
             iban: ibanVal,
             banca: bancaVal,
-            intestatario: intestatarioVal,
             nomeFile: fileName !== undefined ? fileName : (tDataExisting.nomeFile || null),
             tipoFile: fileType !== undefined ? fileType : (tDataExisting.tipoFile || null),
             contenutoBase64: base64Content !== undefined ? base64Content : (tDataExisting.contenutoBase64 || null)
@@ -1882,13 +1933,15 @@ function savePagoPAWithFile() {
 function saveNewCane() {
     const nome = document.getElementById('c-nome').value.trim();
     const razza = document.getElementById('c-razza').value.trim();
+    const sesso = document.getElementById('c-sesso').value;
     const nascita = document.getElementById('c-nascita').value;
     const microchip = document.getElementById('c-microchip').value.trim();
     if (!nome) { showToast("Inserisci il nome del cane.", 'error'); return; }
+    if (!sesso) { showToast("Seleziona il sesso del cane.", 'error'); return; }
     let dogsList = readStorageJSON('dogs_list', []);
-    dogsList.push({ nome, razza, nascita, microchip });
+    dogsList.push({ nome, razza, sesso, nascita, microchip });
     localStorage.setItem('dogs_list', JSON.stringify(dogsList));
-    localStorage.setItem('cane_data', JSON.stringify({ nome, razza, nascita, microchip }));
+    localStorage.setItem('cane_data', JSON.stringify({ nome, razza, sesso, nascita, microchip }));
     showToast("Cane aggiunto!", 'success');
     openModule('canidiary');
 }
@@ -2725,6 +2778,24 @@ function saveVetHistoryItem() {
     showToast("Trattamento registrato!", 'success'); openModule('vet');
 }
 
+function saveHeatCycle() {
+    const cane = document.getElementById('vh-cane').value;
+    const data = document.getElementById('heat-data').value;
+    const note = document.getElementById('heat-note').value.trim();
+    if (!data) { showToast("Inserisci la data del calore.", 'error'); return; }
+    let vetHistory = readStorageJSON('vet_history_list', []);
+    vetHistory.push({
+        cane,
+        tipo: '🔥 Calore',
+        data,
+        note,
+        prossimoCalore: addMonthsToIsoDate(data, 6)
+    });
+    localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
+    showToast("Diario calore aggiornato!", 'success');
+    openModule('vet');
+}
+
 async function deleteVetHistoryItem(index) {
     if (await appConfirm("Rimuovere record?")) {
         let vetHistory = readStorageJSON('vet_history_list', []);
@@ -3409,14 +3480,14 @@ function importaCalendariJSON(event) {
 async function mostraInfoModulo(moduleName) {
     const guideTesti = {
         'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
-        'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto o un PDF del documento (max 1.5MB) per averlo sempre a portata di mano.",
+        'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati anagrafici, gli estremi del tesserino regionale e il relativo allegato digitale, con coordinate bancarie opzionali per il bonifico.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA & PDF**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto (Imposta Sostitutiva o Ritenuta d'Acconto) in base alla presenza di un F24 valido.",
         'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\Consulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
-        'canidiary': "ℹ️ **Guida - Profilo Cani & Diario**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo razza, data di nascita e numero di microchip.",
+        'canidiary': "ℹ️ **Guida - Anagrafica Cane**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo nome, razza, sesso, data di nascita e numero di microchip.",
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
-        'vet': "ℹ️ **Guida - Libretto Sanitario & Profilassi**\n\nRegistra lo storico dei trattamenti veterinari, dei vaccini e della somministrazione di antiparassitari per i tuoi cani.",
+        'vet': "ℹ️ **Guida - Libretto Sanitario & Profilassi**\n\nRegistra lo storico dei trattamenti veterinari, dei vaccini e della somministrazione di antiparassitari per i tuoi cani. Per le femmine è disponibile anche il diario del calore con previsione del ciclo successivo.",
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
