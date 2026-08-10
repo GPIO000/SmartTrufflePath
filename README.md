@@ -1,6 +1,6 @@
-# 🍄 Truffle Mobil Frist
+# 🍄 Truffle Mobil First
 
-**Truffle Mobil Frist** è un'applicazione web mobile-first avanzata, progettata specificamente per i cercatori di tartufi. Combina una mappa interattiva offline-first con strumenti di geolocalizzazione, gestione delle tartufaie, utilità per i cani da tartufo e moduli per la conformità burocratica e fiscale italiana (Legge 145/2018 e normative correlate)[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span).
+**Truffle Mobil First** è un'applicazione web mobile-first avanzata, progettata specificamente per i cercatori di tartufi. Combina una mappa interattiva offline-first con strumenti di geolocalizzazione, gestione delle tartufaie, utilità per i cani da tartufo e moduli per la conformità burocratica e fiscale italiana (Legge 145/2018 e normative correlate)[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span).
 
 ---
 
@@ -33,6 +33,9 @@
 ---
 
 ## 📁 Struttura del Progetto
+
+> Nota: il bootstrap applicativo ora usa `js/app.js` come modulo ES e `js/storage-sync.js` per l'inizializzazione dello storage offline-first.
+
 
 ```text
 ├── index.html          # Struttura principale dell'app e interfaccia UI

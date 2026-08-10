@@ -1,0 +1,22 @@
+{
+  "name": "truffle-mobil-first",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Applicazione web mobile-first per la raccolta e la gestione dei tartufi.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.8.1",
+    "globals": "17.9.0",
+    "jsdom": "30.0.1",
+    "vite": "8.2.1",
+    "vitest": "4.1.10"
+  }
+}

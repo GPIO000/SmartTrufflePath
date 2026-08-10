@@ -1,3 +1,21 @@
+import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
+
+try {
+    if (window.TruffleStorage && typeof window.TruffleStorage.init === 'function') {
+        await window.TruffleStorage.init();
+    }
+} catch (error) {
+    console.warn('Inizializzazione storage avanzato non riuscita.', error);
+}
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then((reg) => console.log('Service Worker registrato con successo:', reg.scope))
+            .catch((err) => console.log('Registrazione Service Worker fallita:', err));
+    });
+}
+
 // Inizializzazione Mappa corretta (ordine invertito per evitare ReferenceError)
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
@@ -139,6 +157,144 @@ function sanitizeRenderable(value) {
 function getRenderableStorageJSON(key, fallbackValue) {
     return sanitizeRenderable(readStorageJSON(key, fallbackValue));
 }
+
+
+function encodeActionArgs(args = []) {
+    return escapeHtml(JSON.stringify(args));
+}
+
+function actionAttrs(actionName, args = []) {
+    return `data-action="${escapeHtml(actionName)}" data-action-args="${encodeActionArgs(args)}"`;
+}
+
+function eventActionAttrs(eventName, actionName, args = []) {
+    const safeEventName = escapeHtml(eventName);
+    return `data-${safeEventName}-action="${escapeHtml(actionName)}" data-${safeEventName}-args="${encodeActionArgs(args)}"`;
+}
+
+function parseActionArgs(rawArgs) {
+    if (!rawArgs) return [];
+    try {
+        const parsed = JSON.parse(rawArgs);
+        return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (error) {
+        console.warn('Argomenti azione non validi ignorati.', error);
+        return [];
+    }
+}
+
+const ACTION_HANDLERS = {
+    toggleDrawer: () => toggleDrawer(),
+    centerOnUser: () => centerOnUser(),
+    saveCarPosition: () => saveCarPosition(),
+    returnToCar: () => returnToCar(),
+    deleteCarPosition: () => deleteCarPosition(),
+    savePoiPosition: () => savePoiPosition(),
+    triggerSOS: () => triggerSOS(),
+    shareAppUrl: () => shareAppUrl(),
+    installApp: () => installApp(),
+    openModule: (_event, moduleName, editMode = false) => openModule(moduleName, editMode),
+    closeActiveModule: () => closeActiveModule(),
+    mostraInfoModulo: (_event, moduleName) => mostraInfoModulo(moduleName),
+    navigateToPoi: (_event, index) => navigateToPoi(index),
+    sharePoi: (_event, index) => sharePoi(index),
+    deletePoi: (_event, index) => deletePoi(index),
+    viewStoredDocument: (_event, storageKey, title, moduleName) => viewStoredDocument(storageKey, title, moduleName),
+    clearData: (_event, storageKey, moduleName) => clearData(storageKey, moduleName),
+    saveTesserino: () => saveTesserino(),
+    savePagoPAWithFile: () => savePagoPAWithFile(),
+    saveF24WithFile: () => saveF24WithFile(),
+    saveNewCane: () => saveNewCane(),
+    deleteDog: (_event, index) => deleteDog(index),
+    savePolizza: () => savePolizza(),
+    deletePolizza: (_event, index) => deletePolizza(index),
+    saveVetHistoryItem: () => saveVetHistoryItem(),
+    deleteVetHistoryItem: (_event, index) => deleteVetHistoryItem(index),
+    saveRaccoltaGiornaliera: () => saveRaccoltaGiornaliera(),
+    deleteRaccoltaGiornaliera: (_event, index) => deleteRaccoltaGiornaliera(index),
+    saveSpesa: () => saveSpesa(),
+    deleteSpesa: (_event, index) => deleteSpesa(index),
+    esportaDatiCSV: () => esportaDatiCSV(),
+    esportaBackupJSON: () => esportaBackupJSON(),
+    saveDriveBackupSettings: () => saveDriveBackupSettings(),
+    runDriveBackupNow: () => runDriveBackupNow(),
+    saveVetClinic: () => saveVetClinic(),
+    shareLocationToVetByIndex: (_event, index) => shareLocationToVetByIndex(index),
+    deleteVetClinic: (_event, index) => deleteVetClinic(index),
+    salvaNotaClienteDaInput: (_event, index) => salvaNotaClienteDaInput(index),
+    creaRicevutaPerCliente: (_event, index) => creaRicevutaPerCliente(index),
+    mostraRicevuteClienteByIndex: (_event, index) => mostraRicevuteClienteByIndex(index),
+    deleteCliente: (_event, index) => deleteCliente(index),
+    estraiDateTartufiDaTesto: () => estraiDateTartufiDaTesto(),
+    esportaCalendariJSON: () => esportaCalendariJSON(),
+    importaCalendariJSON: (event) => importaCalendariJSON(event),
+    chiudiDettaglioRicevuta: () => chiudiDettaglioRicevuta(),
+    condividiRicevuta: (_event, index) => condividiRicevuta(index),
+    condividiRicevutaEmail: (_event, index) => condividiRicevutaEmail(index),
+    visualizzaRicevutaSalvata: (_event, index) => visualizzaRicevutaSalvata(index),
+    modificaRicevuta: (_event, index) => modificaRicevuta(index),
+    salvaModificaRicevuta: (_event, index) => salvaModificaRicevuta(index),
+    eliminaRicevutaConDoppiaConferma: (_event, index) => eliminaRicevutaConDoppiaConferma(index),
+    calcolaTotale: () => calcolaTotale(),
+    calcolaRitenutaAcconto: () => calcolaRitenutaAcconto(),
+    autocompilaDatiCliente: (event) => autocompilaDatiCliente(event.target.value),
+    importBackupData: (event) => importBackupData(event),
+    setArchivioRegione: (event) => {
+        window.currentArchivioRegione = event.target.value;
+        openModule('archivio');
+    },
+    refreshRegistroGiornaliero: () => openModule('registro_giornaliero'),
+    registerRicevutaSafe: async () => {
+        try {
+            await registraVenditaConPrezzoKg();
+        } catch (error) {
+            showToast('Errore: ' + error.message, 'error');
+            console.error(error);
+        }
+    },
+    showAllStoricoRicevute: () => {
+        localStorage.removeItem('filtro_storico_cliente');
+        openModule('storico_ricevute');
+    },
+    saveArchivioRegionaleTartufiSelected: () => salvaArchivioRegionaleTartufi((document.getElementById('seleziona-regione-archivio') || {}).value),
+    printPage: () => window.print(),
+    closeDrawerAndModule: () => {
+        toggleDrawer();
+        closeActiveModule();
+    }
+};
+
+function invokeActionHandler(actionName, event, args = []) {
+    const handler = ACTION_HANDLERS[actionName];
+    if (typeof handler !== 'function') return;
+    Promise.resolve(handler(event, ...args)).catch((error) => {
+        console.error('Errore azione UI:', actionName, error);
+        showToast('Errore durante l'azione richiesta.', 'error');
+    });
+}
+
+function bindDelegatedActions() {
+    document.addEventListener('click', (event) => {
+        const target = event.target.closest('[data-action]');
+        if (!target) return;
+        event.preventDefault();
+        invokeActionHandler(target.dataset.action, event, parseActionArgs(target.dataset.actionArgs));
+    });
+
+    document.addEventListener('input', (event) => {
+        const target = event.target.closest('[data-input-action]');
+        if (!target) return;
+        invokeActionHandler(target.dataset.inputAction, event, parseActionArgs(target.dataset.inputArgs));
+    });
+
+    document.addEventListener('change', (event) => {
+        const target = event.target.closest('[data-change-action]');
+        if (!target) return;
+        invokeActionHandler(target.dataset.changeAction, event, parseActionArgs(target.dataset.changeArgs));
+    });
+}
+
+bindDelegatedActions();
 
 function sanitizePhoneHref(phoneNumber) {
     return String(phoneNumber ?? '').replace(/[^0-9+]/g, '');
@@ -418,9 +574,9 @@ function openModule(moduleName, editMode = false) {
                             <p class="text-muted small-text" style="margin:4px 0;">Data: ${safePoi.date}</p>
                             <p class="text-subtle small-text">Lat: ${poi.lat.toFixed(4)}, Lng: ${poi.lng.toFixed(4)}</p>
                             <div class="btn-row">
-                                <button class="overlay-btn btn-success" onclick="navigateToPoi(${idx})">🧭 Vai</button>
-                                <button class="overlay-btn btn-info" onclick="sharePoi(${idx})">📤 Condividi</button>
-                                <button class="overlay-btn btn-danger" onclick="deletePoi(${idx})">🗑️ Elimina</button>
+                                <button class="overlay-btn btn-success" ${actionAttrs('navigateToPoi', [idx])}>🧭 Vai</button>
+                                <button class="overlay-btn btn-info" ${actionAttrs('sharePoi', [idx])}>📤 Condividi</button>
+                                <button class="overlay-btn btn-danger" ${actionAttrs('deletePoi', [idx])}>🗑️ Elimina</button>
                             </div>
                         </div>`;
                 });
@@ -435,7 +591,7 @@ function openModule(moduleName, editMode = false) {
                 if (getStoredDocumentData('tesserino_data')) {
                     if (tData.tipoFile && tData.tipoFile.startsWith('image/')) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${tData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('tesserino_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Tesserino"></div>`;
-                        visualizzaBtnHTML = `<button class="overlay-btn btn-info" onclick="viewStoredDocument('tesserino_data', 'Tesserino Digitale', 'tesserino')">👁️ Visualizza Immagine</button>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn btn-info" ${actionAttrs('viewStoredDocument', ['tesserino_data', 'Tesserino Digitale', 'tesserino'])}>👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${tData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -455,8 +611,8 @@ function openModule(moduleName, editMode = false) {
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
-                            <button class="overlay-btn btn-primary" onclick="openModule('tesserino', true)">✏️ Modifica</button>
-                            <button class="overlay-btn btn-danger" onclick="clearData('tesserino_data', 'tesserino')">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-primary" ${actionAttrs('openModule', ['tesserino', true])}>✏️ Modifica</button>
+                            <button class="overlay-btn btn-danger" ${actionAttrs('clearData', ['tesserino_data', 'tesserino'])}>🗑️ Elimina</button>
                         </div>
                     </div>`;
             } else {
@@ -474,7 +630,7 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Numero autorizzazione">
                         <label>Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
                         <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
-                        <button class="overlay-btn btn-primary btn-full mt-15" onclick="saveTesserino()">Salva Tesserino</button>
+                        <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveTesserino')}>Salva Tesserino</button>
                     </div>`;
             }
             break;
@@ -486,7 +642,7 @@ function openModule(moduleName, editMode = false) {
                 if (getStoredDocumentData('pagopa_data')) {
                     if (pData.tipoFile && pData.tipoFile.startsWith('image/')) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${pData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('pagopa_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Quietanza PagoPA"></div>`;
-                        visualizzaBtnHTML = `<button class="overlay-btn btn-info" onclick="viewStoredDocument('pagopa_data', 'Quietanza PagoPA', 'pagopa')">👁️ Visualizza Immagine</button>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn btn-info" ${actionAttrs('viewStoredDocument', ['pagopa_data', 'Quietanza PagoPA', 'pagopa'])}>👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${pData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -503,8 +659,8 @@ function openModule(moduleName, editMode = false) {
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
-                            <button class="overlay-btn btn-primary" onclick="openModule('pagopa', true)">✏️ Modifica</button>
-                            <button class="overlay-btn btn-danger" onclick="clearData('pagopa_data', 'pagopa')">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-primary" ${actionAttrs('openModule', ['pagopa', true])}>✏️ Modifica</button>
+                            <button class="overlay-btn btn-danger" ${actionAttrs('clearData', ['pagopa_data', 'pagopa'])}>🗑️ Elimina</button>
                         </div>
                     </div>`;
             } else {
@@ -518,7 +674,7 @@ function openModule(moduleName, editMode = false) {
                         <input type="date" id="p-data" class="mod-input" value="${pData.data || new Date().toISOString().slice(0,10)}">
                         <label>Carica Ricevuta (Immagine o PDF - Obbligatorio):</label>
                         <input type="file" id="p-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
-                        <button class="overlay-btn btn-primary btn-full mt-15" onclick="savePagoPAWithFile()">Archivia Ricevuta PagoPA</button>
+                        <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('savePagoPAWithFile')}>Archivia Ricevuta PagoPA</button>
                     </div>`;
             }
             break;
@@ -549,7 +705,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="hidden" id="r-regime" value="${f24ValidoPreview ? 'sostitutiva' : 'ritenuta'}">
 
                     <label>Acquirente (Privato o Ristorante / Ragione Sociale):</label>
-                    <input type="text" id="r-acquirente" class="mod-input" placeholder="Nome o Ristorante" oninput="autocompilaDatiCliente(this.value)">
+                    <input type="text" id="r-acquirente" class="mod-input" placeholder="Nome o Ristorante" ${eventActionAttrs('input', 'autocompilaDatiCliente')}>
                     
                     <label>P.IVA / Codice Fiscale Acquirente:</label>
                     <input type="text" id="r-cf-acquirente" class="mod-input" placeholder="P.IVA o CF acquirente">
@@ -581,13 +737,13 @@ function openModule(moduleName, editMode = false) {
                     </select>
                     
                     <label>Peso (grammi):</label>
-                    <input type="number" id="pesoGrammi" class="mod-input" placeholder="Es. 150" oninput="calcolaTotale()">
+                    <input type="number" id="pesoGrammi" class="mod-input" placeholder="Es. 150" ${eventActionAttrs('input', 'calcolaTotale')}>
 
                     <label>Prezzo al kg (€):</label>
-                    <input type="number" id="prezzoKg" class="mod-input" placeholder="Es. 1500.00" oninput="calcolaTotale()">
+                    <input type="number" id="prezzoKg" class="mod-input" placeholder="Es. 1500.00" ${eventActionAttrs('input', 'calcolaTotale')}>
 
                     <label>Importo Complessivo / Corrispettivo (€):</label>
-                    <input type="number" id="importoTotale" class="mod-input" placeholder="Es. 200.00" oninput="calcolaRitenutaAcconto()">
+                    <input type="number" id="importoTotale" class="mod-input" placeholder="Es. 200.00" ${eventActionAttrs('input', 'calcolaRitenutaAcconto')}>
 
                     <div id="container-ritenuta" style="display:${f24ValidoPreview ? 'none' : 'block'}; background:#0f172a; padding:10px; border-radius:6px; margin:10px 0; border:1px solid #334155;">
                         <p style="font-size:0.85rem; color:#38bdf8; margin-bottom:6px;"><b>Calcolo Ritenuta d'Acconto (23%):</b></p>
@@ -612,7 +768,7 @@ function openModule(moduleName, editMode = false) {
                     <label style="margin-top: 10px;">📝 Note Cliente (Rubrica):</label>
                     <textarea id="r-nota-cliente" class="mod-input" placeholder="Scrivi una nota per questo cliente..." rows="2" style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 6px; font-size: 0.8rem;"></textarea>
                     
-                    <button class="overlay-btn" style="margin-top:15px; width:100%;" onclick="try { registraVenditaConPrezzoKg(); } catch(e) { showToast('Errore: ' + e.message, 'error'); console.error(e); }">Registra e Genera Ricevuta Conforme</button>
+                    <button class="overlay-btn" style="margin-top:15px; width:100%;" ${actionAttrs('registerRicevutaSafe')}>Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             setTimeout(toggleRegimeFiscaleFields, 50);
             break;
@@ -629,7 +785,7 @@ function openModule(moduleName, editMode = false) {
         storicoHtml += `
             <div style="background: rgba(2, 132, 199, 0.2); border: 1px solid #0284c7; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                 <span style="color: #38bdf8; font-size: 0.9rem;">🔍 Filtrato per cliente: <strong>${filtroClienteRender}</strong></span>
-                <button class="overlay-btn" style="background: #475569; padding: 4px 8px; font-size: 0.75rem;" onclick="localStorage.removeItem('filtro_storico_cliente'); openModule('storico_ricevute');">Mostra Tutte</button>
+                <button class="overlay-btn" style="background: #475569; padding: 4px 8px; font-size: 0.75rem;" ${actionAttrs('showAllStoricoRicevute')}>Mostra Tutte</button>
             </div>`;
         
         // Filtra le ricevute in base al nome dell'acquirente (mantenendo il legame con il loro indice originale)
@@ -656,7 +812,7 @@ function openModule(moduleName, editMode = false) {
             
             let dettaglioImporto = `Importo: € ${escapeHtml(item.importo)}`;
             if (item.regime === 'ritenuta') {
-                const nettoVisibile = item.netto ? item.netto : (item.importo * 0.77).toFixed(2);
+                const nettoVisibile = item.netto ? item.netto : calcolaDettaglioRitenuta(item.importo).netto.toFixed(2);
                 dettaglioImporto = `Lordo: € ${escapeHtml(item.importo)} | <span style="color:#38bdf8;">Netto: € ${escapeHtml(nettoVisibile)}</span>`;
             }
 
@@ -667,9 +823,9 @@ function openModule(moduleName, editMode = false) {
                     <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${safeItem.specie} (${safeItem.peso}g)</p>
                     <p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">${dettaglioImporto}</p>
                     <div class="btn-row">
-                        <button class="overlay-btn btn-primary" style="padding:6px 10px; font-size:0.75rem;" onclick="visualizzaRicevutaSalvata(${originalIndex})">👁️ Visualizza</button>
-                        <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" onclick="modificaRicevuta(${originalIndex})">✏️ Modifica</button>
-                        <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="eliminaRicevutaConDoppiaConferma(${originalIndex})">🗑️ Elimina</button>
+                        <button class="overlay-btn btn-primary" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('visualizzaRicevutaSalvata', [originalIndex])}>👁️ Visualizza</button>
+                        <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('modificaRicevuta', [originalIndex])}>✏️ Modifica</button>
+                        <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('eliminaRicevutaConDoppiaConferma', [originalIndex])}>🗑️ Elimina</button>
                     </div>
                 </div>`;
         });
@@ -685,7 +841,7 @@ function openModule(moduleName, editMode = false) {
                 if (getStoredDocumentData('f24_data')) {
                     if (fData.tipoFile && fData.tipoFile.startsWith('image/')) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('f24_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
-                        visualizzaBtnHTML = `<button class="overlay-btn btn-info" onclick="viewStoredDocument('f24_data', 'F24 ELIDE', 'f24')">👁️ Visualizza Immagine</button>`;
+                        visualizzaBtnHTML = `<button class="overlay-btn btn-info" ${actionAttrs('viewStoredDocument', ['f24_data', 'F24 ELIDE', 'f24'])}>👁️ Visualizza Immagine</button>`;
                     } else {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
                     }
@@ -703,8 +859,8 @@ function openModule(moduleName, editMode = false) {
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
-                            <button class="overlay-btn btn-primary" onclick="openModule('f24', true)">✏️ Modifica</button>
-                            <button class="overlay-btn btn-danger" onclick="clearData('f24_data', 'f24')">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-primary" ${actionAttrs('openModule', ['f24', true])}>✏️ Modifica</button>
+                            <button class="overlay-btn btn-danger" ${actionAttrs('clearData', ['f24_data', 'f24'])}>🗑️ Elimina</button>
                         </div>
                     </div>`;
             } else {
@@ -724,7 +880,7 @@ function openModule(moduleName, editMode = false) {
                         <label>Carica Quietanza F24 (PDF o Immagine - Obbligatorio):</label>
                         <input type="file" id="f-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
                         
-                        <button class="overlay-btn btn-primary btn-full mt-15" onclick="saveF24WithFile()">Archivia F24 ELIDE</button>
+                        <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveF24WithFile')}>Archivia F24 ELIDE</button>
                     </div>`;
             }
             break;
@@ -743,7 +899,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="date" id="c-nascita" class="mod-input">
                     <label>Numero Microchip:</label>
                     <input type="text" id="c-microchip" class="mod-input" placeholder="Codice microchip">
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveNewCane()">Salva Nuovo Cane</button>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveNewCane')}>Salva Nuovo Cane</button>
                 </div>`;
             if (dogsList.length === 0) {
                 dogsHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun cane registrato.</p></div>`;
@@ -756,7 +912,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">Razza: ${dog.razza}</p>
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Nascita: ${dog.nascita || 'Non specificata'}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">Microchip: ${dog.microchip || 'Non inserito'}</p>
-                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteDog(${idx})">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteDog', [idx])}>🗑️ Elimina</button>
                         </div>`;
                 });
             }
@@ -786,7 +942,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="date" id="pol-scadenza" class="mod-input">
                     <label>Note / Massimali / Contatto:</label>
                     <input type="text" id="pol-note" class="mod-input" placeholder="Es. Massimale 1.5M">
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="savePolizza()">Salva Polizza</button>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('savePolizza')}>Salva Polizza</button>
                 </div>`;
             if (polizzeList.length === 0) {
                 polizzeHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna polizza registrata.</p></div>`;
@@ -825,7 +981,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📋 N. ${pol.numero}</p>
                             ${statoScadenza}
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${pol.note || 'Nessuna nota'}</p>
-                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deletePolizza(${idx})">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deletePolizza', [idx])}>🗑️ Elimina</button>
                         </div>`;
                 });
             }
@@ -864,7 +1020,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="date" id="vh-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
                     <label>Note / Dettagli:</label>
                     <input type="text" id="vh-note" class="mod-input" placeholder="Es. Nome farmaco o dosaggio">
-                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" onclick="saveVetHistoryItem()">Registra nel Libretto</button>
+                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveVetHistoryItem')}>Registra nel Libretto</button>
                 </div>`;
             if (vetHistory.length === 0) {
                 vetHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun trattamento registrato.</p></div>`;
@@ -878,7 +1034,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.tipo}</b></p>
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
-                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteVetHistoryItem(${originalIndex})">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteVetHistoryItem', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
             }
@@ -919,13 +1075,13 @@ function openModule(moduleName, editMode = false) {
                     <input type="number" id="reg-peso" class="mod-input" placeholder="Es. 250">
                     <label>Note:</label>
                     <input type="text" id="reg-note" class="mod-input" placeholder="Es. Bosco di castagni">
-                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" onclick="saveRaccoltaGiornaliera()">Salva nel Registro</button>
+                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveRaccoltaGiornaliera')}>Salva nel Registro</button>
                 </div>
                 <div class="module-card" style="margin-bottom: 15px; background: #0f172a; border: 1px solid #334155;">
                     <h3 style="font-size:0.85rem; color:#38bdf8; margin-bottom:8px;">🔍 Filtri Archivio</h3>
                     <div style="display: flex; gap: 10px;">
-                        <div style="flex:1;"><label style="font-size:0.75rem;">Anno:</label><select id="filtro-anno" class="mod-input" onchange="openModule('registro_giornaliero')">${opzioniAnniHtml}</select></div>
-                        <div style="flex:2;"><label style="font-size:0.75rem;">Specie:</label><select id="filtro-specie" class="mod-input" onchange="openModule('registro_giornaliero')">${opzioniSpecieHtml}</select></div>
+                        <div style="flex:1;"><label style="font-size:0.75rem;">Anno:</label><select id="filtro-anno" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniAnniHtml}</select></div>
+                        <div style="flex:2;"><label style="font-size:0.75rem;">Specie:</label><select id="filtro-specie" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniSpecieHtml}</select></div>
                     </div>
                 </div>`;
             let datiFiltrati = storicoRaccolta.filter(item => {
@@ -944,7 +1100,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.specie}</b></p>
                             <p style="font-size:0.85rem; color:#22c55e; margin: 2px 0;">⚖️ Peso: <b>${item.peso} g</b></p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
-                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteRaccoltaGiornaliera(${originalIndex})">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteRaccoltaGiornaliera', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
             }
@@ -975,7 +1131,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="number" step="0.01" id="spese-importo" class="mod-input" placeholder="Es. 25.00">
                     <label>Note / Descrizione:</label>
                     <input type="text" id="spese-note" class="mod-input" placeholder="Es. Benzina per uscita bosco">
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveSpesa()">Salva Spesa</button>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveSpesa')}>Salva Spesa</button>
                 </div>`;
 
             if (speseList.length === 0) {
@@ -996,7 +1152,7 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;"><b>${item.categoria}</b></p>
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
-                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteSpesa(${originalIndex})">🗑️ Elimina</button>
+                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteSpesa', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
 
@@ -1038,8 +1194,9 @@ function openModule(moduleName, editMode = false) {
                     const regime = item.regime || 'sostitutiva';
 
                     if (regime === 'ritenuta') {
-                        const ritenuta = item.ritenuta ? parseFloat(item.ritenuta) : (lordo * 0.23);
-                        const netto = item.netto !== undefined ? parseFloat(item.netto) : (lordo - ritenuta);
+                        const dettagliRitenuta = calcolaDettaglioRitenuta(lordo);
+                        const ritenuta = item.ritenuta ? parseFloat(item.ritenuta) : dettagliRitenuta.ritenuta;
+                        const netto = item.netto !== undefined ? parseFloat(item.netto) : dettagliRitenuta.netto;
                         
                         lordoRitenuta += lordo;
                         nettoRitenuta += netto;
@@ -1080,7 +1237,7 @@ function openModule(moduleName, editMode = false) {
             contentHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h2 style="margin: 0;">Contabilità & Bilancio Annuo (${annoCorrenteBilancio})</h2>
-                    <button onclick="window.print()" style="background-color: #3b82f6; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
+                    <button ${actionAttrs('printPage')} style="background-color: #3b82f6; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
                         🖨️ Stampa
                     </button>
                 </div>
@@ -1130,11 +1287,11 @@ function openModule(moduleName, editMode = false) {
                 <h2>Report & Backup Dati</h2>
                 <div class="module-card">
                     <p>Esporta i dati contabili o fai un backup completo.</p>
-                    <button class="overlay-btn btn-primary btn-full mt-15" onclick="esportaDatiCSV()">Scarica Contabilità in CSV</button>
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#16a34a;" onclick="esportaBackupJSON()">Scarica Backup Totale (JSON)</button>
+                    <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('esportaDatiCSV')}>Scarica Contabilità in CSV</button>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#16a34a;" ${actionAttrs('esportaBackupJSON')}>Scarica Backup Totale (JSON)</button>
                     <hr style="border-color:#334155; margin:20px 0;">
                     <label style="font-weight:bold; color:#f8fafc;">Ripristina Backup da File JSON:</label>
-                    <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" onchange="importBackupData(event)">
+                    <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
                     <hr style="border-color:#334155; margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#38bdf8;">Backup automatico su Google Drive</h3>
                     <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
@@ -1145,8 +1302,8 @@ function openModule(moduleName, editMode = false) {
                     <input type="password" id="drive-backup-token" class="mod-input" placeholder="Incolla token Bearer">
                     <label style="font-size:0.8rem; color:#cbd5e1; margin-top:8px;">Intervallo minimo (minuti)</label>
                     <input type="number" min="1" id="drive-backup-interval" class="mod-input" value="60">
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveDriveBackupSettings()">Salva Configurazione Drive</button>
-                    <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" onclick="runDriveBackupNow()">Esegui Backup Drive Adesso</button>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveDriveBackupSettings')}>Salva Configurazione Drive</button>
+                    <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('runDriveBackupNow')}>Esegui Backup Drive Adesso</button>
                 </div>`;
             break;
         case 'emergency':
@@ -1165,7 +1322,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="tel" id="vc-tel" class="mod-input" placeholder="Es. 0874123456">
                     <label>Note:</label>
                     <input type="text" id="vc-note" class="mod-input" placeholder="Es. Aperto festivi e notturno">
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" onclick="saveVetClinic()">Salva Contatto Emergenza</button>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveVetClinic')}>Salva Contatto Emergenza</button>
                 </div>`;
             if (vetClinics.length === 0) {
                 clinicHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna clinica salvata.</p></div>`;
@@ -1181,8 +1338,8 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 ${safeClinic.note || 'Nessuna nota'}</p>
                             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                                 <a href="tel:${telHref}" class="overlay-btn btn-danger" style="text-decoration:none; text-align:center; display:inline-block; padding:8px 12px;">📞 Chiama</a>
-                                <button class="overlay-btn btn-info" style="padding:8px 12px;" onclick="shareLocationToVetByIndex(${idx})">📍 Invia GPS</button>
-                                <button class="overlay-btn btn-neutral" style="padding:8px 12px;" onclick="deleteVetClinic(${idx})">🗑️ Elimina</button>
+                                <button class="overlay-btn btn-info" style="padding:8px 12px;" ${actionAttrs('shareLocationToVetByIndex', [idx])}>📍 Invia GPS</button>
+                                <button class="overlay-btn btn-neutral" style="padding:8px 12px;" ${actionAttrs('deleteVetClinic', [idx])}>🗑️ Elimina</button>
                             </div>
                         </div>`;
                 });
@@ -1229,14 +1386,14 @@ function openModule(moduleName, editMode = false) {
                             rows="2" 
                             placeholder="Scrivi una nota per questo cliente..."
                         >${cliente.nota || ''}</textarea>
-                        <button class="overlay-btn" style="width: 100%; background:#eab308; color:#0f172a; font-weight:bold; padding:8px; font-size:0.85rem; margin-top:6px; border-radius:4px; border:none; cursor:pointer;" onclick="salvaNotaClienteDaInput(${idx})">💾 Salva Nota</button>
+                        <button class="overlay-btn" style="width: 100%; background:#eab308; color:#0f172a; font-weight:bold; padding:8px; font-size:0.85rem; margin-top:6px; border-radius:4px; border:none; cursor:pointer;" ${actionAttrs('salvaNotaClienteDaInput', [idx])}>💾 Salva Nota</button>
                     </div>
 
                     <!-- Blocco tasti principali distanziato -->
                     <div style="display:flex; gap:6px; margin-top:16px; flex-wrap:wrap;">
-                        <button class="overlay-btn btn-success" style="padding:6px 10px; font-size:0.75rem;" onclick="creaRicevutaPerCliente(${idx})">📄 Nuova Ricevuta</button>
-                        <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" onclick="mostraRicevuteClienteByIndex(${idx})">📜 Vedi Ricevute</button>
-                        <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteCliente(${idx})">🗑️ Elimina</button>
+                        <button class="overlay-btn btn-success" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('creaRicevutaPerCliente', [idx])}>📄 Nuova Ricevuta</button>
+                        <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('mostraRicevuteClienteByIndex', [idx])}>📜 Vedi Ricevute</button>
+                        <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteCliente', [idx])}>🗑️ Elimina</button>
                     </div>
                 </div>`;
         });
@@ -1274,7 +1431,7 @@ function openModule(moduleName, editMode = false) {
 
                 <div class="module-card" style="background: #0f172a; border: 1px solid #334155; margin-bottom: 15px;">
                     <label style="font-size: 0.85rem; color: #94a3b8; display: block; margin-bottom: 5px;">Seleziona Regione da Archiviare:</label>
-                    <select id="seleziona-regione-archivio" class="mod-input" onchange="window.currentArchivioRegione = this.value; openModule('archivio');">
+                    <select id="seleziona-regione-archivio" class="mod-input" ${eventActionAttrs('change', 'setArchivioRegione')}>
                         <option value="${regioneSelezionataArchivio}" selected>${regioneSelezionataArchivio}</option>
                         <option value="Abruzzo">Abruzzo</option>
                         <option value="Calabria">Calabria</option>
@@ -1302,7 +1459,7 @@ function openModule(moduleName, editMode = false) {
                         Incolla qui il testo ufficiale della Regione (es. bollettino o legge regionale) contenente le date di raccolta delle specie di tartufo:
                     </p>
                     <textarea id="testo-normativa-tartufi" class="mod-input" rows="5" placeholder="Es. Il tartufo bianco pregiato si raccoglie dal 1 ottobre al 31 dicembre. Lo scorzone dal 1 maggio al 31 agosto..." style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 8px; font-size: 0.85rem; width: 100%; box-sizing: border-box;"></textarea>
-                    <button class="overlay-btn" style="margin-top: 10px; width: 100%; background: #0284c7; font-weight: bold; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" onclick="estraiDateTartufiDaTesto()">
+                    <button class="overlay-btn" style="margin-top: 10px; width: 100%; background: #0284c7; font-weight: bold; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" ${actionAttrs('estraiDateTartufiDaTesto')}>
                         🔍 Estrai e Compila Date
                     </button>
                 </div>
@@ -1341,18 +1498,18 @@ function openModule(moduleName, editMode = false) {
                     <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">
                         Esporta i tuoi calendari regionali personalizzati su file/condividili o ripristinali da un backup precedente:
                     </p>
-                    <button class="overlay-btn" style="width: 100%; background: #16a34a; font-weight: bold; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-bottom: 10px;" onclick="esportaCalendariJSON()">
+                    <button class="overlay-btn" style="width: 100%; background: #16a34a; font-weight: bold; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-bottom: 10px;" ${actionAttrs('esportaCalendariJSON')}>
                         📥 Scarica o Condividi Calendari (JSON)
                     </button>
                     
                     <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 4px;">Carica Calendari da File JSON:</label>
-                    <input type="file" id="import-calendari-file" accept=".json" class="mod-input" style="padding: 6px; font-size: 0.8rem;" onchange="importaCalendariJSON(event)">
+                    <input type="file" id="import-calendari-file" accept=".json" class="mod-input" style="padding: 6px; font-size: 0.8rem;" ${eventActionAttrs('change', 'importaCalendariJSON')}>
                 </div>
             `;
 
             archivioHtml += `
                 <div style="margin-top: 15px; margin-bottom: 25px;">
-                    <button class="overlay-btn" style="width: 100%; background: #22c55e; color: #0f172a; font-weight: bold; padding: 12px; font-size: 0.95rem; border-radius: 6px; border: none; cursor: pointer;" onclick="salvaArchivioRegionaleTartufi((document.getElementById('seleziona-regione-archivio') || {}).value)">
+                    <button class="overlay-btn" style="width: 100%; background: #22c55e; color: #0f172a; font-weight: bold; padding: 12px; font-size: 0.95rem; border-radius: 6px; border: none; cursor: pointer;" ${actionAttrs('saveArchivioRegionaleTartufiSelected')}>
                         💾 Salva Date e Note in Archivio
                     </button>
                 </div>
@@ -1442,10 +1599,10 @@ function openModule(moduleName, editMode = false) {
     
     activeView.innerHTML = `
         <div class="module-header-bar">
-            <button onclick="closeActiveModule()" class="back-map-btn">← Torna alla Mappa</button>
+            <button ${actionAttrs('closeActiveModule')} class="back-map-btn">← Torna alla Mappa</button>
             <div class="header-actions">
-                <button onclick="mostraInfoModulo(${JSON.stringify(moduleName)})" class="back-map-btn btn-neutral btn-round text-sky border-slate" title="Guida modulo">❓</button>
-                <button onclick="toggleDrawer(); closeActiveModule();" class="back-map-btn">☰ Torna al Menu</button>
+                <button ${actionAttrs('mostraInfoModulo', [moduleName])} class="back-map-btn btn-neutral btn-round text-sky border-slate" title="Guida modulo" aria-label="Apri la guida del modulo">❓</button>
+                <button ${actionAttrs('closeDrawerAndModule')} class="back-map-btn">☰ Torna al Menu</button>
             </div>
         </div>
         <div class="module-body-content">${contentHTML}</div>
@@ -1716,7 +1873,7 @@ function calcolaTotale() {
     const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
     
     if (grammi > 0 && prezzoKg > 0) {
-        const totale = (grammi / 1000) * prezzoKg;
+        const totale = calcolaImportoTotale(grammi, prezzoKg);
         document.getElementById('importoTotale').value = totale.toFixed(2);
         calcolaRitenutaAcconto();
     }
@@ -1743,10 +1900,7 @@ function calcolaRitenutaAcconto() {
     
     const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
     
-    // Correzione: calcolo coerente con la ritenuta applicata sul 78% (17.94 su 100)
-    const baseImponibileRitenuta = importoTotale * 0.78;
-    const ritenuta = baseImponibileRitenuta * 0.23;
-    const netto = importoTotale - ritenuta;
+    const { ritenuta, netto } = calcolaDettaglioRitenuta(importoTotale);
     
     const elRitenuta = document.getElementById('r-importo-ritenuta');
     const elNetto = document.getElementById('r-netto-pagare');
@@ -1821,10 +1975,9 @@ async function registraVenditaConPrezzoKg() {
     let importoNetto = importoTotale.toFixed(2);
 
     if (regimeScelto === 'ritenuta') {
-        const baseImponibileRitenuta = importoTotale * 0.78;
-        const calcoloRitenuta = baseImponibileRitenuta * 0.23;
-        importoRitenuta = calcoloRitenuta.toFixed(2);
-        importoNetto = (importoTotale - calcoloRitenuta).toFixed(2);
+        const dettagliRitenuta = calcolaDettaglioRitenuta(importoTotale);
+        importoRitenuta = dettagliRitenuta.ritenuta.toFixed(2);
+        importoNetto = dettagliRitenuta.netto.toFixed(2);
     }
 
     // 6.1 ACQUISIZIONE NOTA E AGGIORNAMENTO AUTOMATICO RUBRICA CLIENTI
@@ -1846,20 +1999,11 @@ async function registraVenditaConPrezzoKg() {
     // 7. CALCOLO SOGLIA ANNUA (7000 €)
     let storico = readStorageJSON('storico_vendite', []);
     
-    let totaleVenditeAnno = storico.reduce((acc, v) => {
-        const dataVendita = v.data ? new Date(v.data.split('/').reverse().join('-')) : new Date();
-        const annoVendita = dataVendita.getFullYear();
-        if (annoVendita === annoCorrente) {
-            return acc + (parseFloat(v.importo) || 0);
-        }
-        return acc;
-    }, 0);
+    const statoSoglia = calcolaStatoSogliaVendite(storico, annoCorrente, importoTotale);
+    const nuovoTotaleAnno = statoSoglia.nuovoTotaleAnno;
+    const quantoManca = statoSoglia.quantoManca;
 
-    const sogliaBlocco = 7000.00;
-    const nuovoTotaleAnno = totaleVenditeAnno + importoTotale;
-    const quantoManca = Math.max(0, sogliaBlocco - nuovoTotaleAnno);
-
-    if (nuovoTotaleAnno > sogliaBlocco) {
+    if (statoSoglia.superato) {
         await appAlert(`❌ ATTENZIONE: Soglia di blocco di € 7.000 superata!\nIl totale annuo delle vendite raggiungerebbe € ${nuovoTotaleAnno.toFixed(2)}. Registrazione bloccata per limiti normativi.`);
         return;
     }
@@ -1973,12 +2117,13 @@ function visualizzaRicevutaSalvata(index) {
     const isRitenuta = v.regime === 'ritenuta';
     
     // Dati fiscali pronti per essere inseriti alla fine dei dettagli
+    const dettagliRitenutaRicevuta = calcolaDettaglioRitenuta(importoNumerico);
     const dettagliFiscoHtml = isRitenuta ? `
         <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ccc;">
             <p><strong>Regime Fiscale:</strong> Ritenuta d'Acconto del 23% (esonerata dall'imposta sostitutiva)</p>
             <p><strong>Compenso Lordo:</strong> € ${safeReceipt.importo}</p>
-            <p><strong>Ritenuta d'Acconto (23%):</strong> € ${safeReceipt.ritenuta || (importoNumerico * 0.23).toFixed(2)}</p>
-            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${safeReceipt.netto || (importoNumerico * 0.77).toFixed(2)}</p>
+            <p><strong>Ritenuta d'Acconto (23%):</strong> € ${safeReceipt.ritenuta || dettagliRitenutaRicevuta.ritenuta.toFixed(2)}</p>
+            <p style="font-size: 1.05rem; margin-top: 5px; color: #16a34a;"><strong>Totale Ricevuta:</strong> € ${safeReceipt.netto || dettagliRitenutaRicevuta.netto.toFixed(2)}</p>
         </div>
     ` : `
         <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ccc;">
@@ -2036,10 +2181,10 @@ function visualizzaRicevutaSalvata(index) {
                 </div>
             </div>
         </div>
-        <button class="overlay-btn btn-primary btn-full mt-15" onclick="window.print()">🖨️ Stampa / Salva PDF Conforme</button>
-        <button class="overlay-btn btn-info btn-full" style="margin-top:10px;" onclick="condividiRicevuta(${index})">📤 Condividi Ricevuta (WhatsApp)</button>
-        <button class="overlay-btn btn-success btn-full" style="margin-top:10px;" onclick="condividiRicevutaEmail(${index})">📧 Condividi / Invia Email (${safeReceipt.acquirenteEmail || 'Email non inserita'})</button>
-        <button class="overlay-btn btn-neutral btn-full" style="margin-top:10px;" onclick="chiudiDettaglioRicevuta()">← Torna all'Archivio</button>
+        <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('printPage')}>🖨️ Stampa / Salva PDF Conforme</button>
+        <button class="overlay-btn btn-info btn-full" style="margin-top:10px;" ${actionAttrs('condividiRicevuta', [index])}>📤 Condividi Ricevuta (WhatsApp)</button>
+        <button class="overlay-btn btn-success btn-full" style="margin-top:10px;" ${actionAttrs('condividiRicevutaEmail', [index])}>📧 Condividi / Invia Email (${safeReceipt.acquirenteEmail || 'Email non inserita'})</button>
+        <button class="overlay-btn btn-neutral btn-full" style="margin-top:10px;" ${actionAttrs('chiudiDettaglioRicevuta')}>← Torna all'Archivio</button>
     `;
 }
 
@@ -2088,11 +2233,12 @@ function modificaRicevuta(index) {
         if (elLotto) elLotto.value = v.lotto || '';
         if (elF24) elF24.value = v.f24 || '';
 
-        const btnRegistra = document.querySelector('#active-module-view button[onclick="registraVenditaConPrezzoKg()"]');
+        const btnRegistra = document.querySelector('#active-module-view button[data-action="registerRicevutaSafe"]');
 
         if (btnRegistra) {
             btnRegistra.innerText = "Aggiorna Ricevuta Esistente";
-            btnRegistra.setAttribute('onclick', `salvaModificaRicevuta(${index})`);
+            btnRegistra.setAttribute('data-action', 'salvaModificaRicevuta');
+            btnRegistra.setAttribute('data-action-args', JSON.stringify([index]));
         }
     }, 50);
 }
@@ -2116,8 +2262,9 @@ function salvaModificaRicevuta(index) {
     }
 
     const importoCorrente = parseFloat(document.getElementById('importoTotale').value) || 0;
-    const importoRitenuta = regimeScelto === 'ritenuta' ? (importoCorrente * 0.23).toFixed(2) : '0.00';
-    const importoNetto = regimeScelto === 'ritenuta' ? (importoCorrente * 0.77).toFixed(2) : importoCorrente.toFixed(2);
+    const dettagliRitenuta = calcolaDettaglioRitenuta(importoCorrente);
+    const importoRitenuta = regimeScelto === 'ritenuta' ? dettagliRitenuta.ritenuta.toFixed(2) : '0.00';
+    const importoNetto = regimeScelto === 'ritenuta' ? dettagliRitenuta.netto.toFixed(2) : importoCorrente.toFixed(2);
 
     storico[index] = {
         venditoreNome: tData.nome || storico[index].venditoreNome, 
@@ -2489,7 +2636,7 @@ function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tess
         <div class="module-card" style="text-align: center; background: #fff; padding: 15px; border-radius: 8px;">
             <img src="${base64Data}" style="max-width: 100%; height: auto; border-radius: 6px;" alt="Documento Salvato">
         </div>
-        <button class="overlay-btn" style="background:#475569; margin-top:15px; width:100%;" onclick="openModule(${JSON.stringify(moduloProvenienza)})">← Torna Indietro</button>
+        <button class="overlay-btn" style="background:#475569; margin-top:15px; width:100%;" ${actionAttrs('openModule', [moduloProvenienza])}>← Torna Indietro</button>
     `;
     
     activeView.querySelector('.module-body-content').innerHTML = contentHTML;
@@ -2636,8 +2783,9 @@ async function condividiRicevutaEmail(index) {
     let dettagliEconomiciTesto = "";
     if (isRitenuta) {
         const lordo = parseFloat(v.importo) || 0;
-        const ritenuta = v.ritenuta ? parseFloat(v.ritenuta) : (lordo * 0.23);
-        const netto = v.netto !== undefined ? parseFloat(v.netto) : (lordo - ritenuta);
+        const dettagliRitenuta = calcolaDettaglioRitenuta(lordo);
+        const ritenuta = v.ritenuta ? parseFloat(v.ritenuta) : dettagliRitenuta.ritenuta;
+        const netto = v.netto !== undefined ? parseFloat(v.netto) : dettagliRitenuta.netto;
 
         dettagliEconomiciTesto = 
             `• Regime Fiscale: Ritenuta d'Acconto (23%)\n` +

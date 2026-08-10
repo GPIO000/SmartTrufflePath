@@ -1,7 +1,7 @@
 {
   "id": "./index.html",
-  "name": "Truffle App – Raccolta Tartufi",
-  "short_name": "TruffleApp",
+  "name": "Truffle Mobil First – Raccolta Tartufi",
+  "short_name": "TruffleMobil",
   "description": "App mobile per la raccolta, gestione fiscale e contabilità dei tartufi. Conforme alla Legge 145/2018.",
   "lang": "it",
   "start_url": "./index.html",

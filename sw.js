@@ -1,10 +1,8 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'truffle-mobile-first-' + '2026-08-09';
+const CACHE_NAME = 'truffle-mobile-first-' + '2026-08-10';
 const ASSETS = [
   './',
   './index.html',
-  './js/storage-sync.js',
-  './js/app.js',
   './css/style.css',
   './manifest.json',
   './icon-192.png',
@@ -79,6 +77,11 @@ self.addEventListener('fetch', (e) => {
         return cachedResponse;
       }
       return fetch(e.request).then((networkResponse) => {
+        if (networkResponse.ok) {
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, networkResponse.clone());
+          }).catch(() => {});
+        }
         return networkResponse;
       }).catch(() => {
         // Fallback di sicurezza offline per pagine HTML
