@@ -1651,7 +1651,7 @@ function openModule(moduleName, editMode = false) {
         specieConDateSalvate++;
 
         // Controllo di sicurezza nel caso in cui la funzione di verifica non esista
-        let isOpen = typeof window.isSpecieApertaCorrente === 'function' ? isSpecieApertaCorrente(periodoSalvato) : true;
+        let isOpen = typeof isSpecieApertaCorrente === 'function' ? isSpecieApertaCorrente(periodoSalvato) : false;
 
         if (isOpen) {
             specieAperteTrovate++;
