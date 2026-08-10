@@ -737,12 +737,12 @@ function openModule(moduleName, editMode = false) {
                     <select id="r-specie" class="mod-input">
                         <option value="Tuber magnatum Pico (Pregiato Bianco)">Tuber magnatum Pico (Pregiato Bianco)</option>
                         <option value="Tuber melanosporum Vitt. (Nero Pregiato)">Tuber melanosporum Vitt. (Nero Pregiato)</option>
-                        <option value="Tuber aestivum Vitt. (Scorzone Estivo)">Tuber aestivum Vitt. (Scorzone Estivo)</option>
-                        <option value="Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)">Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)</option>
+                        <option value="Tuber macrosporum Vitt. (Nero Liscio)">Tuber macrosporum Vitt. (Nero Liscio)</option>
                         <option value="Tuber brumale Vitt. (Moscatuto / Invernale)">Tuber brumale Vitt. (Moscatuto / Invernale)</option>
                         <option value="Tuber brumale var. moschatum De Ferry (Brumale moscato)">Tuber brumale var. moschatum De Ferry (Brumale moscato)</option>
+                        <option value="Tuber aestivum Vitt. (Scorzone Estivo)">Tuber aestivum Vitt. (Scorzone Estivo)</option>
+                        <option value="Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)">Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)</option>
                         <option value="Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)">Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)</option>
-                        <option value="Tuber macrosporum Vitt. (Nero Liscio)">Tuber macrosporum Vitt. (Nero Liscio)</option>
                         <option value="Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)">Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)</option>
                     </select>
                     
@@ -1145,9 +1145,9 @@ function openModule(moduleName, editMode = false) {
             anniDisponibili.forEach(a => { opzioniAnniHtml += `<option value="${a}" ${filtroAnno === a ? 'selected' : ''}>${a}</option>`; });
             const listaSpecie9 = [
                 "Tuber magnatum Pico (Pregiato Bianco)", "Tuber melanosporum Vitt. (Nero Pregiato)",
-                "Tuber aestivum Vitt. (Scorzone Estivo)", "Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)",
-                "Tuber brumale Vitt. (Moscatuto / Invernale)", "Tuber brumale var. moschatum De Ferry (Brumale moscato - Sottospecie)",
-                "Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)", "Tuber macrosporum Vitt. (Nero Liscio)",
+                "Tuber macrosporum Vitt. (Nero Liscio)", "Tuber brumale Vitt. (Moscatuto / Invernale)",
+                "Tuber brumale var. moschatum De Ferry (Brumale moscato - Sottospecie)", "Tuber aestivum Vitt. (Scorzone Estivo)",
+                "Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)", "Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)",
                 "Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)"
             ];
             let opzioniSpecieHtml = `<option value="tutte">Tutte le specie</option>`;
@@ -1496,15 +1496,15 @@ function openModule(moduleName, editMode = false) {
             case 'archivio':
             // Specie commercializzabili in Italia (Legge 752/1985 e s.m.i.) - ID da 0 a 8
             const specieTartufiArchivio = [
-                "Tuber mesentericum Vitt. (Tartufo nero di Bagnoli Irpino)",       // ID 0
-                "Tuber magnatum Pico (Tartufo bianco pregiato)",                   // ID 1
-                "Tuber aestivum Vitt. (Tartufo estivo o scorzone)",                // ID 2
-                "Tuber uncinatum Chatin (Tartufo uncinato)",                       // ID 3
-                "Tuber borchii Vitt. / T. albidum Pico (Bianchetto o marzuolo)",  // ID 4
-                "Tuber melanosporum Vitt. (Tartufo nero di Norcia)",               // ID 5
-                "Tuber macrosporum Vitt. (Tartufo nero liscio)",                   // ID 6
-                "Tuber brumale Vitt. (Tartufo nero d'inverno)",                    // ID 7
-                "Tuber brumale var. moschatum De Ferry (Tartufo moscato)"          // ID 8
+                "Tuber magnatum Pico (Tartufo bianco pregiato)",                   // ID 0
+                "Tuber melanosporum Vitt. (Tartufo nero di Norcia)",               // ID 1
+                "Tuber macrosporum Vitt. (Tartufo nero liscio)",                   // ID 2
+                "Tuber brumale Vitt. (Tartufo nero d'inverno)",                    // ID 3
+                "Tuber brumale var. moschatum De Ferry (Tartufo moscato)",         // ID 4
+                "Tuber aestivum Vitt. (Tartufo estivo o scorzone)",                // ID 5
+                "Tuber uncinatum Chatin (Tartufo uncinato)",                       // ID 6
+                "Tuber borchii Vitt. / T. albidum Pico (Bianchetto o marzuolo)",  // ID 7
+                "Tuber mesentericum Vitt. (Tartufo nero di Bagnoli Irpino)"        // ID 8
             ];
 
             // Recupera la regione selezionata nell'archivio o usa una di default
@@ -1622,15 +1622,15 @@ function openModule(moduleName, editMode = false) {
     let notaRegionaleCorrente = noteRegionaliSalvate[regioneCal] || '';
 
     const specieTartufiCal = [
-        "Tuber mesentericum Vitt. (Tartufo nero di Bagnoli Irpino)",
         "Tuber magnatum Pico (Tartufo bianco pregiato)",
-        "Tuber aestivum Vitt. (Tartufo estivo o scorzone)",
-        "Tuber uncinatum Chatin (Tartufo uncinato)",
-        "Tuber borchii Vitt. / T. albidum Pico (Bianchetto o marzuolo)",
         "Tuber melanosporum Vitt. (Tartufo nero di Norcia)",
         "Tuber macrosporum Vitt. (Tartufo nero liscio)",
         "Tuber brumale Vitt. (Tartufo nero d'inverno)",
-        "Tuber brumale var. moschatum De Ferry (Tartufo moscato)"
+        "Tuber brumale var. moschatum De Ferry (Tartufo moscato)",
+        "Tuber aestivum Vitt. (Tartufo estivo o scorzone)",
+        "Tuber uncinatum Chatin (Tartufo uncinato)",
+        "Tuber borchii Vitt. / T. albidum Pico (Bianchetto o marzuolo)",
+        "Tuber mesentericum Vitt. (Tartufo nero di Bagnoli Irpino)"
     ];
     const defaultPeriodiCal = [];
 
@@ -3234,15 +3234,15 @@ function estraiDateTartufiDaTesto() {
 
     // Mappatura ordinata dalla più specifica alla più generica
     const regoleEstrazione = [
-        { id: 8, keywords: ["tuber brumale var. moschatum", "tuber brumale var moschatum", "tartufo moscato"] },
-        { id: 4, keywords: ["tuber brumale", "tartufo nero d’inverno", "tartufo nero di inverno", "trifola nera"] },
+        { id: 4, keywords: ["tuber brumale var. moschatum", "tuber brumale var moschatum", "tartufo moscato"] },
+        { id: 3, keywords: ["tuber brumale", "tartufo nero d'inverno", "tartufo nero di inverno", "trifola nera"] },
         { id: 0, keywords: ["tuber magnatum", "tartufo bianco"] },
         { id: 1, keywords: ["tuber melanosporum", "tartufo nero di norcia", "tartufo nero pregiato"] },
-        { id: 2, keywords: ["tuber aestivum", "scorzone", "tartufo d'estate", "tartufo estivo"] },
-        { id: 3, keywords: ["tuber uncinatum", "tartufo uncinato" ] },
-        { id: 5, keywords: ["tuber borchii", "t. borchi", "t. albidum", "bianchetto", "marzuolo"] },
-        { id: 6, keywords: ["tuber macrosporum", "tartufo nero liscio"] },
-        { id: 7, keywords: ["tuber mesentericum", "tartufo nero ordinario", "tartufo nero di bagnoli"] }
+        { id: 5, keywords: ["tuber aestivum", "scorzone", "tartufo d'estate", "tartufo estivo"] },
+        { id: 6, keywords: ["tuber uncinatum", "tartufo uncinato" ] },
+        { id: 7, keywords: ["tuber borchii", "t. borchi", "t. albidum", "bianchetto", "marzuolo"] },
+        { id: 2, keywords: ["tuber macrosporum", "tartufo nero liscio"] },
+        { id: 8, keywords: ["tuber mesentericum", "tartufo nero ordinario", "tartufo nero di bagnoli"] }
     ];
 
     let calendariPersonalizzati = readStorageJSON('calendari_tartufi_custom', {});
