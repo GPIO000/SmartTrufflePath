@@ -1496,15 +1496,26 @@ function openModule(moduleName, editMode = false) {
             case 'archivio':
             // Specie commercializzabili in Italia (Legge 752/1985 e s.m.i.) - ID da 0 a 8
             const specieTartufiArchivio = [
-                "Tuber magnatum Pico (Tartufo bianco pregiato)",          // ID 0
-                "Tuber melanosporum Vitt. (Nero Pregiato, Nero di Norcia)",       // ID 1
-                "Tuber aestivum Vitt. (Scorzone, Tartufo Estivo)",         // ID 2
-                "Tuber uncinatum Chatin (Scorzone Invernale)",    // ID 3
-                "Tuber brumale Vitt. (Tartufo nero d’inverno)",    // ID 4
-                "Tuber borchii Vitt. Tartufo albidum Pico (Bianchetto)",// ID 5
-                "Tuber macrosporum Vitt. (Nero Liscio)",          // ID 6
-                "Tuber mesentericum Vitt. (Nero Ordinario)",      // ID 7
-                "Tuber brumale var. moschatum De Ferry, (Tartufo moscato)"          // ID 8
+                "Tuber mesentericum Vitt. (Tartufo nero di Bagnoli Irpino)",       // ID 0
+                "Tuber magnatum Pico (Tartufo bianco pregiato)",                   // ID 1
+                "Tuber aestivum Vitt. (Tartufo estivo o scorzone)",                // ID 2
+                "Tuber uncinatum Chatin (Tartufo uncinato)",                       // ID 3
+                "Tuber borchii Vitt. / T. albidum Pico (Bianchetto o marzuolo)",  // ID 4
+                "Tuber melanosporum Vitt. (Tartufo nero di Norcia)",               // ID 5
+                "Tuber macrosporum Vitt. (Tartufo nero liscio)",                   // ID 6
+                "Tuber brumale Vitt. (Tartufo nero d'inverno)",                    // ID 7
+                "Tuber brumale var. moschatum De Ferry (Tartufo moscato)"          // ID 8
+            ];
+            const defaultPeriodiArchivio = [
+                "1 settembre - 15 aprile",   // ID 0 mesentericum
+                "1 ottobre - 31 dicembre",   // ID 1 magnatum
+                "1 maggio - 30 novembre",    // ID 2 aestivum
+                "1 ottobre - 31 dicembre",   // ID 3 uncinatum
+                "1 gennaio - 30 aprile",     // ID 4 borchii
+                "15 novembre - 15 marzo",    // ID 5 melanosporum
+                "1 settembre - 31 dicembre", // ID 6 macrosporum
+                "1 gennaio - 15 marzo",      // ID 7 brumale
+                "1 novembre - 15 marzo"      // ID 8 brumale moschatum
             ];
 
             // Recupera la regione selezionata nell'archivio o usa una di default
@@ -1567,11 +1578,7 @@ function openModule(moduleName, editMode = false) {
             `;
 
             specieTartufiArchivio.forEach((specie, idSpecie) => {
-                let defaultPeriodo = "Ottobre - Gennaio";
-                if (specie.includes("Aestivum")) defaultPeriodo = "Maggio - Settembre";
-                if (specie.includes("Borchii")) defaultPeriodo = "Gennaio - Aprile";
-                if (specie.includes("Melanosporum")) defaultPeriodo = "Novembre - Marzo";
-
+                let defaultPeriodo = defaultPeriodiArchivio[idSpecie] || "1 ottobre - 31 dicembre";
                 let periodoSalvato = datiRegioneArchivio[idSpecie] !== undefined ? datiRegioneArchivio[idSpecie] : defaultPeriodo;
 
                 archivioHtml += `
@@ -1625,15 +1632,26 @@ function openModule(moduleName, editMode = false) {
     let notaRegionaleCorrente = noteRegionaliSalvate[regioneCal] || '';
 
     const specieTartufiCal = [
-        "Tuber magnatum Pico (Pregiato Bianco)",
-        "Tuber melanosporum Vitt. (Nero Pregiato)",
-        "Tuber aestivum Vitt. (Scorzone Estivo)",
-        "Tuber uncinatum Chatin (Scorzone Invernale)",
-        "Tuber brumale Vitt. (Moscatuto / Invernale)",
-        "Tuber borchii Vitt. / albidum Pico (Bianchetto)",
-        "Tuber macrosporum Vitt. (Nero Liscio)",
-        "Tuber mesentericum Vitt. (Nero Ordinario)",
-        "Tuber albidum / Altra specie regionale"
+        "Tuber mesentericum Vitt. (Tartufo nero di Bagnoli Irpino)",
+        "Tuber magnatum Pico (Tartufo bianco pregiato)",
+        "Tuber aestivum Vitt. (Tartufo estivo o scorzone)",
+        "Tuber uncinatum Chatin (Tartufo uncinato)",
+        "Tuber borchii Vitt. / T. albidum Pico (Bianchetto o marzuolo)",
+        "Tuber melanosporum Vitt. (Tartufo nero di Norcia)",
+        "Tuber macrosporum Vitt. (Tartufo nero liscio)",
+        "Tuber brumale Vitt. (Tartufo nero d'inverno)",
+        "Tuber brumale var. moschatum De Ferry (Tartufo moscato)"
+    ];
+    const defaultPeriodiCal = [
+        "1 settembre - 15 aprile",   // ID 0 mesentericum
+        "1 ottobre - 31 dicembre",   // ID 1 magnatum
+        "1 maggio - 30 novembre",    // ID 2 aestivum
+        "1 ottobre - 31 dicembre",   // ID 3 uncinatum
+        "1 gennaio - 30 aprile",     // ID 4 borchii
+        "15 novembre - 15 marzo",    // ID 5 melanosporum
+        "1 settembre - 31 dicembre", // ID 6 macrosporum
+        "1 gennaio - 15 marzo",      // ID 7 brumale
+        "1 novembre - 15 marzo"      // ID 8 brumale moschatum
     ];
 
     let calHtml = `
@@ -1645,11 +1663,7 @@ function openModule(moduleName, editMode = false) {
     let specieAperteTrovate = 0;
 
     specieTartufiCal.forEach((specie, id) => {
-        let defaultPeriodoCal = "Ottobre - Gennaio";
-        if (specie.includes("aestivum") || specie.includes("Aestivum") || specie.includes("Scorzone Estivo")) defaultPeriodoCal = "Maggio - Settembre";
-        if (specie.includes("borchii") || specie.includes("Borchii") || specie.includes("Bianchetto")) defaultPeriodoCal = "Gennaio - Aprile";
-        if (specie.includes("melanosporum") || specie.includes("Melanosporum") || specie.includes("Nero Pregiato")) defaultPeriodoCal = "Novembre - Marzo";
-        let periodo = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : defaultPeriodoCal;
+        let periodo = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : (defaultPeriodiCal[id] || "1 ottobre - 31 dicembre");
         
         // Controllo di sicurezza nel caso in cui la funzione di verifica non esista
         let isOpen = typeof window.isSpecieApertaCorrente === 'function' ? isSpecieApertaCorrente(periodo) : true;
