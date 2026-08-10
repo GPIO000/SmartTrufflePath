@@ -615,7 +615,6 @@ function openModule(moduleName, editMode = false) {
                         <p><strong>N. Tesserino:</strong> ${tData.num}</p>
                         ${tData.iban ? `<p style="margin-top:8px; padding-top:8px; border-top:1px dashed #334155;"><strong>IBAN:</strong> ${tData.iban}</p>` : ''}
                         ${tData.banca ? `<p><strong>Banca:</strong> ${tData.banca}</p>` : ''}
-                        ${tData.intestatario ? `<p><strong>Intestatario c/c:</strong> ${tData.intestatario}</p>` : ''}
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
@@ -638,15 +637,13 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="t-regione" class="mod-input" value="${tData.regione || ''}" placeholder="Es. Molise / Abruzzo">
                         <label>Numero Tesserino:</label>
                         <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Numero autorizzazione">
+                        <label style="margin-top:10px;">Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
+                        <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
                         <p style="margin-top:14px; margin-bottom:6px; color:#94a3b8; font-size:0.8rem; text-transform:uppercase; border-top:1px dashed #334155; padding-top:10px;">💳 Coordinate Bancarie (per bonifico)</p>
                         <label>IBAN:</label>
                         <input type="text" id="t-iban" class="mod-input" value="${tData.iban || ''}" placeholder="Es. IT60 X054 2811 1010 0000 0123 456">
-                        <label>Banca / Istituto di Credito:</label>
+                        <label>Banca / Istituto di Credito (facoltativo):</label>
                         <input type="text" id="t-banca" class="mod-input" value="${tData.banca || ''}" placeholder="Es. Banca Intesa Sanpaolo">
-                        <label>Intestatario Conto Corrente:</label>
-                        <input type="text" id="t-intestatario" class="mod-input" value="${tData.intestatario || ''}" placeholder="Es. Mario Rossi">
-                        <label style="margin-top:10px;">Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
-                        <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
                         <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveTesserino')}>Salva Dati Personali</button>
                     </div>`;
             }
@@ -795,10 +792,8 @@ function openModule(moduleName, editMode = false) {
                         <p style="font-size:0.82rem; color:#38bdf8; margin-bottom:8px;"><b>🏦 Coordinate Bancarie del Venditore (da Dati Personali):</b></p>
                         <label>IBAN:</label>
                         <input type="text" id="r-iban" class="mod-input" placeholder="Es. IT60 X054 2811 1010 0000 0123 456">
-                        <label>Banca:</label>
+                        <label>Banca / Istituto di Credito (facoltativo):</label>
                         <input type="text" id="r-banca" class="mod-input" placeholder="Es. Intesa Sanpaolo">
-                        <label>Intestatario:</label>
-                        <input type="text" id="r-intestatario-cc" class="mod-input" placeholder="Es. Mario Rossi">
                         <label style="margin-top:6px;">Causale Bonifico:</label>
                         <input type="text" id="r-causale" class="mod-input" placeholder="Es. Pagamento tartufi freschi - Ricevuta N. ...">
                     </div>
@@ -1732,7 +1727,6 @@ function saveTesserino() {
     const numVal = document.getElementById('t-num').value.trim();
     const ibanVal = (document.getElementById('t-iban') || {}).value?.trim() || '';
     const bancaVal = (document.getElementById('t-banca') || {}).value?.trim() || '';
-    const intestatarioVal = (document.getElementById('t-intestatario') || {}).value?.trim() || '';
     const fileInput = document.getElementById('t-file');
     const file = fileInput ? fileInput.files[0] : null;
 
@@ -1753,7 +1747,7 @@ function saveTesserino() {
             num: numVal,
             iban: ibanVal,
             banca: bancaVal,
-            intestatario: intestatarioVal,
+            intestatario: nomeVal,
             nomeFile: fileName !== undefined ? fileName : (tDataExisting.nomeFile || null),
             tipoFile: fileType !== undefined ? fileType : (tDataExisting.tipoFile || null),
             contenutoBase64: base64Content !== undefined ? base64Content : (tDataExisting.contenutoBase64 || null)
@@ -2013,10 +2007,8 @@ function toggleCoordinateBancarie() {
         const tData = readStorageJSON('tesserino_data', {});
         const elIban = document.getElementById('r-iban');
         const elBanca = document.getElementById('r-banca');
-        const elIntestatario = document.getElementById('r-intestatario-cc');
         if (elIban && !elIban.value && tData.iban) elIban.value = tData.iban;
         if (elBanca && !elBanca.value && tData.banca) elBanca.value = tData.banca;
-        if (elIntestatario && !elIntestatario.value) elIntestatario.value = tData.intestatario || tData.nome || '';
     }
 }
 
@@ -2096,7 +2088,7 @@ async function registraVenditaConPrezzoKg() {
     const metodoPagamento = elMetodoPagamento ? elMetodoPagamento.value : 'contanti';
     const ibanVenditore = metodoPagamento === 'bonifico' ? (document.getElementById('r-iban') || {}).value?.trim() || '' : '';
     const bancaVenditore = metodoPagamento === 'bonifico' ? (document.getElementById('r-banca') || {}).value?.trim() || '' : '';
-    const intestatarioVenditore = metodoPagamento === 'bonifico' ? (document.getElementById('r-intestatario-cc') || {}).value?.trim() || '' : '';
+    const intestatarioVenditore = metodoPagamento === 'bonifico' ? tData.nome || '' : '';
     const causaleVenditore = metodoPagamento === 'bonifico' ? (document.getElementById('r-causale') || {}).value?.trim() || '' : '';
 
     // 6. CALCOLI FINANZIARI
@@ -2393,11 +2385,9 @@ function modificaRicevuta(index) {
             if (v.metodoPagamento === 'bonifico') {
                 const elIban = document.getElementById('r-iban');
                 const elBanca = document.getElementById('r-banca');
-                const elIntestatario = document.getElementById('r-intestatario-cc');
                 const elCausale = document.getElementById('r-causale');
                 if (elIban) elIban.value = v.ibanVenditore || '';
                 if (elBanca) elBanca.value = v.bancaVenditore || '';
-                if (elIntestatario) elIntestatario.value = v.intestatarioVenditore || '';
                 if (elCausale) elCausale.value = v.causaleVenditore || '';
             }
         }
@@ -2455,7 +2445,7 @@ function salvaModificaRicevuta(index) {
         metodoPagamento: (document.getElementById('r-metodo-pagamento') || {}).value || storico[index].metodoPagamento || 'contanti',
         ibanVenditore: (document.getElementById('r-iban') || {}).value?.trim() || storico[index].ibanVenditore || '',
         bancaVenditore: (document.getElementById('r-banca') || {}).value?.trim() || storico[index].bancaVenditore || '',
-        intestatarioVenditore: (document.getElementById('r-intestatario-cc') || {}).value?.trim() || storico[index].intestatarioVenditore || '',
+        intestatarioVenditore: tData.nome || storico[index].intestatarioVenditore || '',
         causaleVenditore: (document.getElementById('r-causale') || {}).value?.trim() || storico[index].causaleVenditore || '',
         data: storico[index].data
     };
