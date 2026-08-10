@@ -240,6 +240,7 @@ const ACTION_HANDLERS = {
     eliminaRicevutaConDoppiaConferma: (_event, index) => eliminaRicevutaConDoppiaConferma(index),
     calcolaTotale: () => calcolaTotale(),
     calcolaRitenutaAcconto: () => calcolaRitenutaAcconto(),
+    toggleCoordinateBancarie: () => toggleCoordinateBancarie(),
     autocompilaDatiCliente: (event) => autocompilaDatiCliente(event.target.value),
     importBackupData: (event) => importBackupData(event),
     setArchivioRegione: (event) => {
@@ -603,14 +604,18 @@ function openModule(moduleName, editMode = false) {
                 }
 
                 contentHTML = `
-                    <h2>Anagrafica & Tesserino Digitale</h2>
+                    <h2>Dati Personali & Tesserino Digitale</h2>
                     <p><strong>Normativa:</strong> Legge 145/2018</p>
                     <div class="module-card card-green-border">
-                        <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ Tesserino Registrato</p>
+                        <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ Dati Personali Registrati</p>
                         <p><strong>Nome:</strong> ${tData.nome}</p>
                         <p><strong>Codice Fiscale:</strong> ${tData.cf}</p>
+                        <p><strong>Indirizzo:</strong> ${tData.indirizzo || 'Non inserito'}</p>
                         <p><strong>Regione / Prov:</strong> ${tData.regione}</p>
                         <p><strong>N. Tesserino:</strong> ${tData.num}</p>
+                        ${tData.iban ? `<p style="margin-top:8px; padding-top:8px; border-top:1px dashed #334155;"><strong>IBAN:</strong> ${tData.iban}</p>` : ''}
+                        ${tData.banca ? `<p><strong>Banca:</strong> ${tData.banca}</p>` : ''}
+                        ${tData.intestatario ? `<p><strong>Intestatario c/c:</strong> ${tData.intestatario}</p>` : ''}
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
@@ -620,20 +625,29 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             } else {
                 contentHTML = `
-                    <h2>Anagrafica & Tesserino Digitale</h2>
-                    <p>Inserisci i dati del tuo tesserino regionale per la raccolta dei tartufi:</p>
+                    <h2>Dati Personali & Tesserino Digitale</h2>
+                    <p>Inserisci i tuoi dati personali e gli estremi del tesserino regionale per la raccolta dei tartufi:</p>
                     <div class="module-card">
                         <label>Nome e Cognome:</label>
                         <input type="text" id="t-nome" class="mod-input" value="${tData.nome || ''}" placeholder="Es. Mario Rossi">
                         <label>Codice Fiscale:</label>
                         <input type="text" id="t-cf" class="mod-input" value="${tData.cf || ''}" placeholder="Es. RSSMRA80A01H501W">
+                        <label>Indirizzo (Via, Città, CAP):</label>
+                        <input type="text" id="t-indirizzo" class="mod-input" value="${tData.indirizzo || ''}" placeholder="Es. Via Roma 1, 00100 Roma (RM)">
                         <label>Regione / Provincia di Rilascio:</label>
                         <input type="text" id="t-regione" class="mod-input" value="${tData.regione || ''}" placeholder="Es. Molise / Abruzzo">
                         <label>Numero Tesserino:</label>
                         <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Numero autorizzazione">
-                        <label>Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
+                        <p style="margin-top:14px; margin-bottom:6px; color:#94a3b8; font-size:0.8rem; text-transform:uppercase; border-top:1px dashed #334155; padding-top:10px;">💳 Coordinate Bancarie (per bonifico)</p>
+                        <label>IBAN:</label>
+                        <input type="text" id="t-iban" class="mod-input" value="${tData.iban || ''}" placeholder="Es. IT60 X054 2811 1010 0000 0123 456">
+                        <label>Banca / Istituto di Credito:</label>
+                        <input type="text" id="t-banca" class="mod-input" value="${tData.banca || ''}" placeholder="Es. Banca Intesa Sanpaolo">
+                        <label>Intestatario Conto Corrente:</label>
+                        <input type="text" id="t-intestatario" class="mod-input" value="${tData.intestatario || ''}" placeholder="Es. Mario Rossi">
+                        <label style="margin-top:10px;">Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
                         <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
-                        <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveTesserino')}>Salva Tesserino</button>
+                        <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveTesserino')}>Salva Dati Personali</button>
                     </div>`;
             }
             break;
@@ -770,10 +784,28 @@ function openModule(moduleName, editMode = false) {
                     <!-- Nuova Sezione: Note Cliente per la Rubrica -->
                     <label style="margin-top: 10px;">📝 Note Cliente (Rubrica):</label>
                     <textarea id="r-nota-cliente" class="mod-input" placeholder="Scrivi una nota per questo cliente..." rows="2" style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 6px; font-size: 0.8rem;"></textarea>
+
+                    <label style="margin-top:12px;">💳 Metodo di Pagamento:</label>
+                    <select id="r-metodo-pagamento" class="mod-input" ${eventActionAttrs('change', 'toggleCoordinateBancarie')}>
+                        <option value="contanti">💵 Contanti</option>
+                        <option value="bonifico">🏦 Bonifico Bancario</option>
+                    </select>
+
+                    <div id="container-coordinate-bancarie" style="display:none; background:#0f172a; padding:10px; border-radius:6px; margin:8px 0; border:1px solid #334155;">
+                        <p style="font-size:0.82rem; color:#38bdf8; margin-bottom:8px;"><b>🏦 Coordinate Bancarie del Venditore (da Dati Personali):</b></p>
+                        <label>IBAN:</label>
+                        <input type="text" id="r-iban" class="mod-input" placeholder="Es. IT60 X054 2811 1010 0000 0123 456">
+                        <label>Banca:</label>
+                        <input type="text" id="r-banca" class="mod-input" placeholder="Es. Intesa Sanpaolo">
+                        <label>Intestatario:</label>
+                        <input type="text" id="r-intestatario-cc" class="mod-input" placeholder="Es. Mario Rossi">
+                        <label style="margin-top:6px;">Causale Bonifico:</label>
+                        <input type="text" id="r-causale" class="mod-input" placeholder="Es. Pagamento tartufi freschi - Ricevuta N. ...">
+                    </div>
                     
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" ${actionAttrs('registerRicevutaSafe')}>Registra e Genera Ricevuta Conforme</button>
                 </div>`;
-            setTimeout(toggleRegimeFiscaleFields, 50);
+            setTimeout(() => { toggleRegimeFiscaleFields(); toggleCoordinateBancarie(); }, 50);
             break;
 
            case 'storico_ricevute':
@@ -870,6 +902,63 @@ function openModule(moduleName, editMode = false) {
                 contentHTML = `
                     <h2>F24 ELIDE - Imposta Sostitutiva</h2>
                     <p>Registra il versamento dell'imposta sostitutiva (100€ annui - Legge 145/2018):</p>
+                    <div class="module-card" style="border-left:4px solid #f59e0b; background:#1e293b; margin-bottom:18px;">
+                        <p style="color:#f59e0b; font-weight:bold; margin-bottom:10px;">📋 PROMEMORIA COMPILAZIONE MODELLO F24 — IMPOSTA SOSTITUTIVA TARTUFI</p>
+                        <table style="width:100%; border-collapse:collapse; font-size:0.85rem; color:#cbd5e1;">
+                            <tbody>
+                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Modello</td><td style="padding:4px 6px;">F24 (o F24 Elide)</td></tr>
+                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Sezione versamento</td><td style="padding:4px 6px;">Erario ed Altro</td></tr>
+                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Tipo</td><td style="padding:4px 6px;">R</td></tr>
+                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Codice Tributo</td><td style="padding:4px 6px; font-weight:bold; color:#38bdf8;">1853</td></tr>
+                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Anno di Riferimento</td><td style="padding:4px 6px;">2026</td></tr>
+                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Importo a debito</td><td style="padding:4px 6px; font-weight:bold; color:#22c55e;">100,00 €</td></tr>
+                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Elementi identificativi</td><td style="padding:4px 6px;">[Codice Regione] [Codice Prodotto] [N. Tesserino]</td></tr>
+                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Esempio pratico</td><td style="padding:4px 6px;">Veneto + Tartufi + N.12345 → <strong style="color:#f59e0b;">21T12345</strong></td></tr>
+                            </tbody>
+                        </table>
+                        <details style="margin-top:12px;">
+                            <summary style="cursor:pointer; color:#38bdf8; font-size:0.85rem; font-weight:bold;">🗺️ Codici Regioni e Province Autonome</summary>
+                            <table style="width:100%; border-collapse:collapse; font-size:0.82rem; color:#cbd5e1; margin-top:8px;">
+                                <tbody>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">01</td><td style="padding:3px 6px;">Abruzzo</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">02</td><td style="padding:3px 6px;">Basilicata</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">03</td><td style="padding:3px 6px;">Prov. autonoma di Bolzano</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">04</td><td style="padding:3px 6px;">Calabria</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">05</td><td style="padding:3px 6px;">Campania</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">06</td><td style="padding:3px 6px;">Emilia-Romagna</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">07</td><td style="padding:3px 6px;">Friuli-Venezia Giulia</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">08</td><td style="padding:3px 6px;">Lazio</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">09</td><td style="padding:3px 6px;">Liguria</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">10</td><td style="padding:3px 6px;">Lombardia</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">11</td><td style="padding:3px 6px;">Marche</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">12</td><td style="padding:3px 6px;">Molise</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">13</td><td style="padding:3px 6px;">Piemonte</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">14</td><td style="padding:3px 6px;">Puglia</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">15</td><td style="padding:3px 6px;">Sardegna</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">16</td><td style="padding:3px 6px;">Sicilia</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">17</td><td style="padding:3px 6px;">Toscana</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">18</td><td style="padding:3px 6px;">Prov. autonoma di Trento</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">19</td><td style="padding:3px 6px;">Umbria</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">20</td><td style="padding:3px 6px;">Valle d'Aosta</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">21</td><td style="padding:3px 6px;">Veneto</td></tr>
+                                </tbody>
+                            </table>
+                        </details>
+                        <details style="margin-top:8px;">
+                            <summary style="cursor:pointer; color:#38bdf8; font-size:0.85rem; font-weight:bold;">🌿 Codici Tipologia Prodotto</summary>
+                            <table style="width:100%; border-collapse:collapse; font-size:0.82rem; color:#cbd5e1; margin-top:8px;">
+                                <tbody>
+                                    <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b; width:30px;">T</td><td style="padding:3px 6px;">Tartufi</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">F</td><td style="padding:3px 6px;">Funghi epigei</td></tr>
+                                    <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">B</td><td style="padding:3px 6px;">Bacche di bosco</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">G</td><td style="padding:3px 6px;">Frutta in guscio (castagne, noci, ecc.)</td></tr>
+                                    <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">E</td><td style="padding:3px 6px;">Erbe officinali spontanee</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">M</td><td style="padding:3px 6px;">Muschi, licheni e piante ornamentali/alimentari</td></tr>
+                                    <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">A</td><td style="padding:3px 6px;">Altri prodotti selvatici non specificati</td></tr>
+                                </tbody>
+                            </table>
+                        </details>
+                    </div>
                     <div class="module-card">
                         <label>Anno Fiscale di Riferimento:</label>
                         <input type="text" id="f-anno" class="mod-input" value="${fData.anno || new Date().getFullYear()}" placeholder="Es. 2026">
@@ -1629,8 +1718,12 @@ async function clearData(storageKey, moduleName) {
 function saveTesserino() {
     const nomeVal = document.getElementById('t-nome').value.trim();
     const cfVal = document.getElementById('t-cf').value.trim().toUpperCase();
+    const indirizzoVal = (document.getElementById('t-indirizzo') || {}).value?.trim() || '';
     const regioneVal = document.getElementById('t-regione').value.trim();
     const numVal = document.getElementById('t-num').value.trim();
+    const ibanVal = (document.getElementById('t-iban') || {}).value?.trim() || '';
+    const bancaVal = (document.getElementById('t-banca') || {}).value?.trim() || '';
+    const intestatarioVal = (document.getElementById('t-intestatario') || {}).value?.trim() || '';
     const fileInput = document.getElementById('t-file');
     const file = fileInput ? fileInput.files[0] : null;
 
@@ -1646,8 +1739,12 @@ function saveTesserino() {
         const data = { 
             nome: nomeVal, 
             cf: cfVal, 
+            indirizzo: indirizzoVal,
             regione: regioneVal, 
             num: numVal,
+            iban: ibanVal,
+            banca: bancaVal,
+            intestatario: intestatarioVal,
             nomeFile: fileName !== undefined ? fileName : (tDataExisting.nomeFile || null),
             tipoFile: fileType !== undefined ? fileType : (tDataExisting.tipoFile || null),
             contenutoBase64: base64Content !== undefined ? base64Content : (tDataExisting.contenutoBase64 || null)
@@ -1655,7 +1752,7 @@ function saveTesserino() {
         
         try {
             localStorage.setItem('tesserino_data', JSON.stringify(data));
-            showToast("Dati tesserino salvati!", 'success');
+            showToast("Dati personali salvati!", 'success');
             openModule('tesserino');
         } catch (e) {
             showToast("Spazio esaurito. Carica un file più piccolo.", 'error');
@@ -1897,6 +1994,23 @@ function toggleRegimeFiscaleFields() {
     }
 }
 
+function toggleCoordinateBancarie() {
+    const metodo = document.getElementById('r-metodo-pagamento');
+    const container = document.getElementById('container-coordinate-bancarie');
+    if (!metodo || !container) return;
+    const isBonifico = metodo.value === 'bonifico';
+    container.style.display = isBonifico ? 'block' : 'none';
+    if (isBonifico) {
+        const tData = readStorageJSON('tesserino_data', {});
+        const elIban = document.getElementById('r-iban');
+        const elBanca = document.getElementById('r-banca');
+        const elIntestatario = document.getElementById('r-intestatario-cc');
+        if (elIban && !elIban.value && tData.iban) elIban.value = tData.iban;
+        if (elBanca && !elBanca.value && tData.banca) elBanca.value = tData.banca;
+        if (elIntestatario && !elIntestatario.value) elIntestatario.value = tData.intestatario || tData.nome || '';
+    }
+}
+
 function calcolaRitenutaAcconto() {
     const regime = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
     if (regime !== 'ritenuta') return;
@@ -1967,6 +2081,14 @@ async function registraVenditaConPrezzoKg() {
         await appAlert("Inserisci il nome o la ragione sociale dell'acquirente.");
         return;
     }
+
+    // 5b. METODO DI PAGAMENTO E COORDINATE BANCARIE
+    const elMetodoPagamento = document.getElementById('r-metodo-pagamento');
+    const metodoPagamento = elMetodoPagamento ? elMetodoPagamento.value : 'contanti';
+    const ibanVenditore = metodoPagamento === 'bonifico' ? (document.getElementById('r-iban') || {}).value?.trim() || '' : '';
+    const bancaVenditore = metodoPagamento === 'bonifico' ? (document.getElementById('r-banca') || {}).value?.trim() || '' : '';
+    const intestatarioVenditore = metodoPagamento === 'bonifico' ? (document.getElementById('r-intestatario-cc') || {}).value?.trim() || '' : '';
+    const causaleVenditore = metodoPagamento === 'bonifico' ? (document.getElementById('r-causale') || {}).value?.trim() || '' : '';
 
     // 6. CALCOLI FINANZIARI
     const pesoGrammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
@@ -2053,6 +2175,11 @@ async function registraVenditaConPrezzoKg() {
         luogoRaccolta: luogoAreaRaccolta, 
         lotto: document.getElementById('r-lotto').value.trim(), 
         f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto 23% su 78%)', 
+        metodoPagamento,
+        ibanVenditore,
+        bancaVenditore,
+        intestatarioVenditore,
+        causaleVenditore,
         data: dataOdierna
     };
     
@@ -2136,6 +2263,18 @@ function visualizzaRicevutaSalvata(index) {
         </div>
     `;
 
+    const isBonifico = v.metodoPagamento === 'bonifico';
+    const metodoPagamentoLabel = isBonifico ? 'Bonifico Bancario' : 'Contanti';
+    const coordinateBancarieHtml = isBonifico ? `
+        <div style="margin-top: 12px; padding: 10px; border: 1px dashed #ccc; border-radius: 4px;">
+            <p><strong>Modalità di Pagamento:</strong> Bonifico Bancario</p>
+            ${safeReceipt.intestatarioVenditore ? `<p><strong>Intestatario:</strong> ${safeReceipt.intestatarioVenditore}</p>` : ''}
+            ${safeReceipt.ibanVenditore ? `<p><strong>IBAN:</strong> ${safeReceipt.ibanVenditore}</p>` : ''}
+            ${safeReceipt.bancaVenditore ? `<p><strong>Banca:</strong> ${safeReceipt.bancaVenditore}</p>` : ''}
+            ${safeReceipt.causaleVenditore ? `<p><strong>Causale:</strong> ${safeReceipt.causaleVenditore}</p>` : ''}
+        </div>
+    ` : `<p style="margin-top: 8px;"><strong>Modalità di Pagamento:</strong> ${metodoPagamentoLabel}</p>`;
+
     // Supporto per retrocompatibilità con vecchie ricevute salvate come v.comune
     const luogoAreaVisualizzazione = safeReceipt.luogoRaccolta || safeReceipt.comune || 'Non specificato';
 
@@ -2169,6 +2308,8 @@ function visualizzaRicevutaSalvata(index) {
                 <p><strong>Codice Lotto / Tracciabilità:</strong> ${safeReceipt.lotto}</p>
                 
                 ${dettagliFiscoHtml}
+
+                ${coordinateBancarieHtml}
 
                 <p style="margin-top: 10px;"><strong>Data Vendita:</strong> ${safeReceipt.data}</p>
 
@@ -2236,6 +2377,22 @@ function modificaRicevuta(index) {
         if (elLotto) elLotto.value = v.lotto || '';
         if (elF24) elF24.value = v.f24 || '';
 
+        const elMetodo = document.getElementById('r-metodo-pagamento');
+        if (elMetodo) {
+            elMetodo.value = v.metodoPagamento || 'contanti';
+            toggleCoordinateBancarie();
+            if (v.metodoPagamento === 'bonifico') {
+                const elIban = document.getElementById('r-iban');
+                const elBanca = document.getElementById('r-banca');
+                const elIntestatario = document.getElementById('r-intestatario-cc');
+                const elCausale = document.getElementById('r-causale');
+                if (elIban) elIban.value = v.ibanVenditore || '';
+                if (elBanca) elBanca.value = v.bancaVenditore || '';
+                if (elIntestatario) elIntestatario.value = v.intestatarioVenditore || '';
+                if (elCausale) elCausale.value = v.causaleVenditore || '';
+            }
+        }
+
         const btnRegistra = document.querySelector('#active-module-view button[data-action="registerRicevutaSafe"]');
 
         if (btnRegistra) {
@@ -2285,7 +2442,12 @@ function salvaModificaRicevuta(index) {
         netto: importoNetto,
         comune: document.getElementById('r-comune').value.trim(), 
         lotto: document.getElementById('r-lotto').value.trim(), 
-        f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto)', 
+        f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto)',
+        metodoPagamento: (document.getElementById('r-metodo-pagamento') || {}).value || storico[index].metodoPagamento || 'contanti',
+        ibanVenditore: (document.getElementById('r-iban') || {}).value?.trim() || storico[index].ibanVenditore || '',
+        bancaVenditore: (document.getElementById('r-banca') || {}).value?.trim() || storico[index].bancaVenditore || '',
+        intestatarioVenditore: (document.getElementById('r-intestatario-cc') || {}).value?.trim() || storico[index].intestatarioVenditore || '',
+        causaleVenditore: (document.getElementById('r-causale') || {}).value?.trim() || storico[index].causaleVenditore || '',
         data: storico[index].data
     };
 
