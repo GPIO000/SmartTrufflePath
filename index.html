@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Truffle App</title>
+    <title>Truffle Mobil First</title>
     
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="./manifest.json">
@@ -22,7 +22,7 @@
     <div id="app-container">
         <!-- Header Superiore -->
         <header id="app-header">
-            <button id="menu-toggle-btn" onclick="toggleDrawer()">☰</button>
+            <button id="menu-toggle-btn" data-action="toggleDrawer" aria-label="Apri o chiudi il menu">☰</button>
             <h1 id="gps-status-text">Truffle App</h1>
             <div id="gps-status-dot" title="GPS in attesa..."></div>
         </header>
@@ -34,13 +34,13 @@
             
             <!-- Bottoni Overlay rialzati -->
             <div id="map-overlays">
-                <button class="overlay-btn" style="background:#0ea5e9;" onclick="centerOnUser()">🎯 Centra</button>
-                <button class="overlay-btn" onclick="saveCarPosition()">🚗 Auto</button>
-                <button class="overlay-btn" onclick="returnToCar()">🧭 Vai</button>
-                <button class="overlay-btn" style="background:#dc2626;" onclick="deleteCarPosition()">🗑️ Del</button>
-                <button class="overlay-btn" onclick="savePoiPosition()">📍 Punto</button>
-                <button class="overlay-btn" onclick="openModule('poilist')">📋 Elenco</button>
-                <button class="overlay-btn sos-overlay-btn" onclick="triggerSOS()">🚨 SOS</button>
+                <button class="overlay-btn" style="background:#0ea5e9;" data-action="centerOnUser" aria-label="Centra la mappa sulla posizione attuale">🎯 Centra</button>
+                <button class="overlay-btn" data-action="saveCarPosition" aria-label="Salva la posizione dell'auto">🚗 Auto</button>
+                <button class="overlay-btn" data-action="returnToCar" aria-label="Avvia la navigazione verso l'auto">🧭 Vai</button>
+                <button class="overlay-btn" style="background:#dc2626;" data-action="deleteCarPosition" aria-label="Elimina la posizione dell'auto">🗑️ Del</button>
+                <button class="overlay-btn" data-action="savePoiPosition" aria-label="Salva un nuovo punto di interesse">📍 Punto</button>
+                <button class="overlay-btn" data-action="openModule" data-action-args="[&quot;poilist&quot;]" aria-label="Apri l'elenco dei punti di interesse">📋 Elenco</button>
+                <button class="overlay-btn sos-overlay-btn" data-action="triggerSOS" aria-label="Invia un messaggio SOS con la posizione">🚨 SOS</button>
             </div>
         </div>
     </div>
@@ -49,46 +49,46 @@
     <div id="app-drawer">
         <div class="drawer-header">
             <h2>Menu</h2>
-            <button onclick="toggleDrawer()">✕</button>
+            <button data-action="toggleDrawer" aria-label="Chiudi il menu">✕</button>
         </div>
         <div class="drawer-content">
             <div class="drawer-section">
                 <h3>Normativa & Fisco (Legge 145/2018)</h3>
-                <button onclick="openModule('calendario')">📅 Calendario Raccolta Tartufi</button>
-                <button onclick="openModule('archivio')">📚 Archivio Data raccolta Tartufi per Regione</button>
-                <button onclick="openModule('registro_giornaliero')">🍄 Registro Ritrovamenti</button>
-                <button onclick="openModule('tesserino')">🆔 Anagrafica & Tesserino</button>
-                <button onclick="openModule('pagopa')">💳 Ricevuta PagoPA (Tassa)</button>
-                <button onclick="openModule('f24')">📄 F24 ELIDE (Imposta 100€)</button>
-                <button onclick="openModule('clienti')">👥 Rubrica Clienti</button>
-                <button onclick="openModule('ricevute')">📝 Emetti Ricevuta Vendita</button>
-                <button onclick="openModule('storico_ricevute')">📂 Archivio Ricevute</button>
+                <button data-action="openModule" data-action-args="[&quot;calendario&quot;]">📅 Calendario Raccolta Tartufi</button>
+                <button data-action="openModule" data-action-args="[&quot;archivio&quot;]">📚 Archivio Data raccolta Tartufi per Regione</button>
+                <button data-action="openModule" data-action-args="[&quot;registro_giornaliero&quot;]">🍄 Registro Ritrovamenti</button>
+                <button data-action="openModule" data-action-args="[&quot;tesserino&quot;]">🆔 Anagrafica & Tesserino</button>
+                <button data-action="openModule" data-action-args="[&quot;pagopa&quot;]">💳 Ricevuta PagoPA (Tassa)</button>
+                <button data-action="openModule" data-action-args="[&quot;f24&quot;]">📄 F24 ELIDE (Imposta 100€)</button>
+                <button data-action="openModule" data-action-args="[&quot;clienti&quot;]">👥 Rubrica Clienti</button>
+                <button data-action="openModule" data-action-args="[&quot;ricevute&quot;]">📝 Emetti Ricevuta Vendita</button>
+                <button data-action="openModule" data-action-args="[&quot;storico_ricevute&quot;]">📂 Archivio Ricevute</button>
             </div>
 
             <div class="drawer-section">
                 <h3>Contabilità & Spese</h3>
-                <button onclick="openModule('spese')">💸 Gestione Spese</button>
-                <button onclick="openModule('bilancio')">📊 Bilancio & Contabilità</button>
+                <button data-action="openModule" data-action-args="[&quot;spese&quot;]">💸 Gestione Spese</button>
+                <button data-action="openModule" data-action-args="[&quot;bilancio&quot;]">📊 Bilancio & Contabilità</button>
             </div>
 
             <div class="drawer-section">
                 <h3>Cane & Sicurezza</h3>
-                <button onclick="openModule('canidiary')">🐕 Profilo Cane</button>
-                <button onclick="openModule('vet')">💉 Libretto Sanitario</button>
-                <button onclick="openModule('vet-emergency')">⚠️ Pronto Soccorso H24</button>
-                <button onclick="openModule('polizze')">🛡️ Polizze & Assicurazioni</button>
-                <button onclick="openModule('emergency')">📞 Chiama 112</button>
+                <button data-action="openModule" data-action-args="[&quot;canidiary&quot;]">🐕 Profilo Cane</button>
+                <button data-action="openModule" data-action-args="[&quot;vet&quot;]">💉 Libretto Sanitario</button>
+                <button data-action="openModule" data-action-args="[&quot;vet-emergency&quot;]">⚠️ Pronto Soccorso H24</button>
+                <button data-action="openModule" data-action-args="[&quot;polizze&quot;]">🛡️ Polizze & Assicurazioni</button>
+                <button data-action="openModule" data-action-args="[&quot;emergency&quot;]">📞 Chiama 112</button>
             </div>
 
             <div class="drawer-section">
                 <h3>Sistema</h3>
-                <button onclick="openModule('export')">💾 Backup & Report CSV</button>
-                <button onclick="shareAppUrl()">📤 Condividi App</button>
-                <button id="btn-installa-app" onclick="installApp()">📲 Installa App</button>
+                <button data-action="openModule" data-action-args="[&quot;export&quot;]">💾 Backup & Report CSV</button>
+                <button data-action="shareAppUrl">📤 Condividi App</button>
+                <button id="btn-installa-app" data-action="installApp">📲 Installa App</button>
             </div>
         </div>
     </div>
-    <div id="drawer-backdrop" onclick="toggleDrawer()"></div>
+    <div id="drawer-backdrop" data-action="toggleDrawer" aria-label="Chiudi il menu"></div>
 
     <!-- Contenitore viste dinamiche a schermo intero -->
     <div id="active-module-view"></div>
@@ -100,7 +100,7 @@
     <dialog id="app-dialog">
         <div class="app-dialog-body">
             <p id="app-dialog-message"></p>
-            <input type="text" id="app-dialog-input" class="mod-input app-dialog-input-field" style="display:none;">
+            <input type="text" id="app-dialog-input" class="mod-input app-dialog-input-field" style="display:none;" aria-label="Inserisci un valore">
             <div class="app-dialog-actions">
                 <button id="app-dialog-cancel" class="overlay-btn btn-neutral" style="display:none;">Annulla</button>
                 <button id="app-dialog-ok" class="overlay-btn btn-primary">OK</button>
@@ -114,18 +114,6 @@
     <!-- html2pdf JS (Necessario per la condivisione e il download diretto del PDF) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <!-- Script Principale dell'App (Conferma percorso cartella js) -->
-    <script src="./js/app.js"></script>
-
-    <!-- Registrazione Service Worker per PWA -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker registrato con successo:', reg.scope))
-                    .catch(err => console.log('Registrazione Service Worker fallita:', err));
-            });
-        }
-    </script>
+    <script type="module" src="./js/app.js"></script>
 </body>
 </html>

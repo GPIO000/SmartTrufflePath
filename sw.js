@@ -1,9 +1,8 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'truffle-mobile-first-' + '2026-08-08';
+const CACHE_NAME = 'truffle-mobile-first-' + '2026-08-10';
 const ASSETS = [
   './',
   './index.html',
-  './js/app.js',
   './css/style.css',
   './manifest.json',
   './icon-192.png',
@@ -13,41 +12,49 @@ const ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
 
-// Installazione Service Worker e salvataggio in cache[span_0](start_span)[span_0](end_span)
+function serviceUnavailableResponse() {
+  return new Response('Service Unavailable', {
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+  });
+}
+
+// Installazione Service Worker e salvataggio in cache
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS);
     })
   );
-  // Forza l'attivazione immediata del nuovo service worker[span_1](start_span)[span_1](end_span)
+  // Forza l'attivazione immediata del nuovo service worker
   self.skipWaiting();
 });
 
-// Attivazione e pulizia delle vecchie cache[span_2](start_span)[span_2](end_span)
+// Attivazione e pulizia delle vecchie cache
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('[Service Worker] Eliminazione vecchia cache:', key);[span_3](start_span)[span_3](end_span)
+            console.log('[Service Worker] Eliminazione vecchia cache:', key);
             return caches.delete(key);
           }
         })
       );
     })
   );
-  // Prende il controllo immediato delle pagine aperte[span_4](start_span)[span_4](end_span)
+  // Prende il controllo immediato delle pagine aperte
   self.clients.claim();
 });
 
-// Intercettazione richieste con strategia Cache-First e fallback di rete[span_5](start_span)[span_5](end_span)
+// Intercettazione richieste con strategia Cache-First e fallback di rete
 self.addEventListener('fetch', (e) => {
-  // Ignora richieste non GET[span_6](start_span)[span_6](end_span)
+  // Ignora richieste non GET
   if (e.request.method !== 'GET') return;
 
-  // Gestione speciale per le tile delle mappe (OpenStreetMap) o risorse esterne dinamiche[span_7](start_span)[span_7](end_span)
+  // Gestione speciale per le tile delle mappe (OpenStreetMap) o risorse esterne dinamiche
   if (e.request.url.includes('tile.openstreetmap.org')) {
     e.respondWith(
       caches.match(e.request).then((cachedResponse) => {
@@ -57,8 +64,7 @@ self.addEventListener('fetch', (e) => {
             return networkResponse;
           });
         }).catch(() => {
-          // Ritorna una Response vuota con status 503 invece di undefined
-          return new Response('', { status: 503, statusText: 'Service Unavailable' });
+          return serviceUnavailableResponse();
         });
       })
     );
@@ -71,12 +77,20 @@ self.addEventListener('fetch', (e) => {
         return cachedResponse;
       }
       return fetch(e.request).then((networkResponse) => {
+        if (networkResponse.ok) {
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, networkResponse.clone());
+          }).catch(() => {});
+        }
         return networkResponse;
       }).catch(() => {
-        // Fallback di sicurezza offline per pagine HTML[span_9](start_span)[span_9](end_span)
+        // Fallback di sicurezza offline per pagine HTML
         if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
-          return caches.match('./index.html');
+          return caches.match('./index.html').then((offlinePage) => {
+            return offlinePage || serviceUnavailableResponse();
+          });
         }
+        return serviceUnavailableResponse();
       });
     })
   );
