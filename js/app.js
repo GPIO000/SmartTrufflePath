@@ -1506,17 +1506,6 @@ function openModule(moduleName, editMode = false) {
                 "Tuber brumale Vitt. (Tartufo nero d'inverno)",                    // ID 7
                 "Tuber brumale var. moschatum De Ferry (Tartufo moscato)"          // ID 8
             ];
-            const defaultPeriodiArchivio = [
-                "1 settembre - 15 aprile",   // ID 0 mesentericum
-                "1 ottobre - 31 dicembre",   // ID 1 magnatum
-                "1 maggio - 30 novembre",    // ID 2 aestivum
-                "1 ottobre - 31 dicembre",   // ID 3 uncinatum
-                "1 gennaio - 30 aprile",     // ID 4 borchii
-                "15 novembre - 15 marzo",    // ID 5 melanosporum
-                "1 settembre - 31 dicembre", // ID 6 macrosporum
-                "1 gennaio - 15 marzo",      // ID 7 brumale
-                "1 novembre - 15 marzo"      // ID 8 brumale moschatum
-            ];
 
             // Recupera la regione selezionata nell'archivio o usa una di default
             const regioneSelezionataArchivio = window.currentArchivioRegione || "Campania";
@@ -1578,14 +1567,15 @@ function openModule(moduleName, editMode = false) {
             `;
 
             specieTartufiArchivio.forEach((specie, idSpecie) => {
-                let defaultPeriodo = defaultPeriodiArchivio[idSpecie] || "1 ottobre - 31 dicembre";
-                let periodoSalvato = datiRegioneArchivio[idSpecie] !== undefined ? datiRegioneArchivio[idSpecie] : defaultPeriodo;
+                let periodoSalvato = datiRegioneArchivio[idSpecie] !== undefined ? datiRegioneArchivio[idSpecie] : '';
+                let borderColor = periodoSalvato ? '#f59e0b' : '#475569';
+                let labelExtra = periodoSalvato ? '' : '<span style="font-size:0.75rem; color:#94a3b8; font-style:italic; margin-left:6px;">⚠️ Nessuna data salvata</span>';
 
                 archivioHtml += `
-                    <div class="module-card" style="border-left: 4px solid #f59e0b; margin-bottom: 10px; background: #1e293b;">
-                        <strong style="color: #f8fafc; font-size: 0.9rem; display: block; margin-bottom: 5px;">🍄 [ID Specie: ${idSpecie}] ${specie}</strong>
+                    <div class="module-card" style="border-left: 4px solid ${borderColor}; margin-bottom: 10px; background: #1e293b;">
+                        <strong style="color: #f8fafc; font-size: 0.9rem; display: block; margin-bottom: 5px;">🍄 [ID Specie: ${idSpecie}] ${specie}${labelExtra}</strong>
                         <label style="font-size: 0.75rem; color: #94a3b8;">Periodo di raccolta autorizzato:</label>
-                        <input type="text" id="specie-archivio-${idSpecie}" class="mod-input" value="${periodoSalvato}" placeholder="Es. 1 Ottobre - 31 Dicembre" style="margin-top: 3px; font-size: 0.85rem;">
+                        <input type="text" id="specie-archivio-${idSpecie}" class="mod-input" value="${periodoSalvato}" placeholder="Nessuna data salvata — inserisci il periodo" style="margin-top: 3px; font-size: 0.85rem;">
                     </div>
                 `;
             });
@@ -1642,17 +1632,7 @@ function openModule(moduleName, editMode = false) {
         "Tuber brumale Vitt. (Tartufo nero d'inverno)",
         "Tuber brumale var. moschatum De Ferry (Tartufo moscato)"
     ];
-    const defaultPeriodiCal = [
-        "1 settembre - 15 aprile",   // ID 0 mesentericum
-        "1 ottobre - 31 dicembre",   // ID 1 magnatum
-        "1 maggio - 30 novembre",    // ID 2 aestivum
-        "1 ottobre - 31 dicembre",   // ID 3 uncinatum
-        "1 gennaio - 30 aprile",     // ID 4 borchii
-        "15 novembre - 15 marzo",    // ID 5 melanosporum
-        "1 settembre - 31 dicembre", // ID 6 macrosporum
-        "1 gennaio - 15 marzo",      // ID 7 brumale
-        "1 novembre - 15 marzo"      // ID 8 brumale moschatum
-    ];
+    const defaultPeriodiCal = [];
 
     let calHtml = `
         <h2>📅 Calendario Raccolta (GPS)</h2>
@@ -1661,26 +1641,37 @@ function openModule(moduleName, editMode = false) {
     `;
 
     let specieAperteTrovate = 0;
+    let specieConDateSalvate = 0;
 
     specieTartufiCal.forEach((specie, id) => {
-        let periodo = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : (defaultPeriodiCal[id] || "1 ottobre - 31 dicembre");
-        
+        let periodoSalvato = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : '';
+
+        // Se non ci sono date salvate per questa specie, la saltiamo
+        if (!periodoSalvato) return;
+        specieConDateSalvate++;
+
         // Controllo di sicurezza nel caso in cui la funzione di verifica non esista
-        let isOpen = typeof window.isSpecieApertaCorrente === 'function' ? isSpecieApertaCorrente(periodo) : true;
+        let isOpen = typeof window.isSpecieApertaCorrente === 'function' ? isSpecieApertaCorrente(periodoSalvato) : true;
 
         if (isOpen) {
             specieAperteTrovate++;
             calHtml += `
                 <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: #1e293b; padding: 10px; border-radius: 6px;">
                     <strong style="color: #f8fafc; font-size: 0.85rem; display: block;">🍄 [ID: ${id}] ${specie}</strong>
-                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">🗓️ Periodo consentito: ${periodo}</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">🗓️ Periodo consentito: ${periodoSalvato}</div>
                     <div style="font-size: 0.75rem; margin-top: 6px;"><span style="color:#22c55e; font-weight:bold;">🟢 RACCOLTA APERTA</span></div>
                 </div>
             `;
         }
     });
 
-    if (specieAperteTrovate === 0) {
+    if (specieConDateSalvate === 0) {
+        calHtml += `
+            <div class="module-card" style="background: #1e293b; border-left: 4px solid #f59e0b; padding: 12px; text-align: center; margin-bottom: 15px;">
+                <p style="color: #f59e0b; font-weight: bold; margin: 0;">⚠️ Nessuna data salvata per la regione ${regioneCal}.<br><span style="font-size:0.8rem; font-weight:normal; color:#94a3b8;">Vai su "📚 Archivio Date per Regione" per inserire i periodi di raccolta.</span></p>
+            </div>
+        `;
+    } else if (specieAperteTrovate === 0) {
         calHtml += `
             <div class="module-card" style="background: #1e293b; border-left: 4px solid #ef4444; padding: 12px; text-align: center; margin-bottom: 15px;">
                 <p style="color: #ef4444; font-weight: bold; margin: 0;">🔴 Nessuna specie aperta in questo periodo per la regione ${regioneCal}.</p>
