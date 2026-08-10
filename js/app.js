@@ -2445,7 +2445,7 @@ function salvaModificaRicevuta(index) {
         metodoPagamento: (document.getElementById('r-metodo-pagamento') || {}).value || storico[index].metodoPagamento || 'contanti',
         ibanVenditore: (document.getElementById('r-iban') || {}).value?.trim() || storico[index].ibanVenditore || '',
         bancaVenditore: (document.getElementById('r-banca') || {}).value?.trim() || storico[index].bancaVenditore || '',
-        intestatarioVenditore: tData.nome || storico[index].intestatarioVenditore || '',
+        intestatarioVenditore: storico[index].intestatarioVenditore || tData.nome || '',
         causaleVenditore: (document.getElementById('r-causale') || {}).value?.trim() || storico[index].causaleVenditore || '',
         data: storico[index].data
     };
