@@ -870,6 +870,63 @@ function openModule(moduleName, editMode = false) {
                 contentHTML = `
                     <h2>F24 ELIDE - Imposta Sostitutiva</h2>
                     <p>Registra il versamento dell'imposta sostitutiva (100€ annui - Legge 145/2018):</p>
+                    <div class="module-card" style="border-left:4px solid #f59e0b; background:#1e293b; margin-bottom:18px;">
+                        <p style="color:#f59e0b; font-weight:bold; margin-bottom:10px;">📋 PROMEMORIA COMPILAZIONE MODELLO F24 — IMPOSTA SOSTITUTIVA TARTUFI</p>
+                        <table style="width:100%; border-collapse:collapse; font-size:0.85rem; color:#cbd5e1;">
+                            <tbody>
+                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Modello</td><td style="padding:4px 6px;">F24 (o F24 Elide)</td></tr>
+                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Sezione versamento</td><td style="padding:4px 6px;">Erario ed Altro</td></tr>
+                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Tipo</td><td style="padding:4px 6px;">R</td></tr>
+                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Codice Tributo</td><td style="padding:4px 6px; font-weight:bold; color:#38bdf8;">1853</td></tr>
+                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Anno di Riferimento</td><td style="padding:4px 6px;">2026</td></tr>
+                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Importo a debito</td><td style="padding:4px 6px; font-weight:bold; color:#22c55e;">100,00 €</td></tr>
+                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Elementi identificativi</td><td style="padding:4px 6px;">[Codice Regione] [Codice Prodotto] [N. Tesserino]</td></tr>
+                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Esempio pratico</td><td style="padding:4px 6px;">Veneto + Tartufi + N.12345 → <strong style="color:#f59e0b;">21T12345</strong></td></tr>
+                            </tbody>
+                        </table>
+                        <details style="margin-top:12px;">
+                            <summary style="cursor:pointer; color:#38bdf8; font-size:0.85rem; font-weight:bold;">🗺️ Codici Regioni e Province Autonome</summary>
+                            <table style="width:100%; border-collapse:collapse; font-size:0.82rem; color:#cbd5e1; margin-top:8px;">
+                                <tbody>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">01</td><td style="padding:3px 6px;">Abruzzo</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">02</td><td style="padding:3px 6px;">Basilicata</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">03</td><td style="padding:3px 6px;">Prov. autonoma di Bolzano</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">04</td><td style="padding:3px 6px;">Calabria</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">05</td><td style="padding:3px 6px;">Campania</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">06</td><td style="padding:3px 6px;">Emilia-Romagna</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">07</td><td style="padding:3px 6px;">Friuli-Venezia Giulia</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">08</td><td style="padding:3px 6px;">Lazio</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">09</td><td style="padding:3px 6px;">Liguria</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">10</td><td style="padding:3px 6px;">Lombardia</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">11</td><td style="padding:3px 6px;">Marche</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">12</td><td style="padding:3px 6px;">Molise</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">13</td><td style="padding:3px 6px;">Piemonte</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">14</td><td style="padding:3px 6px;">Puglia</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">15</td><td style="padding:3px 6px;">Sardegna</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">16</td><td style="padding:3px 6px;">Sicilia</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">17</td><td style="padding:3px 6px;">Toscana</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">18</td><td style="padding:3px 6px;">Prov. autonoma di Trento</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">19</td><td style="padding:3px 6px;">Umbria</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">20</td><td style="padding:3px 6px;">Valle d'Aosta</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#94a3b8;">21</td><td style="padding:3px 6px;">Veneto</td></tr>
+                                </tbody>
+                            </table>
+                        </details>
+                        <details style="margin-top:8px;">
+                            <summary style="cursor:pointer; color:#38bdf8; font-size:0.85rem; font-weight:bold;">🌿 Codici Tipologia Prodotto</summary>
+                            <table style="width:100%; border-collapse:collapse; font-size:0.82rem; color:#cbd5e1; margin-top:8px;">
+                                <tbody>
+                                    <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b; width:30px;">T</td><td style="padding:3px 6px;">Tartufi</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">F</td><td style="padding:3px 6px;">Funghi epigei</td></tr>
+                                    <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">B</td><td style="padding:3px 6px;">Bacche di bosco</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">G</td><td style="padding:3px 6px;">Frutta in guscio (castagne, noci, ecc.)</td></tr>
+                                    <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">E</td><td style="padding:3px 6px;">Erbe officinali spontanee</td></tr>
+                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">M</td><td style="padding:3px 6px;">Muschi, licheni e piante ornamentali/alimentari</td></tr>
+                                    <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">A</td><td style="padding:3px 6px;">Altri prodotti selvatici non specificati</td></tr>
+                                </tbody>
+                            </table>
+                        </details>
+                    </div>
                     <div class="module-card">
                         <label>Anno Fiscale di Riferimento:</label>
                         <input type="text" id="f-anno" class="mod-input" value="${fData.anno || new Date().getFullYear()}" placeholder="Es. 2026">
