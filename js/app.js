@@ -217,6 +217,7 @@ const ACTION_HANDLERS = {
             data: (document.getElementById('vh-data') || {}).value || new Date().toISOString().slice(0, 10),
             note: (document.getElementById('vh-note') || {}).value || '',
             heatData: (document.getElementById('heat-data') || {}).value || new Date().toISOString().slice(0, 10),
+            heatInterval: (document.getElementById('heat-interval') || {}).value || String(HEAT_CYCLE_MONTHS),
             heatNote: (document.getElementById('heat-note') || {}).value || ''
         }));
         localStorage.setItem('vet_selected_dog', event.target.value);
@@ -1140,7 +1141,8 @@ function openModule(moduleName, editMode = false) {
                 .filter(item => item.cane === nomeCaneDefault && item.tipo === '🔥 Calore')
                 .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
             const latestHeatEntry = heatEntries[0] || null;
-            const nextHeatDate = latestHeatEntry?.prossimoCalore || addMonthsToIsoDate(latestHeatEntry?.data, HEAT_CYCLE_MONTHS);
+            const defaultHeatInterval = parseInt(vetDraft.heatInterval || latestHeatEntry?.intervalloMesi || HEAT_CYCLE_MONTHS, 10) || HEAT_CYCLE_MONTHS;
+            const nextHeatDate = latestHeatEntry?.prossimoCalore || addMonthsToIsoDate(latestHeatEntry?.data, latestHeatEntry?.intervalloMesi || HEAT_CYCLE_MONTHS);
             let vetHtml = `
                 <h2>Libretto Sanitario & Profilassi</h2>
                 <p>Storico trattamenti, vaccini e visite per il cane:</p>
@@ -1171,6 +1173,8 @@ function openModule(moduleName, editMode = false) {
                         <p style="font-size:0.85rem; color:#cbd5e1; margin-bottom:10px;">Registra i cicli di ${selectedDogDetails?.nome || nomeCaneDefault} e monitora il prossimo calore previsto.</p>
                         <label>Data inizio calore:</label>
                         <input type="date" id="heat-data" class="mod-input" value="${defaultHeatDate}">
+                        <label>Intervallo previsto (mesi):</label>
+                        <input type="number" id="heat-interval" class="mod-input" value="${defaultHeatInterval}" min="4" max="12" step="1">
                         <label>Note sul ciclo:</label>
                         <input type="text" id="heat-note" class="mod-input" value="${defaultHeatNote}" placeholder="Es. durata, sintomi, osservazioni">
                         <button class="overlay-btn" style="margin-top:12px; width:100%; background:#7c3aed;" ${actionAttrs('saveHeatCycle')}>Salva Diario Calore</button>
@@ -1194,7 +1198,8 @@ function openModule(moduleName, editMode = false) {
                             <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.tipo}</b></p>
                             <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
                             <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
-                            ${item.tipo === '🔥 Calore' && item.prossimoCalore ? `<p style="font-size:0.8rem; color:#f472b6; margin-bottom: 8px;">🌸 Prossimo calore previsto: ${formatItalianDate(item.prossimoCalore)}</p>` : ''}
+                            ${item.tipo === '🔥 Calore' && item.prossimoCalore ? `<p style="font-size:0.8rem; color:#f472b6; margin-bottom: 4px;">🌸 Prossimo calore previsto: ${formatItalianDate(item.prossimoCalore)}</p>` : ''}
+                            ${item.tipo === '🔥 Calore' && item.intervalloMesi ? `<p style="font-size:0.78rem; color:#c084fc; margin-bottom: 8px;">Intervallo impostato: ${item.intervalloMesi} mesi</p>` : ''}
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteVetHistoryItem', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
@@ -2798,6 +2803,7 @@ function saveVetHistoryItem() {
 function saveHeatCycle() {
     const cane = document.getElementById('vh-cane').value;
     const data = document.getElementById('heat-data').value;
+    const intervalloMesi = parseInt(document.getElementById('heat-interval').value, 10) || HEAT_CYCLE_MONTHS;
     const note = document.getElementById('heat-note').value.trim();
     if (!data) { showToast("Inserisci la data del calore.", 'error'); return; }
     let vetHistory = readStorageJSON('vet_history_list', []);
@@ -2805,8 +2811,9 @@ function saveHeatCycle() {
         cane,
         tipo: '🔥 Calore',
         data,
+        intervalloMesi,
         note,
-        prossimoCalore: addMonthsToIsoDate(data, HEAT_CYCLE_MONTHS)
+        prossimoCalore: addMonthsToIsoDate(data, intervalloMesi)
     });
     localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
     localStorage.removeItem('vet_form_draft');
