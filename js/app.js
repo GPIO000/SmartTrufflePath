@@ -24,6 +24,8 @@ const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
 
+const HEAT_CYCLE_MONTHS = 6;
+
 // ── Dialog / Toast personalizzati ────────────────────────────────────────────
 
 function showToast(message, type = 'info') {
@@ -210,6 +212,13 @@ const ACTION_HANDLERS = {
     saveNewCane: () => saveNewCane(),
     deleteDog: (_event, index) => deleteDog(index),
     setVetSelectedDog: (event) => {
+        localStorage.setItem('vet_form_draft', JSON.stringify({
+            tipo: (document.getElementById('vh-tipo') || {}).value || '💉 Vaccino',
+            data: (document.getElementById('vh-data') || {}).value || new Date().toISOString().slice(0, 10),
+            note: (document.getElementById('vh-note') || {}).value || '',
+            heatData: (document.getElementById('heat-data') || {}).value || new Date().toISOString().slice(0, 10),
+            heatNote: (document.getElementById('heat-note') || {}).value || ''
+        }));
         localStorage.setItem('vet_selected_dog', event.target.value);
         openModule('vet');
     },
@@ -1111,8 +1120,14 @@ function openModule(moduleName, editMode = false) {
             const hasStoredSelection = dogsListVet.some(dog => dog.nome === vetSelectedDog);
             const nomeCaneDefault = (hasStoredSelection ? vetSelectedDog : '') || cDataVet.nome || (dogsListVet.length > 0 ? dogsListVet[0].nome : 'Il tuo cane');
             const vetHistory = getRenderableStorageJSON('vet_history_list', []);
+            const vetDraft = readStorageJSON('vet_form_draft', {});
             const selectedDogDetails = dogsListVet.find(dog => dog.nome === nomeCaneDefault) || cDataVet;
             const isFemaleDogSelected = selectedDogDetails?.sesso === 'Femmina';
+            const selectedVetType = vetDraft.tipo || '💉 Vaccino';
+            const defaultVetDate = vetDraft.data || new Date().toISOString().slice(0,10);
+            const defaultVetNote = vetDraft.note || '';
+            const defaultHeatDate = vetDraft.heatData || new Date().toISOString().slice(0,10);
+            const defaultHeatNote = vetDraft.heatNote || '';
             let optionsHtml = '';
             if (dogsListVet.length > 0) {
                 dogsListVet.forEach(dog => {
@@ -1124,7 +1139,7 @@ function openModule(moduleName, editMode = false) {
                 .filter(item => item.cane === nomeCaneDefault && item.tipo === '🔥 Calore')
                 .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
             const latestHeatEntry = heatEntries[0] || null;
-            const nextHeatDate = latestHeatEntry?.prossimoCalore || addMonthsToIsoDate(latestHeatEntry?.data, 6);
+            const nextHeatDate = latestHeatEntry?.prossimoCalore || addMonthsToIsoDate(latestHeatEntry?.data, HEAT_CYCLE_MONTHS);
             let vetHtml = `
                 <h2>Libretto Sanitario & Profilassi</h2>
                 <p>Storico trattamenti, vaccini e visite per il cane:</p>
@@ -1134,18 +1149,18 @@ function openModule(moduleName, editMode = false) {
                     <select id="vh-cane" class="mod-input" ${eventActionAttrs('change', 'setVetSelectedDog')}>${optionsHtml}</select>
                     <label>Tipologia Intervento:</label>
                     <select id="vh-tipo" class="mod-input">
-                        <option value="💉 Vaccino">Vaccino</option>
-                        <option value="💊 Antiparassitario Intestinale">Antiparassitario Intestinale (Pillola)</option>
-                        <option value="💧 Spot-on">Spot-on (Antipulci / Zecche)</option>
-                        <option value="🎗️ Collare Antiparassitario">Collare Antiparassitario</option>
-                        <option value="🩺 Visita Veterinaria">Visita Veterinaria / Controllo</option>
-                        <option value="🩹 Medicazione / Zecca">Medicazione / Ferita / Zecca</option>
-                        <option value="🏥 Somministrazione Farmaci / Altro">Somministrazione Farmaci / Altro</option>
+                        <option value="💉 Vaccino" ${selectedVetType === '💉 Vaccino' ? 'selected' : ''}>Vaccino</option>
+                        <option value="💊 Antiparassitario Intestinale" ${selectedVetType === '💊 Antiparassitario Intestinale' ? 'selected' : ''}>Antiparassitario Intestinale (Pillola)</option>
+                        <option value="💧 Spot-on" ${selectedVetType === '💧 Spot-on' ? 'selected' : ''}>Spot-on (Antipulci / Zecche)</option>
+                        <option value="🎗️ Collare Antiparassitario" ${selectedVetType === '🎗️ Collare Antiparassitario' ? 'selected' : ''}>Collare Antiparassitario</option>
+                        <option value="🩺 Visita Veterinaria" ${selectedVetType === '🩺 Visita Veterinaria' ? 'selected' : ''}>Visita Veterinaria / Controllo</option>
+                        <option value="🩹 Medicazione / Zecca" ${selectedVetType === '🩹 Medicazione / Zecca' ? 'selected' : ''}>Medicazione / Ferita / Zecca</option>
+                        <option value="🏥 Somministrazione Farmaci / Altro" ${selectedVetType === '🏥 Somministrazione Farmaci / Altro' ? 'selected' : ''}>Somministrazione Farmaci / Altro</option>
                     </select>
                     <label>Data del Trattamento:</label>
-                    <input type="date" id="vh-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+                    <input type="date" id="vh-data" class="mod-input" value="${defaultVetDate}">
                     <label>Note / Dettagli:</label>
-                    <input type="text" id="vh-note" class="mod-input" placeholder="Es. Nome farmaco o dosaggio">
+                    <input type="text" id="vh-note" class="mod-input" value="${defaultVetNote}" placeholder="Es. Nome farmaco o dosaggio">
                     <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveVetHistoryItem')}>Registra nel Libretto</button>
                 </div>`;
             if (isFemaleDogSelected) {
@@ -1154,9 +1169,9 @@ function openModule(moduleName, editMode = false) {
                         <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">🌸 Diario Calore</h3>
                         <p style="font-size:0.85rem; color:#cbd5e1; margin-bottom:10px;">Registra i cicli di ${selectedDogDetails?.nome || nomeCaneDefault} e monitora il prossimo calore previsto.</p>
                         <label>Data inizio calore:</label>
-                        <input type="date" id="heat-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+                        <input type="date" id="heat-data" class="mod-input" value="${defaultHeatDate}">
                         <label>Note sul ciclo:</label>
-                        <input type="text" id="heat-note" class="mod-input" placeholder="Es. durata, sintomi, osservazioni">
+                        <input type="text" id="heat-note" class="mod-input" value="${defaultHeatNote}" placeholder="Es. durata, sintomi, osservazioni">
                         <button class="overlay-btn" style="margin-top:12px; width:100%; background:#7c3aed;" ${actionAttrs('saveHeatCycle')}>Salva Diario Calore</button>
                         <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #475569;">
                             <p style="font-size:0.82rem; color:#94a3b8; margin:0 0 4px;">Ultimo calore registrato</p>
@@ -1762,6 +1777,9 @@ function openModule(moduleName, editMode = false) {
         <div class="module-body-content">${contentHTML}</div>
     `;
     activeView.style.display = 'flex';
+    if (moduleName === 'vet') {
+        localStorage.removeItem('vet_form_draft');
+    }
     if (moduleName === 'export') {
         setTimeout(syncDriveBackupSettingsUI, 0);
     }
@@ -2775,6 +2793,7 @@ function saveVetHistoryItem() {
     let vetHistory = readStorageJSON('vet_history_list', []);
     vetHistory.push({ cane, tipo, data, note });
     localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
+    localStorage.removeItem('vet_form_draft');
     showToast("Trattamento registrato!", 'success'); openModule('vet');
 }
 
@@ -2789,9 +2808,10 @@ function saveHeatCycle() {
         tipo: '🔥 Calore',
         data,
         note,
-        prossimoCalore: addMonthsToIsoDate(data, 6)
+        prossimoCalore: addMonthsToIsoDate(data, HEAT_CYCLE_MONTHS)
     });
     localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
+    localStorage.removeItem('vet_form_draft');
     showToast("Diario calore aggiornato!", 'success');
     openModule('vet');
 }
@@ -3483,7 +3503,7 @@ async function mostraInfoModulo(moduleName) {
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati anagrafici, gli estremi del tesserino regionale e il relativo allegato digitale, con coordinate bancarie opzionali per il bonifico.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA & PDF**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto (Imposta Sostitutiva o Ritenuta d'Acconto) in base alla presenza di un F24 valido.",
-        'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\Consulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
+        'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\nConsulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
         'canidiary': "ℹ️ **Guida - Anagrafica Cane**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo nome, razza, sesso, data di nascita e numero di microchip.",
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
