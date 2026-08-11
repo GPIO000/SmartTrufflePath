@@ -71,17 +71,10 @@ function appConfirm(message) {
         if (!dialog) { resolve(window.confirm(message)); return; }
         msg.textContent = message;
         inputField.style.display = 'none';
-        cancelBtn.style.display = '';
-        cancelBtn.textContent = 'Annulla';
+        cancelBtn.style.display = 'none';
         okBtn.textContent = 'OK';
-        const cleanup = () => {
-            okBtn.removeEventListener('click', onOk);
-            cancelBtn.removeEventListener('click', onCancel);
-        };
-        const onOk = () => { dialog.close(); cleanup(); resolve(true); };
-        const onCancel = () => { dialog.close(); cleanup(); resolve(false); };
+        const onOk = () => { dialog.close(); okBtn.removeEventListener('click', onOk); resolve(true); };
         okBtn.addEventListener('click', onOk);
-        cancelBtn.addEventListener('click', onCancel);
         dialog.showModal();
     });
 }
@@ -2187,7 +2180,7 @@ async function registraVenditaConPrezzoKg() {
         `----------------------------------------\n` +
         `• Totale vendite annue: € ${nuovoTotaleAnno.toFixed(2)} / € 7.000,00\n` +
         `• Mancante alla soglia di blocco: € ${quantoManca.toFixed(2)}\n\n` +
-        `Premi OK per confermare la presa visione e registrare la vendita, oppure Annulla per interrompere.`;
+        `Premi OK per confermare la presa visione e registrare la vendita.`;
 
     if (!(await appConfirm(messaggioRiepilogo))) {
         return; 
