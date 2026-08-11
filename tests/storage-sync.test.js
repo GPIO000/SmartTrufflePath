@@ -1,11 +1,35 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  init,
   getAutomaticBackupStatus,
   getLatestAutomaticBackupSnapshot,
   getLatestAutomaticBackupSnapshotAsync,
+  persistEntries,
   saveAutomaticBackupSnapshot,
 } from '../js/storage-sync.js';
+
+function readIndexedDbValue(key) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('truffle-storage-db', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('kv', 'readonly');
+      const store = tx.objectStore('kv');
+      const getRequest = store.get(key);
+      getRequest.onerror = () => {
+        db.close();
+        reject(getRequest.error);
+      };
+      getRequest.onsuccess = () => {
+        const result = getRequest.result;
+        db.close();
+        resolve(result ? result.value : null);
+      };
+    };
+  });
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -115,5 +139,19 @@ describe('getAutomaticBackupStatus', () => {
     expect(status).not.toBeNull();
     expect(status.ok).toBe(false);
     expect(typeof status.message).toBe('string');
+  });
+});
+
+describe('persistEntries', () => {
+  it('attende la persistenza su IndexedDB prima di terminare', async () => {
+    await init();
+    const storageKey = `restore_test_${Date.now()}`;
+    const storageValue = JSON.stringify({ contenutoBase64: 'data:application/pdf;base64,QUJDRA==' });
+
+    const result = await persistEntries([[storageKey, storageValue]]);
+
+    expect(result).toEqual({ ok: true, count: 1 });
+    expect(localStorage.getItem(storageKey)).toBe(storageValue);
+    expect(await readIndexedDbValue(storageKey)).toBe(storageValue);
   });
 });

@@ -148,6 +148,33 @@
     }
   }
 
+  async function persistEntries(entries) {
+    if (!Array.isArray(entries)) {
+      throw new Error('Elenco voci non valido');
+    }
+
+    const normalizedEntries = entries
+      .filter((entry) => Array.isArray(entry) && typeof entry[0] === 'string')
+      .map(([key, value]) => [key, String(value)]);
+
+    if (normalizedEntries.length === 0) {
+      return { ok: true, count: 0 };
+    }
+
+    if (localStorageOriginals) {
+      normalizedEntries.forEach(([key, value]) => {
+        localStorageOriginals.setItem(key, value);
+      });
+      await Promise.all(normalizedEntries.map(([key, value]) => putEntry(key, value)));
+    } else {
+      normalizedEntries.forEach(([key, value]) => {
+        localStorage.setItem(key, value);
+      });
+    }
+
+    return { ok: true, count: normalizedEntries.length };
+  }
+
   function patchLocalStorage() {
     if (localStorageOriginals) return;
     localStorageOriginals = {
@@ -204,4 +231,4 @@
     initialized = true;
   }
 
-export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshotAsync, getAutomaticBackupStatus };
+export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshotAsync, getAutomaticBackupStatus, persistEntries };

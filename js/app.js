@@ -349,7 +349,7 @@ function normalizeBackupEntry(entryValue, fallbackValue) {
     return JSON.stringify(parsedValue);
 }
 
-function restoreBackupEntries(data) {
+async function restoreBackupEntries(data) {
     const backupSchema = {
         tesserino: { storageKey: 'tesserino_data', fallbackValue: {} },
         pagopa: { storageKey: 'pagopa_data', fallbackValue: {} },
@@ -377,6 +377,12 @@ function restoreBackupEntries(data) {
         const normalizedValue = normalizeBackupEntry(data[backupKey], config.fallbackValue);
         normalizedEntries.push([config.storageKey, normalizedValue]);
     });
+
+    const storageApi = getAutomaticBackupStorageApi();
+    if (storageApi && typeof storageApi.persistEntries === 'function') {
+        await storageApi.persistEntries(normalizedEntries);
+        return;
+    }
 
     normalizedEntries.forEach(([storageKey, normalizedValue]) => {
         localStorage.setItem(storageKey, normalizedValue);
@@ -2808,13 +2814,13 @@ function importBackupData(event) {
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         try {
             const data = JSON.parse(e.target.result);
             if (!data || typeof data !== 'object' || Array.isArray(data)) {
                 throw new Error('Backup non valido');
             }
-            restoreBackupEntries(data);
+            await restoreBackupEntries(data);
             
             showToast("Backup ripristinato!", 'success'); 
             location.reload();
@@ -2882,9 +2888,9 @@ async function restoreLatestAutomaticBackup() {
     }
     if (!await appConfirm("Vuoi ripristinare l'ultimo backup automatico locale?")) return;
     try {
-        restoreBackupEntries(snapshot.data);
+        await restoreBackupEntries(snapshot.data);
         showToast("Backup automatico ripristinato!", 'success');
-        setTimeout(() => location.reload(), 500);
+        location.reload();
     } catch (error) {
         showToast("Ripristino backup automatico non riuscito.", 'error');
     }
