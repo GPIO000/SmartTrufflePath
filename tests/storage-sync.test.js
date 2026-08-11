@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getAutomaticBackupStatus,
   getLatestAutomaticBackupSnapshot,
   getLatestAutomaticBackupSnapshotAsync,
   saveAutomaticBackupSnapshot,
+  setDataChangeListener,
+  notifyDataChange,
 } from '../js/storage-sync.js';
 
 beforeEach(() => {
@@ -115,5 +117,48 @@ describe('getAutomaticBackupStatus', () => {
     expect(status).not.toBeNull();
     expect(status.ok).toBe(false);
     expect(typeof status.message).toBe('string');
+  });
+});
+
+describe('setDataChangeListener', () => {
+  afterEach(() => {
+    setDataChangeListener(null);
+  });
+
+  it('chiama il listener per una chiave dato normale', () => {
+    const listener = vi.fn();
+    setDataChangeListener(listener);
+    notifyDataChange('storico_vendite');
+    expect(listener).toHaveBeenCalledWith('storico_vendite');
+  });
+
+  it('non chiama il listener per la chiave snapshot del backup', () => {
+    const listener = vi.fn();
+    setDataChangeListener(listener);
+    notifyDataChange('local_auto_backup_snapshot');
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('non chiama il listener per la chiave status del backup', () => {
+    const listener = vi.fn();
+    setDataChangeListener(listener);
+    notifyDataChange('local_auto_backup_status');
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('non chiama il listener se rimosso con null', () => {
+    const listener = vi.fn();
+    setDataChangeListener(listener);
+    setDataChangeListener(null);
+    notifyDataChange('rubrica_clienti');
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('non chiama il listener se impostato con valore non funzione', () => {
+    const listener = vi.fn();
+    setDataChangeListener(listener);
+    setDataChangeListener('non-una-funzione');
+    notifyDataChange('dogs_list');
+    expect(listener).not.toHaveBeenCalled();
   });
 });

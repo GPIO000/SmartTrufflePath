@@ -1410,7 +1410,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Backup automatico locale</h3>
-                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app salva automaticamente un backup locale quando esci e periodicamente durante l'uso (nessuna API cloud).</p>
+                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app salva automaticamente un backup locale ad ogni modifica dei dati e quando esci (nessuna API cloud).</p>
                     <p id="local-backup-status" style="font-size:0.82rem; color:#b8b0a0; margin:0 0 10px 0;">Stato ultimo backup automatico: non disponibile</p>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('forceLocalBackupNow')}>Aggiorna Backup Automatico Ora</button>
                     <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('restoreLatestAutomaticBackup')}>Ripristina Ultimo Backup Automatico</button>
@@ -2774,11 +2774,12 @@ async function runAutomaticLocalBackup(reason) {
     }
 }
 
-const AUTO_BACKUP_INTERVAL_MS = 3 * 60 * 1000;
 // Deduplica i trigger di uscita che spesso arrivano in sequenza (visibilitychange/pagehide/beforeunload).
 const AUTO_BACKUP_EXIT_DEDUP_MS = 1200;
+const AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS = 500;
 let automaticBackupLifecycleInitialized = false;
 let lastAutomaticBackupFingerprint = '';
+let dataChangeDebounceTimer = null;
 
 function setupAutomaticBackupLifecycle() {
     if (automaticBackupLifecycleInitialized) return;
@@ -2798,9 +2799,6 @@ function setupAutomaticBackupLifecycle() {
     });
     window.addEventListener('pagehide', triggerBackupDeduped);
     window.addEventListener('beforeunload', triggerBackupDeduped);
-    if (window.__truffleAutoBackupIntervalId) {
-        clearInterval(window.__truffleAutoBackupIntervalId);
-    }
     const api = getAutomaticBackupStorageApi();
     if (api && typeof api.getLatestAutomaticBackupSnapshot === 'function') {
         const latestSnapshot = api.getLatestAutomaticBackupSnapshot();
@@ -2808,9 +2806,12 @@ function setupAutomaticBackupLifecycle() {
             lastAutomaticBackupFingerprint = JSON.stringify(latestSnapshot.data);
         }
     }
-    window.__truffleAutoBackupIntervalId = setInterval(() => {
-        runAutomaticLocalBackup('periodic');
-    }, AUTO_BACKUP_INTERVAL_MS);
+    if (api && typeof api.setDataChangeListener === 'function') {
+        api.setDataChangeListener(() => {
+            clearTimeout(dataChangeDebounceTimer);
+            dataChangeDebounceTimer = setTimeout(() => runAutomaticLocalBackup('data-change'), AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS);
+        });
+    }
 }
 
 setupAutomaticBackupLifecycle();

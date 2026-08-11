@@ -6,6 +6,7 @@
 
   let dbPromise = null;
   let localStorageOriginals = null;
+  let dataChangeListener = null;
   const rawLocalStorageApi = {
     setItem: localStorage.setItem.bind(localStorage),
     removeItem: localStorage.removeItem.bind(localStorage),
@@ -148,6 +149,12 @@
     }
   }
 
+  function notifyDataChange(key) {
+    if (key !== AUTO_BACKUP_SNAPSHOT_KEY && key !== AUTO_BACKUP_STATUS_KEY && typeof dataChangeListener === 'function') {
+      dataChangeListener(key);
+    }
+  }
+
   function patchLocalStorage() {
     if (localStorageOriginals) return;
     localStorageOriginals = {
@@ -160,6 +167,7 @@
       const normalizedValue = String(value);
       localStorageOriginals.setItem(key, normalizedValue);
       putEntry(key, normalizedValue).catch(() => {});
+      notifyDataChange(key);
     };
 
     localStorage.removeItem = (key) => {
@@ -171,6 +179,10 @@
       localStorageOriginals.clear();
       clearEntries().catch(() => {});
     };
+  }
+
+  function setDataChangeListener(fn) {
+    dataChangeListener = typeof fn === 'function' ? fn : null;
   }
 
   async function hydrateLocalStorageFromDb() {
@@ -194,7 +206,12 @@
   }
 
   async function init() {
-    if (initialized || !('indexedDB' in window)) return;
+    if (initialized) return;
+    if (!('indexedDB' in window)) {
+      patchLocalStorage();
+      initialized = true;
+      return;
+    }
     await openDb();
     const hydrated = await hydrateLocalStorageFromDb();
     if (!hydrated) {
@@ -204,4 +221,4 @@
     initialized = true;
   }
 
-export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshotAsync, getAutomaticBackupStatus };
+export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshotAsync, getAutomaticBackupStatus, setDataChangeListener, notifyDataChange };
