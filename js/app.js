@@ -780,6 +780,7 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="r-causale" class="mod-input" placeholder="Es. Pagamento tartufi freschi - Ricevuta N. ...">
                     </div>
                     
+                    <p style="font-size:0.82rem; color:#ddd6c8; margin:12px 0 0 0;">Nota importante: anche se l'app salva i dati in memoria e crea backup automatici, è vivamente consigliato conservare una copia cartacea di ogni ricevuta.</p>
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" ${actionAttrs('registerRicevutaSafe')}>Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             setTimeout(() => { toggleRegimeFiscaleFields(); toggleCoordinateBancarie(); }, 50);
