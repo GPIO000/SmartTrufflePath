@@ -9,9 +9,102 @@ import {
   saveAutomaticBackupSnapshot,
 } from '../js/storage-sync.js';
 
+function createFakeIndexedDb() {
+  const stores = new Map();
+
+  const makeRequest = (operation, tx) => {
+    const request = { onsuccess: null, onerror: null, result: undefined, error: null };
+    queueMicrotask(() => {
+      try {
+        request.result = operation();
+        if (typeof request.onsuccess === 'function') request.onsuccess();
+        if (tx && typeof tx.oncomplete === 'function') tx.oncomplete();
+      } catch (error) {
+        request.error = error;
+        if (tx) tx.error = error;
+        if (typeof request.onerror === 'function') request.onerror();
+        if (tx && typeof tx.onerror === 'function') tx.onerror();
+      }
+    });
+    return request;
+  };
+
+  class FakeDb {
+    constructor() {
+      this.objectStoreNames = {
+        contains: (name) => stores.has(name)
+      };
+    }
+
+    createObjectStore(name) {
+      if (!stores.has(name)) {
+        stores.set(name, new Map());
+      }
+      return {};
+    }
+
+    transaction(name) {
+      if (!stores.has(name)) {
+        stores.set(name, new Map());
+      }
+      const tx = {
+        oncomplete: null,
+        onerror: null,
+        onabort: null,
+        error: null,
+        objectStore() {
+          const store = stores.get(name);
+          return {
+            getAll: () => makeRequest(() => Array.from(store.entries()).map(([key, value]) => ({ key, value })), tx),
+            put: (record) => makeRequest(() => {
+              store.set(record.key, record.value);
+              return record.key;
+            }, tx),
+            delete: (key) => makeRequest(() => {
+              store.delete(key);
+              return undefined;
+            }, tx),
+            clear: () => makeRequest(() => {
+              store.clear();
+              return undefined;
+            }, tx),
+            get: (key) => makeRequest(() => (store.has(key) ? { key, value: store.get(key) } : undefined), tx)
+          };
+        }
+      };
+      return tx;
+    }
+
+    close() {}
+  }
+
+  return {
+    open() {
+      const request = { onsuccess: null, onerror: null, onupgradeneeded: null, result: null, error: null };
+      queueMicrotask(() => {
+        try {
+          const db = new FakeDb();
+          request.result = db;
+          if (!db.objectStoreNames.contains('kv') && typeof request.onupgradeneeded === 'function') {
+            request.onupgradeneeded({ target: request });
+          }
+          if (!db.objectStoreNames.contains('kv')) {
+            db.createObjectStore('kv', { keyPath: 'key' });
+          }
+          if (typeof request.onsuccess === 'function') request.onsuccess();
+        } catch (error) {
+          request.error = error;
+          if (typeof request.onerror === 'function') request.onerror();
+        }
+      });
+      return request;
+    }
+  };
+}
+
 function readIndexedDbValue(key) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('truffle-storage-db', 1);
+    const request = window.indexedDB.open('truffle-storage-db', 1);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
       const db = request.result;
@@ -32,6 +125,10 @@ function readIndexedDbValue(key) {
 }
 
 beforeEach(() => {
+  if (!window.indexedDB) {
+    window.indexedDB = createFakeIndexedDb();
+    globalThis.indexedDB = window.indexedDB;
+  }
   localStorage.clear();
 });
 
