@@ -32,16 +32,51 @@
 
 ---
 
+## 🔄 Come Funziona lo Storage Offline-First
+
+Il modulo `js/storage-sync.js` è il cuore della persistenza dati dell'applicazione. Di seguito una descrizione del suo funzionamento passo per passo:
+
+### 1. Inizializzazione (`init`)
+All'avvio dell'app, `init()` apre (o crea) un database **IndexedDB** chiamato `truffle-storage-db` con un unico object store a chiave-valore (`kv`). Poi:
+- Se il database contiene già dati (sessioni precedenti), li **idratta nel `localStorage`** sovrascrivendo i valori presenti in memoria → `hydrateLocalStorageFromDb()`.
+- Se invece il database è vuoto (prima installazione), copia **tutti i dati già presenti nel `localStorage` verso IndexedDB** → `migrateLocalStorageToDb()`.
+
+### 2. Patch del `localStorage` (`patchLocalStorage`)
+Dopo l'inizializzazione, i metodi `setItem`, `removeItem` e `clear` del `localStorage` vengono **sostituiti con versioni sincronizzate**:
+- Ogni scrittura aggiorna sia il `localStorage` (sincrono, per compatibilità con il codice esistente) sia IndexedDB (asincrono, per la persistenza duratura).
+- Questo approccio è trasparente: il resto dell'applicazione continua a usare `localStorage` normalmente senza modifiche.
+
+### 3. Backup Automatico Locale (`saveAutomaticBackupSnapshot`)
+Quando l'utente esce dall'app (evento `beforeunload` / `pagehide`), viene creato uno **snapshot completo dei dati**:
+```json
+{
+  "schemaVersion": 1,
+  "savedAt": "2025-...",
+  "reason": "app-exit",
+  "data": { /* tutti i dati dell'utente */ }
+}
+```
+Lo snapshot viene salvato sia in `localStorage` (chiave `local_auto_backup_snapshot`) sia in IndexedDB per la massima ridondanza. Un secondo record (`local_auto_backup_status`) tiene traccia dell'esito dell'operazione (ok/errore, timestamp).
+
+### 4. Ripristino
+Al successivo avvio, l'app può leggere lo snapshot tramite `getLatestAutomaticBackupSnapshot()` e proporre il ripristino dei dati all'utente, garantendo che nessun dato venga perso anche in caso di chiusura improvvisa del browser.
+
+> **Nessun cloud, nessun server**: tutti i dati restano esclusivamente sul dispositivo dell'utente.
+
+---
+
 ## 📁 Struttura del Progetto
 
 > Nota: il bootstrap applicativo ora usa `js/app.js` come modulo ES e `js/storage-sync.js` per l'inizializzazione dello storage offline-first.
 
 
 ```text
-├── index.html          # Struttura principale dell'app e interfaccia UI
+├── index.html              # Struttura principale dell'app e interfaccia UI
 ├── css/
-│   └── style.css       # Foglio di stile (UI scura, drawer, modali e overlay)
+│   └── style.css           # Foglio di stile (UI scura, drawer, modali e overlay)
 ├── js/
-│   └── app.js          # Logica di geolocalizzazione, mappa, moduli e salvataggio dati
-├── manifest.json       # Manifest della PWA
-└── sw.js               # Service Worker per la gestione della cache e offline-first
+│   ├── app.js              # Logica di geolocalizzazione, mappa, moduli e salvataggio dati
+│   ├── storage-sync.js     # Sincronizzazione localStorage ↔ IndexedDB e backup automatico
+│   └── fiscal-utils.js     # Utilità per calcoli fiscali (F24 ELIDE, ricevute, CSV)
+├── manifest.json           # Manifest della PWA
+└── sw.js                   # Service Worker per la gestione della cache e offline-first
