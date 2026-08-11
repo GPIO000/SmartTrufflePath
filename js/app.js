@@ -2763,11 +2763,10 @@ async function runAutomaticLocalBackup(reason) {
     const api = getAutomaticBackupStorageApi();
     if (!api) return;
     const backupData = buildCompleteBackupData();
-    const fingerprint = JSON.stringify(backupData);
     try {
         const result = await api.saveAutomaticBackupSnapshot(backupData, reason);
         if (result && result.ok) {
-            lastAutomaticBackupFingerprint = fingerprint;
+            lastAutomaticBackupFingerprint = JSON.stringify(backupData);
             syncAutomaticBackupStatusUI();
         }
     } catch (error) {
