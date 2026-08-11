@@ -671,6 +671,11 @@ function openModule(moduleName, editMode = false) {
             const f24SavedData = readStorageJSON('f24_data', {});
             const defaultProtocollo = f24SavedData.protocollo || '';
             
+            const storicoRicevutePreview = readStorageJSON('storico_vendite', []);
+            const prossimaNumerazione = storicoRicevutePreview.length + 1;
+            const dataOdiernaCausale = new Date().toLocaleDateString('it-IT');
+            const causaleDefault = `Pagamento ricevuta ${prossimaNumerazione} emessa il ${dataOdiernaCausale}`;
+            
             const annoCorrenteReg = new Date().getFullYear();
             let f24ValidoPreview = false;
             if (f24SavedData.protocollo && f24SavedData.dataPagamento) {
@@ -770,7 +775,7 @@ function openModule(moduleName, editMode = false) {
                         <label>Banca / Istituto di Credito (facoltativo):</label>
                         <input type="text" id="r-banca" class="mod-input" placeholder="Es. Intesa Sanpaolo">
                         <label style="margin-top:6px;">Causale Bonifico:</label>
-                        <input type="text" id="r-causale" class="mod-input" placeholder="Es. Pagamento tartufi freschi - Ricevuta N. ...">
+                        <input type="text" id="r-causale" class="mod-input" value="${causaleDefault}" placeholder="Es. Pagamento tartufi freschi - Ricevuta N. ...">
                     </div>
                     
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" ${actionAttrs('registerRicevutaSafe')}>Registra e Genera Ricevuta Conforme</button>
