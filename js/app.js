@@ -1,4 +1,5 @@
 import * as TruffleStorage from './storage-sync.js';
+import { normalizeBackupEntry } from './backup-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
 
 window.TruffleStorage = TruffleStorage;
@@ -323,29 +324,6 @@ function viewStoredDocument(storageKey, title, moduleName) {
         return;
     }
     visualizzaImmagineSalvata(base64Data, title, moduleName);
-}
-
-function normalizeBackupEntry(entryValue, fallbackValue) {
-    let parsedValue = entryValue;
-    if (typeof entryValue === 'string') {
-        try {
-            parsedValue = JSON.parse(entryValue);
-        } catch (error) {
-            throw new Error('Voce backup non valida');
-        }
-    }
-
-    if (Array.isArray(fallbackValue) && !Array.isArray(parsedValue)) {
-        throw new Error('Formato array non valido');
-    }
-
-    if (fallbackValue && typeof fallbackValue === 'object' && !Array.isArray(fallbackValue)) {
-        if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
-            throw new Error('Formato oggetto non valido');
-        }
-    }
-
-    return JSON.stringify(parsedValue);
 }
 
 function restoreBackupEntries(data) {
