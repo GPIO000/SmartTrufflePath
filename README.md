@@ -1,6 +1,6 @@
-# 🍄 Truffle Mobil First
+# 🍄 SmartTruffle Path
 
-**Truffle Mobil First** è un'applicazione web mobile-first avanzata, progettata specificamente per i cercatori di tartufi. Combina una mappa interattiva offline-first con strumenti di geolocalizzazione, gestione delle tartufaie, utilità per i cani da tartufo e moduli per la conformità burocratica e fiscale italiana (Legge 145/2018 e normative correlate)[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span).
+**SmartTruffle Path** è un'applicazione web mobile-first avanzata, progettata specificamente per i cercatori di tartufi. Combina una mappa interattiva offline-first con strumenti di geolocalizzazione, gestione delle tartufaie, utilità per i cani da tartufo e moduli per la conformità burocratica e fiscale italiana (Legge 145/2018 e normative correlate)[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span).
 
 ---
 
