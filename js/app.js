@@ -2764,11 +2764,11 @@ async function runAutomaticLocalBackup(reason) {
     if (!api) return;
     const backupData = buildCompleteBackupData();
     const fingerprint = JSON.stringify(backupData);
-    if (reason !== 'manual' && fingerprint === lastAutomaticBackupFingerprint) return;
     try {
         const result = await api.saveAutomaticBackupSnapshot(backupData, reason);
         if (result && result.ok) {
             lastAutomaticBackupFingerprint = fingerprint;
+            syncAutomaticBackupStatusUI();
         }
     } catch (error) {
         console.warn('Backup automatico locale non riuscito.', error);
