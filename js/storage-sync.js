@@ -1,14 +1,8 @@
   const DB_NAME = 'truffle-storage-db';
   const DB_VERSION = 1;
   const STORE_KV = 'kv';
-  const DRIVE_CONFIG_KEY = 'drive_backup_config';
-  const DRIVE_TOKEN_SESSION_KEY = 'drive_backup_token_session';
-  const DRIVE_STATUS_KEY = 'drive_backup_status';
-  const BACKUP_DEBOUNCE_MS = 15000;
-  const DEFAULT_DRIVE_CONFIG = {
-    enabled: false,
-    minIntervalMinutes: 60
-  };
+  const AUTO_BACKUP_SNAPSHOT_KEY = 'local_auto_backup_snapshot';
+  const AUTO_BACKUP_STATUS_KEY = 'local_auto_backup_status';
 
   let dbPromise = null;
   let localStorageOriginals = null;
@@ -18,9 +12,6 @@
     clear: localStorage.clear.bind(localStorage)
   };
   let initialized = false;
-  let backupTimer = null;
-  let lastBackupAt = 0;
-  let lastBackupFingerprint = '';
 
   function openDb() {
     if (dbPromise) return dbPromise;
@@ -89,140 +80,59 @@
     }
   }
 
-  function getDriveBackupConfig() {
-    const saved = safeParseJSON(localStorage.getItem(DRIVE_CONFIG_KEY), {});
-    const sessionToken = (sessionStorage.getItem(DRIVE_TOKEN_SESSION_KEY) || '').trim();
-    const legacyToken = typeof saved.accessToken === 'string' ? saved.accessToken.trim() : '';
-    const accessToken = sessionToken || legacyToken;
-    if (!sessionToken && legacyToken) {
-      sessionStorage.setItem(DRIVE_TOKEN_SESSION_KEY, legacyToken);
-      const migrated = {
-        enabled: Boolean(saved.enabled),
-        minIntervalMinutes: Number(saved.minIntervalMinutes) > 0 ? Number(saved.minIntervalMinutes) : DEFAULT_DRIVE_CONFIG.minIntervalMinutes
-      };
-      rawLocalStorageApi.setItem(DRIVE_CONFIG_KEY, JSON.stringify(migrated));
-      putEntry(DRIVE_CONFIG_KEY, JSON.stringify(migrated)).catch(() => {});
-    }
-    return {
-      enabled: Boolean(saved.enabled),
-      accessToken,
-      minIntervalMinutes: Number(saved.minIntervalMinutes) > 0 ? Number(saved.minIntervalMinutes) : DEFAULT_DRIVE_CONFIG.minIntervalMinutes
-    };
-  }
-
-  function setDriveBackupConfig(partialConfig = {}) {
-    const current = getDriveBackupConfig();
-    const merged = {
-      ...current,
-      ...partialConfig
-    };
-    const normalized = {
-      enabled: Boolean(merged.enabled),
-      minIntervalMinutes: Number(merged.minIntervalMinutes) > 0 ? Number(merged.minIntervalMinutes) : DEFAULT_DRIVE_CONFIG.minIntervalMinutes
-    };
-    const normalizedToken = typeof merged.accessToken === 'string' ? merged.accessToken.trim() : '';
-    if (normalizedToken) sessionStorage.setItem(DRIVE_TOKEN_SESSION_KEY, normalizedToken);
-    else sessionStorage.removeItem(DRIVE_TOKEN_SESSION_KEY);
-
-    const save = JSON.stringify(normalized);
-    if (localStorageOriginals) {
-      localStorageOriginals.setItem(DRIVE_CONFIG_KEY, save);
-      putEntry(DRIVE_CONFIG_KEY, save).catch(() => {});
-    } else {
-      localStorage.setItem(DRIVE_CONFIG_KEY, save);
-    }
-    return normalized;
-  }
-
-  function setDriveBackupStatus(statusValue) {
+  function setAutomaticBackupStatus(statusValue) {
     const payload = JSON.stringify({
       ...statusValue,
       updatedAt: new Date().toISOString()
     });
     if (localStorageOriginals) {
-      localStorageOriginals.setItem(DRIVE_STATUS_KEY, payload);
-      putEntry(DRIVE_STATUS_KEY, payload).catch(() => {});
+      localStorageOriginals.setItem(AUTO_BACKUP_STATUS_KEY, payload);
+      putEntry(AUTO_BACKUP_STATUS_KEY, payload).catch(() => {});
     } else {
-      localStorage.setItem(DRIVE_STATUS_KEY, payload);
+      localStorage.setItem(AUTO_BACKUP_STATUS_KEY, payload);
     }
   }
 
-  function collectBackupPayload() {
-    const entries = {};
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index);
-      if (!key || key === DRIVE_CONFIG_KEY || key === DRIVE_STATUS_KEY) continue;
-      entries[key] = localStorage.getItem(key);
-    }
-    return {
-      schemaVersion: 1,
-      exportedAt: new Date().toISOString(),
-      data: entries
-    };
+  function getAutomaticBackupStatus() {
+    return safeParseJSON(localStorage.getItem(AUTO_BACKUP_STATUS_KEY), null);
   }
 
-  async function uploadBackupToDrive(accessToken, payload) {
-    const fileName = `truffle_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    const metadata = {
-      name: fileName,
-      mimeType: 'application/json',
-      parents: ['appDataFolder']
-    };
-
-    const boundary = `truffle_boundary_${Date.now()}`;
-    const body =
-      `--${boundary}\r\n` +
-      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-      `${JSON.stringify(metadata)}\r\n` +
-      `--${boundary}\r\n` +
-      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-      `${JSON.stringify(payload)}\r\n` +
-      `--${boundary}--`;
-
-    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer ' + accessToken,
-        'Content-Type': `multipart/related; boundary=${boundary}`
-      },
-      body
-    });
-
-    if (!response.ok) {
-      const responseText = await response.text().catch(() => 'Errore sconosciuto');
-      throw new Error(`Drive upload fallito (${response.status}): ${responseText}`);
-    }
+  function getLatestAutomaticBackupSnapshot() {
+    return safeParseJSON(localStorage.getItem(AUTO_BACKUP_SNAPSHOT_KEY), null);
   }
 
-  async function triggerDriveBackupNow(force = false) {
-    const config = getDriveBackupConfig();
-    if (!config.enabled || !config.accessToken) return { skipped: true, reason: 'disabled-or-missing-token' };
-
-    const minIntervalMs = config.minIntervalMinutes * 60 * 1000;
-    const now = Date.now();
-    if (!force && now - lastBackupAt < minIntervalMs) return { skipped: true, reason: 'interval-not-reached' };
-
-    const payload = collectBackupPayload();
-    const fingerprint = JSON.stringify(payload.data);
-    if (!force && fingerprint === lastBackupFingerprint) return { skipped: true, reason: 'no-data-change' };
-
+  async function saveAutomaticBackupSnapshot(data, reason = 'manual') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error('Payload backup non valido');
+    }
     try {
-      await uploadBackupToDrive(config.accessToken, payload);
-      lastBackupAt = now;
-      lastBackupFingerprint = fingerprint;
-      setDriveBackupStatus({ ok: true, message: 'Backup Drive completato' });
-      return { ok: true };
+      const snapshot = {
+        schemaVersion: 1,
+        savedAt: new Date().toISOString(),
+        reason,
+        data
+      };
+      const serialized = JSON.stringify(snapshot);
+      if (localStorageOriginals) {
+        localStorageOriginals.setItem(AUTO_BACKUP_SNAPSHOT_KEY, serialized);
+        await putEntry(AUTO_BACKUP_SNAPSHOT_KEY, serialized);
+      } else {
+        localStorage.setItem(AUTO_BACKUP_SNAPSHOT_KEY, serialized);
+      }
+      setAutomaticBackupStatus({
+        ok: true,
+        message: 'Backup automatico locale aggiornato',
+        savedAt: snapshot.savedAt,
+        reason
+      });
+      return { ok: true, snapshot };
     } catch (error) {
-      setDriveBackupStatus({ ok: false, message: error.message || 'Backup Drive fallito' });
+      setAutomaticBackupStatus({
+        ok: false,
+        message: error.message || 'Backup automatico locale fallito'
+      });
       return { ok: false, error };
     }
-  }
-
-  function scheduleDriveBackup() {
-    if (backupTimer) clearTimeout(backupTimer);
-    backupTimer = setTimeout(() => {
-      triggerDriveBackupNow(false).catch(() => {});
-    }, BACKUP_DEBOUNCE_MS);
   }
 
   function patchLocalStorage() {
@@ -237,19 +147,16 @@
       const normalizedValue = String(value);
       localStorageOriginals.setItem(key, normalizedValue);
       putEntry(key, normalizedValue).catch(() => {});
-      if (key !== DRIVE_CONFIG_KEY && key !== DRIVE_STATUS_KEY) scheduleDriveBackup();
     };
 
     localStorage.removeItem = (key) => {
       localStorageOriginals.removeItem(key);
       deleteEntry(key).catch(() => {});
-      if (key !== DRIVE_CONFIG_KEY && key !== DRIVE_STATUS_KEY) scheduleDriveBackup();
     };
 
     localStorage.clear = () => {
       localStorageOriginals.clear();
       clearEntries().catch(() => {});
-      scheduleDriveBackup();
     };
   }
 
@@ -281,14 +188,7 @@
       await migrateLocalStorageToDb();
     }
     patchLocalStorage();
-    if (!localStorage.getItem(DRIVE_CONFIG_KEY)) {
-      setDriveBackupConfig(DEFAULT_DRIVE_CONFIG);
-    }
     initialized = true;
   }
 
-export { init, getDriveBackupConfig, setDriveBackupConfig, collectBackupPayload };
-
-export function triggerDriveBackupNowImmediate() {
-  return triggerDriveBackupNow(true);
-}
+export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getAutomaticBackupStatus };
