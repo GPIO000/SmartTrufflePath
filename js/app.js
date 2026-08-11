@@ -245,6 +245,7 @@ const ACTION_HANDLERS = {
     toggleCoordinateBancarie: () => toggleCoordinateBancarie(),
     autocompilaDatiCliente: (event) => autocompilaDatiCliente(event.target.value),
     importBackupData: (event) => importBackupData(event),
+    archiviaAnnoPrecedente: () => archiviaAnnoPrecedente(),
     setArchivioRegione: (event) => {
         window.currentArchivioRegione = event.target.value;
         openModule('archivio');
@@ -1435,6 +1436,10 @@ function openModule(moduleName, editMode = false) {
                     <p id="local-backup-status" style="font-size:0.82rem; color:#b8b0a0; margin:0 0 10px 0;">Stato ultimo backup automatico: non disponibile</p>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('forceLocalBackupNow')}>Aggiorna Backup Automatico Ora</button>
                     <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('restoreLatestAutomaticBackup')}>Ripristina Ultimo Backup Automatico</button>
+                    <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
+                    <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#b45309;">🗂️ Archiviazione per Anno</h3>
+                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">Crea un backup JSON con i dati dell'anno precedente (ricevute, raccolta, spese) e li rimuove dall'app per mantenerla più ordinata.</p>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#b45309;" ${actionAttrs('archiviaAnnoPrecedente')}>🗂️ Archivia & Pulisci Anno Precedente</button>
                 </div>`;
             break;
         case 'emergency':
@@ -2718,6 +2723,62 @@ async function restoreLatestAutomaticBackup() {
     } catch (error) {
         showToast("Ripristino backup automatico non riuscito.", 'error');
     }
+}
+
+async function archiviaAnnoPrecedente() {
+    const annoPrecedente = new Date().getFullYear() - 1;
+
+    const riepilogo = await appConfirm(
+        `Archiviazione anno ${annoPrecedente}\n\n` +
+        `Questa operazione creerà un file di backup JSON con tutti i dati dell'anno ${annoPrecedente} ` +
+        `(ricevute vendita, registro raccolta, spese) e li rimuoverà dall'app.\n\n` +
+        `Assicurati di salvare il file scaricato prima di procedere.\n\nConfermi?`
+    );
+    if (!riepilogo) return;
+
+    function getYearFromDateStr(dateStr) {
+        if (!dateStr) return null;
+        if (String(dateStr).includes('/')) {
+            const parts = String(dateStr).split('/');
+            return parseInt(parts[parts.length - 1], 10);
+        }
+        return parseInt(String(dateStr).slice(0, 4), 10);
+    }
+
+    const storicoVendite = readStorageJSON('storico_vendite', []);
+    const storicoRaccolta = readStorageJSON('storico_raccolta_giornaliera', []);
+    const speseList = readStorageJSON('spese_list', []);
+
+    const venditeAnno = storicoVendite.filter(item => getYearFromDateStr(item.data) === annoPrecedente);
+    const raccoltaAnno = storicoRaccolta.filter(item => getYearFromDateStr(item.data) === annoPrecedente);
+    const speseAnno = speseList.filter(item => getYearFromDateStr(item.data) === annoPrecedente);
+
+    if (venditeAnno.length === 0 && raccoltaAnno.length === 0 && speseAnno.length === 0) {
+        showToast(`Nessun dato trovato per l'anno ${annoPrecedente}.`, 'error');
+        return;
+    }
+
+    const archivioData = {
+        anno: annoPrecedente,
+        dataExport: new Date().toISOString(),
+        storicoVendite: venditeAnno,
+        storicoRaccolta: raccoltaAnno,
+        speseList: speseAnno
+    };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(archivioData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `archivio_tartufi_${annoPrecedente}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    localStorage.setItem('storico_vendite', JSON.stringify(storicoVendite.filter(item => getYearFromDateStr(item.data) !== annoPrecedente)));
+    localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta.filter(item => getYearFromDateStr(item.data) !== annoPrecedente)));
+    localStorage.setItem('spese_list', JSON.stringify(speseList.filter(item => getYearFromDateStr(item.data) !== annoPrecedente)));
+
+    showToast(`✅ Archivio ${annoPrecedente} creato. Dati dell'anno rimossi dall'app.`, 'success');
 }
 
 async function runAutomaticLocalBackup(reason) {
