@@ -2690,7 +2690,19 @@ async function restoreLatestAutomaticBackup() {
     }
     const snapshot = await api.getLatestAutomaticBackupSnapshotAsync();
     if (!snapshot || !snapshot.data || typeof snapshot.data !== 'object' || Array.isArray(snapshot.data)) {
-        showToast("Nessun backup automatico disponibile.", 'error');
+        const fallback = await appConfirm(
+            "Nessun backup automatico disponibile (la cache potrebbe essere stata cancellata).\n\nVuoi selezionare manualmente un file di backup JSON?"
+        );
+        if (fallback) {
+            const fileInput = document.getElementById('import-file');
+            if (fileInput) {
+                fileInput.click();
+            } else {
+                showToast("Elemento file non trovato. Usa 'Ripristina Backup da File JSON' nella sezione Report & Backup.", 'error');
+            }
+        } else {
+            showToast("Nessun backup ripristinato.", 'info');
+        }
         return;
     }
     if (!await appConfirm("Vuoi ripristinare l'ultimo backup automatico locale?")) return;
