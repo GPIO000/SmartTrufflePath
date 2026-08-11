@@ -200,6 +200,7 @@ const ACTION_HANDLERS = {
     closeActiveModule: () => closeActiveModule(),
     mostraInfoModulo: (_event, moduleName) => mostraInfoModulo(moduleName),
     navigateToPoi: (_event, index) => navigateToPoi(index),
+    previewPoi: (_event, index) => previewPoi(index),
     sharePoi: (_event, index) => sharePoi(index),
     deletePoi: (_event, index) => deletePoi(index),
     viewStoredDocument: (_event, storageKey, title, moduleName) => viewStoredDocument(storageKey, title, moduleName),
@@ -524,6 +525,13 @@ async function savePoiPosition() {
         showToast("📍 Punto salvato!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
+function previewPoi(index) {
+    if (poiList[index]) {
+        map.setView([poiList[index].lat, poiList[index].lng], 18);
+        if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
+        closeActiveModule();
+    }
+}
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
@@ -582,6 +590,7 @@ function openModule(moduleName, editMode = false) {
                             <p class="text-muted small-text" style="margin:4px 0;">Data: ${safePoi.date}</p>
                             <p class="text-subtle small-text">Lat: ${poi.lat.toFixed(4)}, Lng: ${poi.lng.toFixed(4)}</p>
                             <div class="btn-row">
+                                <button class="overlay-btn btn-neutral" ${actionAttrs('previewPoi', [idx])}>🗺️ Anteprima</button>
                                 <button class="overlay-btn btn-success" ${actionAttrs('navigateToPoi', [idx])}>🧭 Vai</button>
                                 <button class="overlay-btn btn-info" ${actionAttrs('sharePoi', [idx])}>📤 Condividi</button>
                                 <button class="overlay-btn btn-danger" ${actionAttrs('deletePoi', [idx])}>🗑️ Elimina</button>
