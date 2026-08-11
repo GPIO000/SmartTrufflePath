@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   getAutomaticBackupStatus,
   getLatestAutomaticBackupSnapshot,
+  getLatestAutomaticBackupSnapshotAsync,
   saveAutomaticBackupSnapshot,
 } from '../js/storage-sync.js';
 
@@ -67,6 +68,29 @@ describe('getLatestAutomaticBackupSnapshot', () => {
     const snapshot = getLatestAutomaticBackupSnapshot();
     expect(snapshot.data).toEqual({ second: true });
     expect(snapshot.reason).toBe('periodic');
+  });
+});
+
+describe('getLatestAutomaticBackupSnapshotAsync', () => {
+  it('restituisce null quando non è stato salvato alcuno snapshot', async () => {
+    expect(await getLatestAutomaticBackupSnapshotAsync()).toBeNull();
+  });
+
+  it('restituisce lo snapshot dopo il salvataggio', async () => {
+    const data = { async: true };
+    await saveAutomaticBackupSnapshot(data, 'manual');
+    const snapshot = await getLatestAutomaticBackupSnapshotAsync();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot.data).toEqual(data);
+    expect(snapshot.reason).toBe('manual');
+  });
+
+  it('restituisce lo snapshot da localStorage quando disponibile', async () => {
+    const data = { fromLS: 42 };
+    await saveAutomaticBackupSnapshot(data, 'periodic');
+    const snapshot = await getLatestAutomaticBackupSnapshotAsync();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot.data).toEqual(data);
   });
 });
 

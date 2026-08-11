@@ -2701,11 +2701,11 @@ async function forceLocalBackupNow() {
 
 async function restoreLatestAutomaticBackup() {
     const api = getAutomaticBackupStorageApi();
-    if (!api || typeof api.getLatestAutomaticBackupSnapshot !== 'function') {
+    if (!api || typeof api.getLatestAutomaticBackupSnapshotAsync !== 'function') {
         showToast("Storage avanzato non disponibile su questo browser.", 'error');
         return;
     }
-    const snapshot = api.getLatestAutomaticBackupSnapshot();
+    const snapshot = await api.getLatestAutomaticBackupSnapshotAsync();
     if (!snapshot || !snapshot.data || typeof snapshot.data !== 'object' || Array.isArray(snapshot.data)) {
         showToast("Nessun backup automatico disponibile.", 'error');
         return;
