@@ -2924,7 +2924,7 @@ async function deleteHeatEntry(index) {
 
 function shareAppUrl() {
     const shareData = {
-        title: 'Truffle App',
+        title: 'SmartTruffle Path',
         text: 'Condividi la tua applicazione per la raccolta dei tartufi',
         url: window.location.href
     };
