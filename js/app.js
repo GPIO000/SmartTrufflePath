@@ -1407,7 +1407,7 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#16a34a;" ${actionAttrs('esportaBackupJSON')}>Esporta Backup Manuale (JSON)</button>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <label style="font-weight:bold; color:#f6f1e6;">Ripristina Backup da File JSON:</label>
-                    <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
+                    <input type="file" id="import-file" accept=".json,application/json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Backup automatico locale</h3>
                     <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app salva automaticamente il file <strong>backup_truffle_automatico.json</strong> nella cartella Download ad ogni modifica dei dati (sovrascrive il precedente). Nessun cloud.</p>
@@ -2657,11 +2657,41 @@ function syncAutomaticBackupStatusUI() {
     statusEl.textContent = `Stato ultimo backup automatico: OK - ${formatBackupTimestamp(lastAutomaticBackupSavedAt)}`;
 }
 
-function downloadBackupFile(data) {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+let _automaticBackupFileHandle = null;
+
+async function downloadBackupFile(data) {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const fileName = 'backup_truffle_automatico.json';
+
+    if (window.showSaveFilePicker) {
+        try {
+            if (!_automaticBackupFileHandle) {
+                _automaticBackupFileHandle = await window.showSaveFilePicker({
+                    suggestedName: fileName,
+                    types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+                });
+            }
+            const writable = await _automaticBackupFileHandle.createWritable();
+            await writable.write(jsonStr);
+            await writable.close();
+            lastAutomaticBackupSavedAt = new Date().toISOString();
+            syncAutomaticBackupStatusUI();
+            return;
+        } catch (err) {
+            if (err && err.name === 'AbortError') {
+                _automaticBackupFileHandle = null;
+                return;
+            }
+            // If overwrite fails (e.g. handle invalidated), clear handle and fall through to anchor download
+            _automaticBackupFileHandle = null;
+        }
+    }
+
+    // Fallback: anchor download
+    const dataStr = "data:application/json;charset=utf-8," + encodeURIComponent(jsonStr);
     const a = document.createElement('a');
     a.setAttribute('href', dataStr);
-    a.setAttribute('download', 'backup_truffle_automatico.json');
+    a.setAttribute('download', fileName);
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -2669,9 +2699,9 @@ function downloadBackupFile(data) {
     syncAutomaticBackupStatusUI();
 }
 
-function forceLocalBackupNow() {
+async function forceLocalBackupNow() {
     const backupData = buildCompleteBackupData();
-    downloadBackupFile(backupData);
+    await downloadBackupFile(backupData);
     lastAutomaticBackupFingerprint = JSON.stringify(backupData);
     showToast("Backup salvato nella cartella Download.", 'success');
 }
@@ -2680,7 +2710,7 @@ async function restoreLatestAutomaticBackup() {
     if (!await appConfirm("Scegli il file di backup automatico (backup_truffle_automatico.json) dalla cartella Download del dispositivo.")) return;
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
-    fileInput.accept = '.json';
+    fileInput.accept = '.json,application/json';
     fileInput.style.display = 'none';
     document.body.appendChild(fileInput);
     fileInput.addEventListener('change', (event) => {
@@ -2765,11 +2795,11 @@ async function archiviaAnnoPrecedente() {
     showToast(`✅ Archivio ${annoPrecedente} creato. Dati dell'anno rimossi dall'app.`, 'success');
 }
 
-function runAutomaticLocalBackup() {
+async function runAutomaticLocalBackup() {
     const backupData = buildCompleteBackupData();
     const fingerprint = JSON.stringify(backupData);
     if (fingerprint === lastAutomaticBackupFingerprint) return;
-    downloadBackupFile(backupData);
+    await downloadBackupFile(backupData);
     lastAutomaticBackupFingerprint = fingerprint;
 }
 
