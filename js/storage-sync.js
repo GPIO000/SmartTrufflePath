@@ -101,6 +101,19 @@
     return safeParseJSON(localStorage.getItem(AUTO_BACKUP_SNAPSHOT_KEY), null);
   }
 
+  async function getLatestAutomaticBackupSnapshotAsync() {
+    const fromLocalStorage = getLatestAutomaticBackupSnapshot();
+    if (fromLocalStorage) return fromLocalStorage;
+    try {
+      const entries = await getAllEntries();
+      const entry = entries && entries.find((e) => e.key === AUTO_BACKUP_SNAPSHOT_KEY);
+      if (entry && entry.value) return safeParseJSON(entry.value, null);
+    } catch {
+      // IndexedDB not available or failed; already checked localStorage above
+    }
+    return null;
+  }
+
   async function saveAutomaticBackupSnapshot(data, reason = 'manual') {
     try {
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -191,4 +204,4 @@
     initialized = true;
   }
 
-export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getAutomaticBackupStatus };
+export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshotAsync, getAutomaticBackupStatus };
