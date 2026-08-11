@@ -673,11 +673,6 @@ function openModule(moduleName, editMode = false) {
             
             const storicoRicevutePreview = readStorageJSON('storico_vendite', []);
             const prossimaNumerazione = storicoRicevutePreview.length + 1;
-            const dataOdiernaCausale = new Date().toLocaleDateString('it-IT');
-            const riferimentoNormativoCausale = f24ValidoPreview
-                ? "ai sensi della Legge 145/2018 - Regime Imposta Sostitutiva"
-                : "ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 - Regime Ritenuta d'Acconto";
-            const causaleDefault = `Pagamento della ricevuta n. ${prossimaNumerazione} per la vendita occasionale di tartufi (${riferimentoNormativoCausale}) emessa in data ${dataOdiernaCausale}.`;
             
             const annoCorrenteReg = new Date().getFullYear();
             let f24ValidoPreview = false;
@@ -686,6 +681,11 @@ function openModule(moduleName, editMode = false) {
                 const scadenzaF24 = new Date(annoCorrenteReg, 1, 16, 23, 59, 59);
                 if (dataP <= scadenzaF24) f24ValidoPreview = true;
             }
+            const dataOdiernaCausale = new Date().toLocaleDateString('it-IT');
+            const riferimentoNormativoCausale = f24ValidoPreview
+                ? "ai sensi della Legge 145/2018 - Regime Imposta Sostitutiva"
+                : "ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 - Regime Ritenuta d'Acconto";
+            const causaleDefault = `Pagamento della ricevuta n. ${prossimaNumerazione} per la vendita occasionale di tartufi (${riferimentoNormativoCausale}) emessa in data ${dataOdiernaCausale}.`;
             const regimeRilevatoTesto = f24ValidoPreview 
                 ? '<span style="color:#22c55e; font-weight:bold;">Imposta Sostitutiva (F24 ELIDE valido)</span>' 
                 : '<span style="color:#38bdf8; font-weight:bold;">Ritenuta d\'Acconto (23% - F24 assente o non valido)</span>';
