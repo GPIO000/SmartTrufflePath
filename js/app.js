@@ -1387,7 +1387,7 @@ function openModule(moduleName, editMode = false) {
 
                 <!-- Dettaglio 2: Ritenuta d'Acconto -->
                 <div class="module-card" style="border-left: 4px solid #4d8a98; margin-bottom: 15px;">
-                    <h3 style="font-size:0.9rem; color:#4d8a98; margin-bottom:6px;">🔵 Regime Ritenuta d'Acconto (23%)</h3>
+                    <h3 style="font-size:0.9rem; color:#4d8a98; margin-bottom:6px;">🔹 Regime Ritenuta d'Acconto (23%)</h3>
                     <p style="font-size:0.85rem; margin:2px 0;">Ricevute: <strong>${countRitenuta}</strong> | Lordo: € ${lordoRitenuta.toFixed(2)}</p>
                     <p style="font-size:0.85rem; margin:2px 0;">Ritenute subite: <span style="color:#f87171;">- € ${totaleRitenuteSubite.toFixed(2)}</span></p>
                     <p style="font-size:0.85rem; margin:2px 0;">Netto percepito: <strong style="color:#4d8a98;">€ ${nettoRitenuta.toFixed(2)}</strong></p>
