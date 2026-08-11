@@ -364,28 +364,80 @@ let carCoordinates = readStorageJSON('car_coords', null);
 let poiList = readStorageJSON('poi_list', []);
 let poiMapMarkers = {}; 
 let targetNavigation = null;
+const REVERSE_GEOCODE_MIN_INTERVAL_MS = 30000;
+const REVERSE_GEOCODE_GRID_DECIMALS = 3;
+const REVERSE_GEOCODE_MAX_CACHE_ENTRIES = 200;
+const reverseGeocodeCache = new Map();
+let reverseGeocodeInFlight = false;
+let lastReverseGeocodeAt = 0;
+
+function getReverseGeocodeCacheKey(lat, lng) {
+    return `${Number(lat).toFixed(REVERSE_GEOCODE_GRID_DECIMALS)},${Number(lng).toFixed(REVERSE_GEOCODE_GRID_DECIMALS)}`;
+}
+
+function updateGpsStatusTextFromLocation(locationData, lat, lng) {
+    const gpsText = document.getElementById('gps-status-text');
+    if (!gpsText) return;
+
+    const regione = locationData && typeof locationData.regione === 'string' ? locationData.regione : '';
+    const provincia = locationData && typeof locationData.provincia === 'string' ? locationData.provincia : '';
+    const comune = locationData && typeof locationData.comune === 'string' ? locationData.comune : '';
+    const parti = [];
+    if (regione) parti.push(`<b>${escapeHtml(regione)}</b>`);
+    if (provincia) parti.push(`<b>${escapeHtml(provincia)}</b>`);
+    if (comune) parti.push(`<b>${escapeHtml(comune)}</b>`);
+    gpsText.innerHTML = parti.length > 0 ? `GPS: ${parti.join(' > ')}` : `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+}
+
+async function reverseGeocodePosition(lat, lng) {
+    const cacheKey = getReverseGeocodeCacheKey(lat, lng);
+    const cachedLocation = reverseGeocodeCache.get(cacheKey);
+    if (cachedLocation) {
+        updateGpsStatusTextFromLocation(cachedLocation, lat, lng);
+        return;
+    }
+
+    if (reverseGeocodeInFlight) return;
+
+    const now = Date.now();
+    if ((now - lastReverseGeocodeAt) < REVERSE_GEOCODE_MIN_INTERVAL_MS) return;
+
+    reverseGeocodeInFlight = true;
+    lastReverseGeocodeAt = now;
+
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=14&addressdetails=1`,
+            { headers: { 'Accept-Language': 'it' } }
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const address = data && data.address ? data.address : {};
+        const locationData = {
+            regione: address.region || address.state || '',
+            provincia: address.province || address.county || '',
+            comune: address.city || address.town || address.village || address.municipality || ''
+        };
+        reverseGeocodeCache.set(cacheKey, locationData);
+        if (reverseGeocodeCache.size > REVERSE_GEOCODE_MAX_CACHE_ENTRIES) {
+            const firstKey = reverseGeocodeCache.keys().next().value;
+            if (firstKey !== undefined) reverseGeocodeCache.delete(firstKey);
+        }
+        updateGpsStatusTextFromLocation(locationData, lat, lng);
+    } catch (error) {
+        console.log("Errore geocodifica:", error);
+    } finally {
+        reverseGeocodeInFlight = false;
+    }
+}
+
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         const dot = document.getElementById('gps-status-dot');
         if (dot) { dot.style.backgroundColor = '#22c55e'; dot.title = "GPS Attivo: " + lat.toFixed(4) + ", " + lng.toFixed(4); }
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`, { headers: { 'Accept-Language': 'it' } })
-        .then(res => res.json()).then(data => {
-            if (data && data.address) {
-                const regione = data.address.region || data.address.state || '';
-                const provincia = data.address.province || data.address.county || '';
-                const comune = data.address.city || data.address.town || data.address.village || data.address.municipality || '';
-                const gpsText = document.getElementById('gps-status-text');
-                if (gpsText) {
-                    let parti = [];
-                    if (regione) parti.push(`<b>${regione}</b>`);
-                    if (provincia) parti.push(`<b>${provincia}</b>`);
-                    if (comune) parti.push(`<b>${comune}</b>`);
-                    gpsText.innerHTML = parti.length > 0 ? `GPS: ${parti.join(' > ')}` : `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                }
-            }
-        }).catch(err => console.log("Errore geocodifica:", err));
+        reverseGeocodePosition(lat, lng);
         if (!userMarker) {
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>Sei qui</b>").openPopup();
             map.setView([lat, lng], 16);
