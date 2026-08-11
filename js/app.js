@@ -221,8 +221,8 @@ const ACTION_HANDLERS = {
     deleteSpesa: (_event, index) => deleteSpesa(index),
     esportaDatiCSV: () => esportaDatiCSV(),
     esportaBackupJSON: () => esportaBackupJSON(),
-    saveDriveBackupSettings: () => saveDriveBackupSettings(),
-    runDriveBackupNow: () => runDriveBackupNow(),
+    forceLocalBackupNow: () => forceLocalBackupNow(),
+    restoreLatestAutomaticBackup: () => restoreLatestAutomaticBackup(),
     saveVetClinic: () => saveVetClinic(),
     shareLocationToVetByIndex: (_event, index) => shareLocationToVetByIndex(index),
     deleteVetClinic: (_event, index) => deleteVetClinic(index),
@@ -1423,24 +1423,18 @@ function openModule(moduleName, editMode = false) {
             contentHTML = `
                 <h2>Report & Backup Dati</h2>
                 <div class="module-card">
-                    <p>Esporta i dati contabili o fai un backup completo.</p>
+                    <p>Esporta i dati contabili o gestisci backup locali senza cloud.</p>
                     <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('esportaDatiCSV')}>Scarica Contabilità in CSV</button>
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#16a34a;" ${actionAttrs('esportaBackupJSON')}>Scarica Backup Totale (JSON)</button>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#16a34a;" ${actionAttrs('esportaBackupJSON')}>Esporta Backup Manuale (JSON)</button>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <label style="font-weight:bold; color:#f6f1e6;">Ripristina Backup da File JSON:</label>
                     <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
-                    <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Backup automatico su Google Drive</h3>
-                    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-                        <input type="checkbox" id="drive-backup-enabled">
-                        <span>Attiva backup automatico</span>
-                    </label>
-                    <label style="font-size:0.8rem; color:#ddd6c8;">Access token OAuth Google Drive</label>
-                    <input type="password" id="drive-backup-token" class="mod-input" placeholder="Incolla token Bearer">
-                    <label style="font-size:0.8rem; color:#ddd6c8; margin-top:8px;">Intervallo minimo (minuti)</label>
-                    <input type="number" min="1" id="drive-backup-interval" class="mod-input" value="60">
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveDriveBackupSettings')}>Salva Configurazione Drive</button>
-                    <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('runDriveBackupNow')}>Esegui Backup Drive Adesso</button>
+                    <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Backup automatico locale</h3>
+                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app salva automaticamente un backup locale quando esci e periodicamente durante l'uso (nessuna API cloud).</p>
+                    <p id="local-backup-status" style="font-size:0.82rem; color:#b8b0a0; margin:0 0 10px 0;">Stato ultimo backup automatico: non disponibile</p>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('forceLocalBackupNow')}>Aggiorna Backup Automatico Ora</button>
+                    <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('restoreLatestAutomaticBackup')}>Ripristina Ultimo Backup Automatico</button>
                 </div>`;
             break;
         case 'emergency':
@@ -1753,7 +1747,7 @@ function openModule(moduleName, editMode = false) {
     `;
     activeView.style.display = 'flex';
     if (moduleName === 'export') {
-        setTimeout(syncDriveBackupSettingsUI, 0);
+        setTimeout(syncAutomaticBackupStatusUI, 0);
     }
 }
 
@@ -2607,8 +2601,8 @@ function mostraRicevuteClienteByIndex(index) {
     mostraRicevuteCliente(cliente.nome);
 }
 
-function esportaBackupJSON() {
-    const backupData = { 
+function buildCompleteBackupData() {
+    return { 
         tesserino: localStorage.getItem('tesserino_data'), 
         pagopa: localStorage.getItem('pagopa_data'),
         f24: localStorage.getItem('f24_data'),
@@ -2627,6 +2621,10 @@ function esportaBackupJSON() {
         noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
         carCoords: localStorage.getItem('car_coords')
     };
+}
+
+function esportaBackupJSON() {
+    const backupData = buildCompleteBackupData();
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr); 
@@ -2657,55 +2655,127 @@ function importBackupData(event) {
     reader.readAsText(file);
 }
 
-function getDriveBackupStorageApi() {
-    return window.TruffleStorage && typeof window.TruffleStorage.getDriveBackupConfig === 'function'
+function getAutomaticBackupStorageApi() {
+    return window.TruffleStorage && typeof window.TruffleStorage.saveAutomaticBackupSnapshot === 'function'
         ? window.TruffleStorage
         : null;
 }
 
-function syncDriveBackupSettingsUI() {
-    const api = getDriveBackupStorageApi();
+function formatBackupTimestamp(isoDate) {
+    if (!isoDate) return 'n/d';
+    const date = new Date(isoDate);
+    if (Number.isNaN(date.getTime())) return 'n/d';
+    return date.toLocaleString('it-IT');
+}
+
+function syncAutomaticBackupStatusUI() {
+    const api = getAutomaticBackupStorageApi();
+    const statusEl = document.getElementById('local-backup-status');
+    if (!statusEl) return;
     if (!api) return;
-    const config = api.getDriveBackupConfig();
-    const enabledEl = document.getElementById('drive-backup-enabled');
-    const tokenEl = document.getElementById('drive-backup-token');
-    const intervalEl = document.getElementById('drive-backup-interval');
-    if (enabledEl) enabledEl.checked = Boolean(config.enabled);
-    if (tokenEl) tokenEl.value = config.accessToken || '';
-    if (intervalEl) intervalEl.value = String(config.minIntervalMinutes || 60);
+    const status = api.getAutomaticBackupStatus && api.getAutomaticBackupStatus();
+    if (!status || !status.savedAt) {
+        statusEl.textContent = 'Stato ultimo backup automatico: non disponibile';
+        return;
+    }
+    const esito = status.ok ? 'OK' : 'Errore';
+    statusEl.textContent = `Stato ultimo backup automatico: ${esito} - ${formatBackupTimestamp(status.savedAt)}`;
 }
 
-function saveDriveBackupSettings() {
-    const api = getDriveBackupStorageApi();
-    if (!api || typeof api.setDriveBackupConfig !== 'function') {
+async function forceLocalBackupNow() {
+    const api = getAutomaticBackupStorageApi();
+    if (!api) {
         showToast("Storage avanzato non disponibile su questo browser.", 'error');
         return;
     }
-    const enabledEl = document.getElementById('drive-backup-enabled');
-    const tokenEl = document.getElementById('drive-backup-token');
-    const intervalEl = document.getElementById('drive-backup-interval');
-    const minIntervalMinutes = Math.max(1, parseInt(intervalEl && intervalEl.value ? intervalEl.value : '60', 10) || 60);
-    api.setDriveBackupConfig({
-        enabled: Boolean(enabledEl && enabledEl.checked),
-        accessToken: tokenEl ? tokenEl.value.trim() : '',
-        minIntervalMinutes
-    });
-    showToast("Configurazione backup Drive salvata.", 'success');
-}
-
-async function runDriveBackupNow() {
-    const api = getDriveBackupStorageApi();
-    if (!api || typeof api.triggerDriveBackupNowImmediate !== 'function') {
-        showToast("Storage avanzato non disponibile su questo browser.", 'error');
-        return;
-    }
-    const result = await api.triggerDriveBackupNowImmediate();
+    const backupData = buildCompleteBackupData();
+    const result = await api.saveAutomaticBackupSnapshot(backupData, 'manual');
     if (result && result.ok) {
-        showToast("Backup Drive completato.", 'success');
+        lastAutomaticBackupFingerprint = JSON.stringify(backupData);
+        showToast("Backup automatico locale aggiornato.", 'success');
     } else {
-        showToast("Backup Drive non completato. Verifica token e connessione.", 'error');
+        showToast("Backup locale non completato.", 'error');
+    }
+    syncAutomaticBackupStatusUI();
+}
+
+async function restoreLatestAutomaticBackup() {
+    const api = getAutomaticBackupStorageApi();
+    if (!api || typeof api.getLatestAutomaticBackupSnapshot !== 'function') {
+        showToast("Storage avanzato non disponibile su questo browser.", 'error');
+        return;
+    }
+    const snapshot = api.getLatestAutomaticBackupSnapshot();
+    if (!snapshot || !snapshot.data || typeof snapshot.data !== 'object' || Array.isArray(snapshot.data)) {
+        showToast("Nessun backup automatico disponibile.", 'error');
+        return;
+    }
+    if (!await appConfirm("Vuoi ripristinare l'ultimo backup automatico locale?")) return;
+    try {
+        restoreBackupEntries(snapshot.data);
+        showToast("Backup automatico ripristinato!", 'success');
+        setTimeout(() => location.reload(), 500);
+    } catch (error) {
+        showToast("Ripristino backup automatico non riuscito.", 'error');
     }
 }
+
+async function runAutomaticLocalBackup(reason) {
+    const api = getAutomaticBackupStorageApi();
+    if (!api) return;
+    const backupData = buildCompleteBackupData();
+    const fingerprint = JSON.stringify(backupData);
+    if (reason !== 'manual' && fingerprint === lastAutomaticBackupFingerprint) return;
+    try {
+        const result = await api.saveAutomaticBackupSnapshot(backupData, reason);
+        if (result && result.ok) {
+            lastAutomaticBackupFingerprint = fingerprint;
+        }
+    } catch (error) {
+        console.warn('Backup automatico locale non riuscito.', error);
+    }
+}
+
+const AUTO_BACKUP_INTERVAL_MS = 3 * 60 * 1000;
+// Deduplica i trigger di uscita che spesso arrivano in sequenza (visibilitychange/pagehide/beforeunload).
+const AUTO_BACKUP_EXIT_DEDUP_MS = 1200;
+let automaticBackupLifecycleInitialized = false;
+let lastAutomaticBackupFingerprint = '';
+
+function setupAutomaticBackupLifecycle() {
+    if (automaticBackupLifecycleInitialized) return;
+    automaticBackupLifecycleInitialized = true;
+    let lastExitBackupAt = 0;
+    const triggerBackup = () => runAutomaticLocalBackup('app-exit');
+    const triggerBackupDeduped = () => {
+        const now = Date.now();
+        if (now - lastExitBackupAt < AUTO_BACKUP_EXIT_DEDUP_MS) return;
+        lastExitBackupAt = now;
+        triggerBackup();
+    };
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            triggerBackupDeduped();
+        }
+    });
+    window.addEventListener('pagehide', triggerBackupDeduped);
+    window.addEventListener('beforeunload', triggerBackupDeduped);
+    if (window.__truffleAutoBackupIntervalId) {
+        clearInterval(window.__truffleAutoBackupIntervalId);
+    }
+    const api = getAutomaticBackupStorageApi();
+    if (api && typeof api.getLatestAutomaticBackupSnapshot === 'function') {
+        const latestSnapshot = api.getLatestAutomaticBackupSnapshot();
+        if (latestSnapshot && latestSnapshot.data && typeof latestSnapshot.data === 'object' && !Array.isArray(latestSnapshot.data)) {
+            lastAutomaticBackupFingerprint = JSON.stringify(latestSnapshot.data);
+        }
+    }
+    window.__truffleAutoBackupIntervalId = setInterval(() => {
+        runAutomaticLocalBackup('periodic');
+    }, AUTO_BACKUP_INTERVAL_MS);
+}
+
+setupAutomaticBackupLifecycle();
 
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
@@ -3481,7 +3551,7 @@ async function mostraInfoModulo(moduleName) {
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
-        'export': "ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV, scarica un backup completo in formato JSON o ripristina i dati da un file di salvataggio precedente.",
+        'export': "ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV, crea un backup manuale JSON e usa il backup automatico locale (uscita app + salvataggio periodico) senza servizi cloud.",
         'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
         'clienti': "ℹ️ **Guida - Rubrica Clienti & Acquirenti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico e gestisci le note dedicate.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
