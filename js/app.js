@@ -71,17 +71,10 @@ function appConfirm(message) {
         if (!dialog) { resolve(window.confirm(message)); return; }
         msg.textContent = message;
         inputField.style.display = 'none';
-        cancelBtn.style.display = '';
-        cancelBtn.textContent = 'Annulla';
+        cancelBtn.style.display = 'none';
         okBtn.textContent = 'OK';
-        const cleanup = () => {
-            okBtn.removeEventListener('click', onOk);
-            cancelBtn.removeEventListener('click', onCancel);
-        };
-        const onOk = () => { dialog.close(); cleanup(); resolve(true); };
-        const onCancel = () => { dialog.close(); cleanup(); resolve(false); };
+        const onOk = () => { dialog.close(); okBtn.removeEventListener('click', onOk); resolve(true); };
         okBtn.addEventListener('click', onOk);
-        cancelBtn.addEventListener('click', onCancel);
         dialog.showModal();
     });
 }
@@ -791,6 +784,7 @@ function openModule(moduleName, editMode = false) {
     const filtroClienteRender = escapeHtml(filtroCliente);
 
     let storicoHtml = `<h2>Archivio Storico Ricevute</h2>`;
+    storicoHtml += `<p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">Nota importante: anche se l'app salva i dati in memoria e crea backup automatici, è vivamente consigliato conservare una copia cartacea di ogni ricevuta.</p>`;
 
     // Se c'è un filtro attivo dalla rubrica, mostra il banner e filtra l'array
     if (filtroCliente) {
@@ -2160,6 +2154,16 @@ async function registraVenditaConPrezzoKg() {
         return;
     }
 
+    const messaggioConservazioneCartacea =
+        `Presa visione:\n\n` +
+        `Anche se l'app salva i dati in memoria e crea backup automatici, ` +
+        `è vivamente consigliato conservare una copia cartacea di ogni ricevuta.\n\n` +
+        `Premi OK per confermare la presa visione e continuare.`;
+
+    if (!(await appConfirm(messaggioConservazioneCartacea))) {
+        return;
+    }
+
     // 8. MESSAGGIO DI RIEPILOGO CON TRACCIABILITÀ E PRESA VISIONE
     const tipoRicevutaTesto = regimeScelto === 'sostitutiva' 
         ? "Imposta Sostitutiva (F24)" 
@@ -2176,7 +2180,7 @@ async function registraVenditaConPrezzoKg() {
         `----------------------------------------\n` +
         `• Totale vendite annue: € ${nuovoTotaleAnno.toFixed(2)} / € 7.000,00\n` +
         `• Mancante alla soglia di blocco: € ${quantoManca.toFixed(2)}\n\n` +
-        `Premi OK per confermare la presa visione e registrare la vendita, oppure Annulla per interrompere.`;
+        `Premi OK per confermare la presa visione e registrare la vendita.`;
 
     if (!(await appConfirm(messaggioRiepilogo))) {
         return; 
