@@ -603,7 +603,7 @@ function openModule(moduleName, editMode = false) {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${tData.nomeFile || 'File PDF'}</p>`;
                     }
                 } else {
-                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                    filePreviewHTML = `<p style="margin-top:10px; color:#b8b0a0;">Nessun file allegato.</p>`;
                 }
 
                 contentHTML = `
@@ -616,7 +616,7 @@ function openModule(moduleName, editMode = false) {
                         <p><strong>Indirizzo:</strong> ${tData.indirizzo || 'Non inserito'}</p>
                         <p><strong>Regione / Prov:</strong> ${tData.regione}</p>
                         <p><strong>N. Tesserino:</strong> ${tData.num}</p>
-                        ${tData.iban ? `<p style="margin-top:8px; padding-top:8px; border-top:1px dashed #334155;"><strong>IBAN:</strong> ${tData.iban}</p>` : ''}
+                        ${tData.iban ? `<p style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.07);"><strong>IBAN:</strong> ${tData.iban}</p>` : ''}
                         ${tData.banca ? `<p><strong>Banca:</strong> ${tData.banca}</p>` : ''}
                         ${filePreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
@@ -642,7 +642,7 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Numero autorizzazione">
                         <label style="margin-top:10px;">Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
                         <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
-                        <p style="margin-top:14px; margin-bottom:6px; color:#94a3b8; font-size:0.8rem; text-transform:uppercase; border-top:1px dashed #334155; padding-top:10px;">💳 Coordinate Bancarie (per bonifico)</p>
+                        <p style="margin-top:14px; margin-bottom:6px; color:#b8b0a0; font-size:0.8rem; text-transform:uppercase; border-top:1px dashed rgba(255,255,255,0.07); padding-top:10px;">💳 Coordinate Bancarie (per bonifico)</p>
                         <label>IBAN:</label>
                         <input type="text" id="t-iban" class="mod-input" value="${tData.iban || ''}" placeholder="Es. IT60 X054 2811 1010 0000 0123 456">
                         <label>Banca / Istituto di Credito (facoltativo):</label>
@@ -664,7 +664,7 @@ function openModule(moduleName, editMode = false) {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${pData.nomeFile || 'File PDF'}</p>`;
                     }
                 } else {
-                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                    filePreviewHTML = `<p style="margin-top:10px; color:#b8b0a0;">Nessun file allegato.</p>`;
                 }
 
                 contentHTML = `
@@ -817,8 +817,8 @@ function openModule(moduleName, editMode = false) {
     if (filtroCliente) {
         storicoHtml += `
             <div style="background: rgba(2, 132, 199, 0.2); border: 1px solid #0284c7; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                <span style="color: #38bdf8; font-size: 0.9rem;">🔍 Filtrato per cliente: <strong>${filtroClienteRender}</strong></span>
-                <button class="overlay-btn" style="background: #475569; padding: 4px 8px; font-size: 0.75rem;" ${actionAttrs('showAllStoricoRicevute')}>Mostra Tutte</button>
+                <span style="color: #4d8a98; font-size: 0.9rem;">🔍 Filtrato per cliente: <strong>${filtroClienteRender}</strong></span>
+                <button class="overlay-btn" style="background: #556152; padding: 4px 8px; font-size: 0.75rem;" ${actionAttrs('showAllStoricoRicevute')}>Mostra Tutte</button>
             </div>`;
         
         // Filtra le ricevute in base al nome dell'acquirente (mantenendo il legame con il loro indice originale)
@@ -841,19 +841,19 @@ function openModule(moduleName, editMode = false) {
             const safeItem = sanitizeRenderable(item);
             const originalIndex = obj.realIndex;
             
-            const regimeLabel = item.regime === 'ritenuta' ? '<span style="color:#38bdf8; font-size:0.75rem;">[Ritenuta d\'Acconto]</span>' : '<span style="color:#22c55e; font-size:0.75rem;">[Imposta Sostitutiva]</span>';
+            const regimeLabel = item.regime === 'ritenuta' ? '<span style="color:#4d8a98; font-size:0.75rem;">[Ritenuta d\'Acconto]</span>' : '<span style="color:#22c55e; font-size:0.75rem;">[Imposta Sostitutiva]</span>';
             
             let dettaglioImporto = `Importo: € ${escapeHtml(item.importo)}`;
             if (item.regime === 'ritenuta') {
                 const nettoVisibile = item.netto ? item.netto : calcolaDettaglioRitenuta(item.importo).netto.toFixed(2);
-                dettaglioImporto = `Lordo: € ${escapeHtml(item.importo)} | <span style="color:#38bdf8;">Netto: € ${escapeHtml(nettoVisibile)}</span>`;
+                dettaglioImporto = `Lordo: € ${escapeHtml(item.importo)} | <span style="color:#4d8a98;">Netto: € ${escapeHtml(nettoVisibile)}</span>`;
             }
 
             storicoHtml += `
-                <div class="module-card" style="margin-bottom:12px; border-left: 4px solid #3b82f6;">
-                    <strong style="color:#60a5fa; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${safeItem.data} ${regimeLabel}</strong>
-                    <p style="font-size:0.85rem; color:#f8fafc; margin:4px 0;">Acquirente: <b>${safeItem.acquirente}</b></p>
-                    <p style="font-size:0.8rem; color:#94a3b8; margin:2px 0;">Specie: ${safeItem.specie} (${safeItem.peso}g)</p>
+                <div class="module-card" style="margin-bottom:12px; border-left: 4px solid #627d54;">
+                    <strong style="color:#d3a45f; font-size:0.95rem;">📄 Ricevuta #${originalIndex + 1} - ${safeItem.data} ${regimeLabel}</strong>
+                    <p style="font-size:0.85rem; color:#f6f1e6; margin:4px 0;">Acquirente: <b>${safeItem.acquirente}</b></p>
+                    <p style="font-size:0.8rem; color:#b8b0a0; margin:2px 0;">Specie: ${safeItem.specie} (${safeItem.peso}g)</p>
                     <p style="font-size:0.9rem; color:#22c55e; font-weight:bold; margin-top:4px;">${dettaglioImporto}</p>
                     <div class="btn-row">
                         <button class="overlay-btn btn-primary" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('visualizzaRicevutaSalvata', [originalIndex])}>👁️ Visualizza</button>
@@ -879,7 +879,7 @@ function openModule(moduleName, editMode = false) {
                         filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
                     }
                 } else {
-                    filePreviewHTML = `<p style="margin-top:10px; color:#94a3b8;">Nessun file allegato.</p>`;
+                    filePreviewHTML = `<p style="margin-top:10px; color:#b8b0a0;">Nessun file allegato.</p>`;
                 }
 
                 contentHTML = `
@@ -900,58 +900,58 @@ function openModule(moduleName, editMode = false) {
                 contentHTML = `
                     <h2>F24 ELIDE - Imposta Sostitutiva</h2>
                     <p>Registra il versamento dell'imposta sostitutiva (100€ annui - Legge 145/2018):</p>
-                    <div class="module-card" style="border-left:4px solid #f59e0b; background:#1e293b; margin-bottom:18px;">
+                    <div class="module-card" style="border-left:4px solid #f59e0b; background:rgba(29,40,30,0.96); margin-bottom:18px;">
                         <p style="color:#f59e0b; font-weight:bold; margin-bottom:10px;">📋 PROMEMORIA COMPILAZIONE MODELLO F24 — IMPOSTA SOSTITUTIVA TARTUFI</p>
-                        <table style="width:100%; border-collapse:collapse; font-size:0.85rem; color:#cbd5e1;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.85rem; color:#ddd6c8;">
                             <tbody>
-                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Modello</td><td style="padding:4px 6px;">F24 (o F24 Elide)</td></tr>
-                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Sezione versamento</td><td style="padding:4px 6px;">Erario ed Altro</td></tr>
-                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Tipo</td><td style="padding:4px 6px;">R</td></tr>
-                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Codice Tributo</td><td style="padding:4px 6px; font-weight:bold; color:#38bdf8;">1853</td></tr>
-                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Anno di Riferimento</td><td style="padding:4px 6px;">2026</td></tr>
-                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Importo a debito</td><td style="padding:4px 6px; font-weight:bold; color:#22c55e;">100,00 €</td></tr>
-                                <tr><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Elementi identificativi</td><td style="padding:4px 6px;">[Codice Regione] [Codice Prodotto] [N. Tesserino]</td></tr>
-                                <tr style="background:#0f172a;"><td style="padding:4px 6px; color:#94a3b8; white-space:nowrap;">Esempio pratico</td><td style="padding:4px 6px;">Veneto + Tartufi + N.12345 → <strong style="color:#f59e0b;">21T12345</strong></td></tr>
+                                <tr><td style="padding:4px 6px; color:#b8b0a0; white-space:nowrap;">Modello</td><td style="padding:4px 6px;">F24 (o F24 Elide)</td></tr>
+                                <tr style="background:#121610;"><td style="padding:4px 6px; color:#b8b0a0; white-space:nowrap;">Sezione versamento</td><td style="padding:4px 6px;">Erario ed Altro</td></tr>
+                                <tr><td style="padding:4px 6px; color:#b8b0a0; white-space:nowrap;">Tipo</td><td style="padding:4px 6px;">R</td></tr>
+                                <tr style="background:#121610;"><td style="padding:4px 6px; color:#b8b0a0; white-space:nowrap;">Codice Tributo</td><td style="padding:4px 6px; font-weight:bold; color:#4d8a98;">1853</td></tr>
+                                <tr><td style="padding:4px 6px; color:#b8b0a0; white-space:nowrap;">Anno di Riferimento</td><td style="padding:4px 6px;">2026</td></tr>
+                                <tr style="background:#121610;"><td style="padding:4px 6px; color:#b8b0a0; white-space:nowrap;">Importo a debito</td><td style="padding:4px 6px; font-weight:bold; color:#22c55e;">100,00 €</td></tr>
+                                <tr><td style="padding:4px 6px; color:#b8b0a0; white-space:nowrap;">Elementi identificativi</td><td style="padding:4px 6px;">[Codice Regione] [Codice Prodotto] [N. Tesserino]</td></tr>
+                                <tr style="background:#121610;"><td style="padding:4px 6px; color:#b8b0a0; white-space:nowrap;">Esempio pratico</td><td style="padding:4px 6px;">Veneto + Tartufi + N.12345 → <strong style="color:#f59e0b;">21T12345</strong></td></tr>
                             </tbody>
                         </table>
                         <details style="margin-top:12px;">
-                            <summary style="cursor:pointer; color:#38bdf8; font-size:0.85rem; font-weight:bold;">🗺️ Codici Regioni e Province Autonome</summary>
-                            <table style="width:100%; border-collapse:collapse; font-size:0.82rem; color:#cbd5e1; margin-top:8px;">
+                            <summary style="cursor:pointer; color:#4d8a98; font-size:0.85rem; font-weight:bold;">🗺️ Codici Regioni e Province Autonome</summary>
+                            <table style="width:100%; border-collapse:collapse; font-size:0.82rem; color:#ddd6c8; margin-top:8px;">
                                 <tbody>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">01</td><td style="padding:3px 6px;">Abruzzo</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">02</td><td style="padding:3px 6px;">Basilicata</td></tr>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">03</td><td style="padding:3px 6px;">Prov. autonoma di Bolzano</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">04</td><td style="padding:3px 6px;">Calabria</td></tr>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">05</td><td style="padding:3px 6px;">Campania</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">06</td><td style="padding:3px 6px;">Emilia-Romagna</td></tr>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">07</td><td style="padding:3px 6px;">Friuli-Venezia Giulia</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">08</td><td style="padding:3px 6px;">Lazio</td></tr>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">09</td><td style="padding:3px 6px;">Liguria</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">10</td><td style="padding:3px 6px;">Lombardia</td></tr>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">11</td><td style="padding:3px 6px;">Marche</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">12</td><td style="padding:3px 6px;">Molise</td></tr>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">13</td><td style="padding:3px 6px;">Piemonte</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">14</td><td style="padding:3px 6px;">Puglia</td></tr>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">15</td><td style="padding:3px 6px;">Sardegna</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">16</td><td style="padding:3px 6px;">Sicilia</td></tr>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">17</td><td style="padding:3px 6px;">Toscana</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">18</td><td style="padding:3px 6px;">Prov. autonoma di Trento</td></tr>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">19</td><td style="padding:3px 6px;">Umbria</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; color:#94a3b8;">20</td><td style="padding:3px 6px;">Valle d'Aosta</td></tr>
-                                    <tr><td style="padding:3px 6px; color:#94a3b8;">21</td><td style="padding:3px 6px;">Veneto</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">01</td><td style="padding:3px 6px;">Abruzzo</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; color:#b8b0a0;">02</td><td style="padding:3px 6px;">Basilicata</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">03</td><td style="padding:3px 6px;">Prov. autonoma di Bolzano</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; color:#b8b0a0;">04</td><td style="padding:3px 6px;">Calabria</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">05</td><td style="padding:3px 6px;">Campania</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; color:#b8b0a0;">06</td><td style="padding:3px 6px;">Emilia-Romagna</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">07</td><td style="padding:3px 6px;">Friuli-Venezia Giulia</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; color:#b8b0a0;">08</td><td style="padding:3px 6px;">Lazio</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">09</td><td style="padding:3px 6px;">Liguria</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; color:#b8b0a0;">10</td><td style="padding:3px 6px;">Lombardia</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">11</td><td style="padding:3px 6px;">Marche</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; color:#b8b0a0;">12</td><td style="padding:3px 6px;">Molise</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">13</td><td style="padding:3px 6px;">Piemonte</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; color:#b8b0a0;">14</td><td style="padding:3px 6px;">Puglia</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">15</td><td style="padding:3px 6px;">Sardegna</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; color:#b8b0a0;">16</td><td style="padding:3px 6px;">Sicilia</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">17</td><td style="padding:3px 6px;">Toscana</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; color:#b8b0a0;">18</td><td style="padding:3px 6px;">Prov. autonoma di Trento</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">19</td><td style="padding:3px 6px;">Umbria</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; color:#b8b0a0;">20</td><td style="padding:3px 6px;">Valle d'Aosta</td></tr>
+                                    <tr><td style="padding:3px 6px; color:#b8b0a0;">21</td><td style="padding:3px 6px;">Veneto</td></tr>
                                 </tbody>
                             </table>
                         </details>
                         <details style="margin-top:8px;">
-                            <summary style="cursor:pointer; color:#38bdf8; font-size:0.85rem; font-weight:bold;">🌿 Codici Tipologia Prodotto</summary>
-                            <table style="width:100%; border-collapse:collapse; font-size:0.82rem; color:#cbd5e1; margin-top:8px;">
+                            <summary style="cursor:pointer; color:#4d8a98; font-size:0.85rem; font-weight:bold;">🌿 Codici Tipologia Prodotto</summary>
+                            <table style="width:100%; border-collapse:collapse; font-size:0.82rem; color:#ddd6c8; margin-top:8px;">
                                 <tbody>
                                     <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b; width:30px;">T</td><td style="padding:3px 6px;">Tartufi</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">F</td><td style="padding:3px 6px;">Funghi epigei</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">F</td><td style="padding:3px 6px;">Funghi epigei</td></tr>
                                     <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">B</td><td style="padding:3px 6px;">Bacche di bosco</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">G</td><td style="padding:3px 6px;">Frutta in guscio (castagne, noci, ecc.)</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">G</td><td style="padding:3px 6px;">Frutta in guscio (castagne, noci, ecc.)</td></tr>
                                     <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">E</td><td style="padding:3px 6px;">Erbe officinali spontanee</td></tr>
-                                    <tr style="background:#0f172a;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">M</td><td style="padding:3px 6px;">Muschi, licheni e piante ornamentali/alimentari</td></tr>
+                                    <tr style="background:#121610;"><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">M</td><td style="padding:3px 6px;">Muschi, licheni e piante ornamentali/alimentari</td></tr>
                                     <tr><td style="padding:3px 6px; font-weight:bold; color:#f59e0b;">A</td><td style="padding:3px 6px;">Altri prodotti selvatici non specificati</td></tr>
                                 </tbody>
                             </table>
@@ -979,8 +979,8 @@ function openModule(moduleName, editMode = false) {
             let dogsHtml = `
                 <h2>Anagrafica Cane</h2>
                 <p>Gestisci i tuoi cani da tartufo:</p>
-                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
-                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Nuovo Cane</h3>
+                <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Nuovo Cane</h3>
                     <label>Nome del Cane:</label>
                     <input type="text" id="c-nome" class="mod-input" placeholder="Es. Argo">
                     <label>Razza:</label>
@@ -997,18 +997,18 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveNewCane')}>Salva Nuovo Cane</button>
                 </div>`;
             if (dogsList.length === 0) {
-                dogsHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun cane registrato.</p></div>`;
+                dogsHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun cane registrato.</p></div>`;
             } else {
-                dogsHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">I tuoi cani registrati:</h3>`;
+                dogsHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">I tuoi cani registrati:</h3>`;
                 dogsList.forEach((dog, idx) => {
                     const sessoIcon = dog.sesso === 'Femmina' ? '🐩' : '🐕';
                     dogsHtml += `
                         <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
-                            <strong style="color:#f8fafc; font-size:1rem;">${sessoIcon} ${dog.nome}</strong>
-                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">Razza: ${dog.razza}</p>
-                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">⚥ Sesso: ${dog.sesso || 'Non specificato'}</p>
-                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Nascita: ${dog.nascita || 'Non specificata'}</p>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">Microchip: ${dog.microchip || 'Non inserito'}</p>
+                            <strong style="color:#f6f1e6; font-size:1rem;">${sessoIcon} ${dog.nome}</strong>
+                            <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">Razza: ${dog.razza}</p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">⚥ Sesso: ${dog.sesso || 'Non specificato'}</p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Nascita: ${dog.nascita || 'Non specificata'}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">Microchip: ${dog.microchip || 'Non inserito'}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteDog', [idx])}>🗑️ Elimina</button>
                         </div>`;
                 });
@@ -1020,8 +1020,8 @@ function openModule(moduleName, editMode = false) {
             let polizzeHtml = `
                 <h2>Polizze & Assicurazioni</h2>
                 <p>Gestisci le polizze assicurative (RC Cane, Responsabilità Civile Raccolta, Infortuni):</p>
-                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
-                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Nuova Polizza</h3>
+                <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Nuova Polizza</h3>
                     <label>Compagnia Assicurativa:</label>
                     <input type="text" id="pol-compagnia" class="mod-input" placeholder="Es. Unipol / Generali">
                     <label>Numero Polizza:</label>
@@ -1042,15 +1042,15 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('savePolizza')}>Salva Polizza</button>
                 </div>`;
             if (polizzeList.length === 0) {
-                polizzeHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna polizza registrata.</p></div>`;
+                polizzeHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessuna polizza registrata.</p></div>`;
             } else {
-                polizzeHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Le tue polizze attive:</h3>`;
+                polizzeHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Le tue polizze attive:</h3>`;
                 
                 const oggi = new Date();
                 
                 polizzeList.forEach((pol, idx) => {
                     let statoScadenza = '';
-                    let bordoColore = '#3b82f6';
+                    let bordoColore = '#4d8a98';
                     
                     if (pol.scadenza) {
                         const dataScad = new Date(pol.scadenza);
@@ -1068,16 +1068,16 @@ function openModule(moduleName, editMode = false) {
                             bordoColore = '#22c55e';
                         }
                     } else {
-                        statoScadenza = `<p style="font-size:0.8rem; color:#94a3b8; margin: 2px 0;">⏳ Scadenza: Non specificata</p>`;
+                        statoScadenza = `<p style="font-size:0.8rem; color:#b8b0a0; margin: 2px 0;">⏳ Scadenza: Non specificata</p>`;
                     }
 
                     polizzeHtml += `
                         <div class="module-card" style="border-left: 4px solid ${bordoColore}; margin-bottom: 12px;">
-                            <strong style="color:#f8fafc; font-size:1rem;">🛡️ ${pol.compagnia}</strong>
-                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">Tipo: ${pol.tipo}</p>
-                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📋 N. ${pol.numero}</p>
+                            <strong style="color:#f6f1e6; font-size:1rem;">🛡️ ${pol.compagnia}</strong>
+                            <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">Tipo: ${pol.tipo}</p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📋 N. ${pol.numero}</p>
                             ${statoScadenza}
-                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${pol.note || 'Nessuna nota'}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${pol.note || 'Nessuna nota'}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deletePolizza', [idx])}>🗑️ Elimina</button>
                         </div>`;
                 });
@@ -1099,8 +1099,8 @@ function openModule(moduleName, editMode = false) {
             let vetHtml = `
                 <h2>Libretto Sanitario & Profilassi</h2>
                 <p>Storico trattamenti, vaccini e visite per il cane:</p>
-                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
-                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Trattamento / Visita</h3>
+                <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Trattamento / Visita</h3>
                     <label>Seleziona Cane:</label>
                     <select id="vh-cane" class="mod-input">${optionsHtml}</select>
                     <label>Tipologia Intervento:</label>
@@ -1120,17 +1120,17 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveVetHistoryItem')}>Registra nel Libretto</button>
                 </div>`;
             if (vetHistory.length === 0) {
-                vetHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun trattamento registrato.</p></div>`;
+                vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun trattamento registrato.</p></div>`;
             } else {
-                vetHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Storico Registrazioni:</h3>`;
+                vetHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Storico Registrazioni:</h3>`;
                 vetHistory.slice().reverse().forEach((item, index) => {
                     const originalIndex = vetHistory.length - 1 - index;
                     vetHtml += `
                         <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
-                            <strong style="color:#f8fafc; font-size:0.95rem;">🐕 ${item.cane}</strong>
-                            <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.tipo}</b></p>
-                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                            <strong style="color:#f6f1e6; font-size:0.95rem;">🐕 ${item.cane}</strong>
+                            <p style="font-size:0.9rem; color:#4d8a98; margin: 4px 0;"><b>${item.tipo}</b></p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Data: ${item.data}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteVetHistoryItem', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
@@ -1144,7 +1144,7 @@ function openModule(moduleName, editMode = false) {
                 let optionsFemmine = '';
                 femmineVet.forEach(d => { optionsFemmine += `<option value="${d.nome}">${d.nome}</option>`; });
                 vetHtml += `
-                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #f472b6;">
+                <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid #f472b6;">
                     <h3 style="font-size:0.9rem; color:#f472b6; margin-bottom:10px;">➕ Registra Inizio Calore</h3>
                     <label>Seleziona Cagna:</label>
                     <select id="heat-cane" class="mod-input">${optionsFemmine}</select>
@@ -1155,9 +1155,9 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:12px; width:100%; background:#be185d;" ${actionAttrs('saveHeatEntry')}>Registra Calore</button>
                 </div>`;
                 if (heatDiary.length === 0) {
-                    vetHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun calore registrato.</p></div>`;
+                    vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun calore registrato.</p></div>`;
                 } else {
-                    vetHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Storico Calori:</h3>`;
+                    vetHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Storico Calori:</h3>`;
                     heatDiary.slice().reverse().forEach((entry, index) => {
                         const originalIndex = heatDiary.length - 1 - index;
                         const dataInizio = new Date(entry.data);
@@ -1166,10 +1166,10 @@ function openModule(moduleName, editMode = false) {
                         const prossimoStr = prossimoCalore.toISOString().slice(0, 10);
                         vetHtml += `
                         <div class="module-card" style="border-left: 4px solid #f472b6; margin-bottom: 12px;">
-                            <strong style="color:#f8fafc; font-size:0.95rem;">🐩 ${entry.cane}</strong>
+                            <strong style="color:#f6f1e6; font-size:0.95rem;">🐩 ${entry.cane}</strong>
                             <p style="font-size:0.9rem; color:#f472b6; margin: 4px 0;"><b>🌸 Inizio Calore: ${entry.data}</b></p>
                             <p style="font-size:0.85rem; color:#fbbf24; margin: 2px 0;">📅 Prossimo calore previsto: <b>${prossimoStr}</b></p>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${entry.note || 'Nessuna nota'}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${entry.note || 'Nessuna nota'}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteHeatEntry', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                     });
@@ -1202,8 +1202,8 @@ function openModule(moduleName, editMode = false) {
             let registroHtml = `
                 <h2>Registro Giornaliero Ritrovamenti</h2>
                 <p>Registra i quantitativi raccolti e filtra per anno o specie</p>
-                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
-                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Raccolta</h3>
+                <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Raccolta</h3>
                     <label>Data:</label>
                     <input type="date" id="reg-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
                     <label>Specie Tartufo:</label>
@@ -1214,8 +1214,8 @@ function openModule(moduleName, editMode = false) {
                     <input type="text" id="reg-note" class="mod-input" placeholder="Es. Bosco di castagni">
                     <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveRaccoltaGiornaliera')}>Salva nel Registro</button>
                 </div>
-                <div class="module-card" style="margin-bottom: 15px; background: #0f172a; border: 1px solid #334155;">
-                    <h3 style="font-size:0.85rem; color:#38bdf8; margin-bottom:8px;">🔍 Filtri Archivio</h3>
+                <div class="module-card" style="margin-bottom: 15px; background: #121610; border: 1px solid rgba(255,255,255,0.07);">
+                    <h3 style="font-size:0.85rem; color:#4d8a98; margin-bottom:8px;">🔍 Filtri Archivio</h3>
                     <div style="display: flex; gap: 10px;">
                         <div style="flex:1;"><label style="font-size:0.75rem;">Anno:</label><select id="filtro-anno" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniAnniHtml}</select></div>
                         <div style="flex:2;"><label style="font-size:0.75rem;">Specie:</label><select id="filtro-specie" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniSpecieHtml}</select></div>
@@ -1226,17 +1226,17 @@ function openModule(moduleName, editMode = false) {
                 return (filtroAnno === 'tutti' || annoItem === filtroAnno) && (filtroSpecie === 'tutte' || item.specie === filtroSpecie);
             });
             if (datiFiltrati.length === 0) {
-                registroHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun ritrovamento trovato con i filtri selezionati.</p></div>`;
+                registroHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun ritrovamento trovato con i filtri selezionati.</p></div>`;
             } else {
-                registroHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Storico Filtrato (${datiFiltrati.length}):</h3>`;
+                registroHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Storico Filtrato (${datiFiltrati.length}):</h3>`;
                 datiFiltrati.slice().reverse().forEach((item) => {
                     const originalIndex = storicoRaccolta.indexOf(item);
                     registroHtml += `
                         <div class="module-card" style="border-left: 4px solid #10b981; margin-bottom: 12px;">
-                            <strong style="color:#f8fafc; font-size:0.95rem;">📅 ${item.data}</strong>
-                            <p style="font-size:0.9rem; color:#38bdf8; margin: 4px 0;"><b>${item.specie}</b></p>
+                            <strong style="color:#f6f1e6; font-size:0.95rem;">📅 ${item.data}</strong>
+                            <p style="font-size:0.9rem; color:#4d8a98; margin: 4px 0;"><b>${item.specie}</b></p>
                             <p style="font-size:0.85rem; color:#22c55e; margin: 2px 0;">⚖️ Peso: <b>${item.peso} g</b></p>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteRaccoltaGiornaliera', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
@@ -1251,8 +1251,8 @@ function openModule(moduleName, editMode = false) {
             let speseHtml = `
                 <h2>Gestione Spese Tartufaio</h2>
                 <p>Traccia carburante, attrezzatura, manutenzione e spese veterinarie:</p>
-                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
-                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Nuova Spesa</h3>
+                <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Nuova Spesa</h3>
                     <label>Data:</label>
                     <input type="date" id="spese-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
                     <label>Categoria:</label>
@@ -1272,9 +1272,9 @@ function openModule(moduleName, editMode = false) {
                 </div>`;
 
             if (speseList.length === 0) {
-                speseHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna spesa registrata.</p></div>`;
+                speseHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessuna spesa registrata.</p></div>`;
             } else {
-                speseHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">Elenco Spese Registrate:</h3>`;
+                speseHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Elenco Spese Registrate:</h3>`;
                 
                 speseList.slice().reverse().forEach((item, index) => {
                     const originalIndex = speseList.length - 1 - index;
@@ -1285,17 +1285,17 @@ function openModule(moduleName, editMode = false) {
 
                     speseHtml += `
                         <div class="module-card" style="border-left: 4px solid #f59e0b; margin-bottom: 12px;">
-                            <strong style="color:#f8fafc; font-size:0.95rem;">💶 € ${parseFloat(item.importo).toFixed(2)}</strong>
-                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;"><b>${item.categoria}</b></p>
-                            <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📅 Data: ${item.data}</p>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                            <strong style="color:#f6f1e6; font-size:0.95rem;">💶 € ${parseFloat(item.importo).toFixed(2)}</strong>
+                            <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;"><b>${item.categoria}</b></p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Data: ${item.data}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteSpesa', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
 
                 speseHtml = `
-                    <div class="module-card" style="background: #0f172a; border: 1px solid #334155; margin-bottom: 15px; text-align: center;">
-                        <p style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase;">Totale Spese Anno Corrente (${annoCorrenteSpese})</p>
+                    <div class="module-card" style="background: #121610; border: 1px solid rgba(255,255,255,0.07); margin-bottom: 15px; text-align: center;">
+                        <p style="font-size: 0.8rem; color: #b8b0a0; text-transform: uppercase;">Totale Spese Anno Corrente (${annoCorrenteSpese})</p>
                         <p style="font-size: 1.4rem; color: #f59e0b; font-weight: bold; margin: 4px 0 0 0;">€ ${totaleSpeseAnno.toFixed(2)}</p>
                     </div>` + speseHtml;
             }
@@ -1369,12 +1369,12 @@ function openModule(moduleName, editMode = false) {
             const isSuperato = totaleLordoGuadagni > sogliaLimiteBilancio;
 
             // Stile comune per le caselle a dimensione uniforme
-            const boxStyleUniforme = "background: #0f172a; border: 1px solid #334155; text-align: center; padding: 15px; margin-bottom: 12px; border-radius: 8px;";
+            const boxStyleUniforme = "background: #121610; border: 1px solid rgba(255,255,255,0.07); text-align: center; padding: 15px; margin-bottom: 12px; border-radius: 8px;";
 
             contentHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h2 style="margin: 0;">Contabilità & Bilancio Annuo (${annoCorrenteBilancio})</h2>
-                    <button ${actionAttrs('printPage')} style="background-color: #3b82f6; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
+                    <button ${actionAttrs('printPage')} style="background-color: #627d54; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
                         🖨️ Stampa
                     </button>
                 </div>
@@ -1386,11 +1386,11 @@ function openModule(moduleName, editMode = false) {
                 </div>
 
                 <!-- Dettaglio 2: Ritenuta d'Acconto -->
-                <div class="module-card" style="border-left: 4px solid #38bdf8; margin-bottom: 15px;">
-                    <h3 style="font-size:0.9rem; color:#38bdf8; margin-bottom:6px;">🔵 Regime Ritenuta d'Acconto (23%)</h3>
+                <div class="module-card" style="border-left: 4px solid #4d8a98; margin-bottom: 15px;">
+                    <h3 style="font-size:0.9rem; color:#4d8a98; margin-bottom:6px;">🔵 Regime Ritenuta d'Acconto (23%)</h3>
                     <p style="font-size:0.85rem; margin:2px 0;">Ricevute: <strong>${countRitenuta}</strong> | Lordo: € ${lordoRitenuta.toFixed(2)}</p>
                     <p style="font-size:0.85rem; margin:2px 0;">Ritenute subite: <span style="color:#f87171;">- € ${totaleRitenuteSubite.toFixed(2)}</span></p>
-                    <p style="font-size:0.85rem; margin:2px 0;">Netto percepito: <strong style="color:#38bdf8;">€ ${nettoRitenuta.toFixed(2)}</strong></p>
+                    <p style="font-size:0.85rem; margin:2px 0;">Netto percepito: <strong style="color:#4d8a98;">€ ${nettoRitenuta.toFixed(2)}</strong></p>
                 </div>
 
                 <!-- 1. TOTALE NETTO DEI GUADAGNI (Dimensioni uguali) -->
@@ -1407,7 +1407,7 @@ function openModule(moduleName, editMode = false) {
 
                 <!-- Utile Netto Effettivo (Dimensioni uguali) -->
                 <div class="module-card" style="${boxStyleUniforme}">
-                    <p style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Utile Finale (Netto Guadagni - Spese)</p>
+                    <p style="font-size: 0.8rem; color: #b8b0a0; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Utile Finale (Netto Guadagni - Spese)</p>
                     <p style="font-size: 1.6rem; color: ${utileNettoEffettivo >= 0 ? '#22c55e' : '#ef4444'}; font-weight: bold; margin: 6px 0 0 0;">€ ${utileNettoEffettivo.toFixed(2)}</p>
                 </div>
 
@@ -1426,18 +1426,18 @@ function openModule(moduleName, editMode = false) {
                     <p>Esporta i dati contabili o fai un backup completo.</p>
                     <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('esportaDatiCSV')}>Scarica Contabilità in CSV</button>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#16a34a;" ${actionAttrs('esportaBackupJSON')}>Scarica Backup Totale (JSON)</button>
-                    <hr style="border-color:#334155; margin:20px 0;">
-                    <label style="font-weight:bold; color:#f8fafc;">Ripristina Backup da File JSON:</label>
+                    <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
+                    <label style="font-weight:bold; color:#f6f1e6;">Ripristina Backup da File JSON:</label>
                     <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
-                    <hr style="border-color:#334155; margin:20px 0;">
-                    <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#38bdf8;">Backup automatico su Google Drive</h3>
+                    <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
+                    <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Backup automatico su Google Drive</h3>
                     <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
                         <input type="checkbox" id="drive-backup-enabled">
                         <span>Attiva backup automatico</span>
                     </label>
-                    <label style="font-size:0.8rem; color:#cbd5e1;">Access token OAuth Google Drive</label>
+                    <label style="font-size:0.8rem; color:#ddd6c8;">Access token OAuth Google Drive</label>
                     <input type="password" id="drive-backup-token" class="mod-input" placeholder="Incolla token Bearer">
-                    <label style="font-size:0.8rem; color:#cbd5e1; margin-top:8px;">Intervallo minimo (minuti)</label>
+                    <label style="font-size:0.8rem; color:#ddd6c8; margin-top:8px;">Intervallo minimo (minuti)</label>
                     <input type="number" min="1" id="drive-backup-interval" class="mod-input" value="60">
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveDriveBackupSettings')}>Salva Configurazione Drive</button>
                     <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('runDriveBackupNow')}>Esegui Backup Drive Adesso</button>
@@ -1451,8 +1451,8 @@ function openModule(moduleName, editMode = false) {
             let clinicHtml = `
                 <h2>Pronto Soccorso & Cliniche Veterinarie H24</h2>
                 <p>Gestisci i numeri d'emergenza dei veterinari:</p>
-                <div class="module-card" style="margin-bottom: 20px; background: #1e293b; border: 1px solid #334155;">
-                    <h3 style="font-size:0.9rem; color:#f8fafc; margin-bottom:10px;">➕ Aggiungi Clinica H24</h3>
+                <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Clinica H24</h3>
                     <label>Nome Clinica o Medico:</label>
                     <input type="text" id="vc-nome" class="mod-input" placeholder="Es. Clinica Centrale">
                     <label>Numero di Telefono:</label>
@@ -1462,17 +1462,17 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveVetClinic')}>Salva Contatto Emergenza</button>
                 </div>`;
             if (vetClinics.length === 0) {
-                clinicHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessuna clinica salvata.</p></div>`;
+                clinicHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessuna clinica salvata.</p></div>`;
             } else {
-                clinicHtml += `<h3 style="font-size:0.85rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase;">I tuoi contatti salvati:</h3>`;
+                clinicHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">I tuoi contatti salvati:</h3>`;
                 vetClinics.forEach((clinic, idx) => {
                     const safeClinic = sanitizeRenderable(clinic);
                     const telHref = sanitizePhoneHref(clinic.tel);
                     clinicHtml += `
                         <div class="module-card" style="border-left: 4px solid #dc2626; margin-bottom: 12px;">
-                            <strong style="color:#f8fafc; font-size:1rem;">🏥 ${safeClinic.nome}</strong>
-                            <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">📞 ${safeClinic.tel}</p>
-                            <p style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">📝 ${safeClinic.note || 'Nessuna nota'}</p>
+                            <strong style="color:#f6f1e6; font-size:1rem;">🏥 ${safeClinic.nome}</strong>
+                            <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">📞 ${safeClinic.tel}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 ${safeClinic.note || 'Nessuna nota'}</p>
                             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                                 <a href="tel:${telHref}" class="overlay-btn btn-danger" style="text-decoration:none; text-align:center; display:inline-block; padding:8px 12px;">📞 Chiama</a>
                                 <button class="overlay-btn btn-info" style="padding:8px 12px;" ${actionAttrs('shareLocationToVetByIndex', [idx])}>📍 Invia GPS</button>
@@ -1495,7 +1495,7 @@ function openModule(moduleName, editMode = false) {
         <p>Elenco dei clienti salvati con storico acquisti:</p>
     `;
     if (rubricaClienti.length === 0) {
-        clientiHtml += `<div class="module-card"><p style="color:#94a3b8;">Nessun cliente salvato in rubrica.</p></div>`;
+        clientiHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun cliente salvato in rubrica.</p></div>`;
     } else {
         rubricaClienti.forEach((cliente, idx) => {
             // Formattazione del totale acquisti in valuta
@@ -1503,23 +1503,23 @@ function openModule(moduleName, editMode = false) {
             
             clientiHtml += `
                 <div class="module-card" style="border-left: 4px solid #0284c7; margin-bottom: 12px;">
-                    <strong style="color:#f8fafc; font-size:1rem;">👤 ${cliente.nome}</strong>
-                    <p style="font-size:0.85rem; color:#38bdf8; margin: 4px 0;">P.IVA / CF: ${cliente.cf || 'Non inserito'}</p>
-                    <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📍 Indirizzo: ${cliente.indirizzo || 'Non inserito'}</p>
-                    <p style="font-size:0.8rem; color:#cbd5e1; margin: 2px 0;">📧 Email: ${cliente.email || 'Non specificata'}</p>
+                    <strong style="color:#f6f1e6; font-size:1rem;">👤 ${cliente.nome}</strong>
+                    <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">P.IVA / CF: ${cliente.cf || 'Non inserito'}</p>
+                    <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📍 Indirizzo: ${cliente.indirizzo || 'Non inserito'}</p>
+                    <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📧 Email: ${cliente.email || 'Non specificata'}</p>
                     
                     <!-- Sezione Statistiche Spesa -->
                     <div style="background: rgba(15, 23, 42, 0.6); padding: 8px; border-radius: 6px; margin: 8px 0;">
                         <p style="font-size:0.85rem; color:#4ade80; margin: 0; font-weight: bold;">💰 Totale Acquisti: ${totaleFormattato}</p>
-                        <p style="font-size:0.75rem; color:#94a3b8; margin: 2px 0 0 0;">📦 Ricevute emesse: ${cliente.numeroAcquisti || 1} | Ultimo: ${cliente.dataUltimoAcquisto || 'N.D.'}</p>
+                        <p style="font-size:0.75rem; color:#b8b0a0; margin: 2px 0 0 0;">📦 Ricevute emesse: ${cliente.numeroAcquisti || 1} | Ultimo: ${cliente.dataUltimoAcquisto || 'N.D.'}</p>
                     </div>
 
                     <!-- Sezione Note Cliente con Tasto Salva a pieno larghezza -->
                     <div style="margin: 8px 0;">
-                        <label style="font-size:0.75rem; color:#94a3b8; display:block; margin-bottom:2px;">📝 Note Cliente:</label>
+                        <label style="font-size:0.75rem; color:#b8b0a0; display:block; margin-bottom:2px;">📝 Note Cliente:</label>
                         <textarea 
                             id="nota-cliente-${idx}"
-                            style="width: 100%; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 6px; font-size: 0.8rem; resize: vertical;" 
+                            style="width: 100%; background: #121610; color: #f6f1e6; border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 6px; font-size: 0.8rem; resize: vertical;" 
                             rows="2" 
                             placeholder="Scrivi una nota per questo cliente..."
                         >${cliente.nota || ''}</textarea>
@@ -1566,8 +1566,8 @@ function openModule(moduleName, editMode = false) {
                 <h2>📚 Archivio Date per Regione</h2>
                 <p>Gestisci e memorizza i periodi autorizzati per le regioni di interesse.</p>
 
-                <div class="module-card" style="background: #0f172a; border: 1px solid #334155; margin-bottom: 15px;">
-                    <label style="font-size: 0.85rem; color: #94a3b8; display: block; margin-bottom: 5px;">Seleziona Regione da Archiviare:</label>
+                <div class="module-card" style="background: #121610; border: 1px solid rgba(255,255,255,0.07); margin-bottom: 15px;">
+                    <label style="font-size: 0.85rem; color: #b8b0a0; display: block; margin-bottom: 5px;">Seleziona Regione da Archiviare:</label>
                     <select id="seleziona-regione-archivio" class="mod-input" ${eventActionAttrs('change', 'setArchivioRegione')}>
                         <option value="${regioneSelezionataArchivio}" selected>${regioneSelezionataArchivio}</option>
                         <option value="Abruzzo">Abruzzo</option>
@@ -1590,36 +1590,36 @@ function openModule(moduleName, editMode = false) {
                 </div>
 
                 <!-- Box di Estrazione Automatica da Testo Ufficiale -->
-                <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-bottom: 15px; border-radius: 8px; padding: 15px;">
-                    <h3 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px;">📋 Estrazione Automatica Date da Testo</h3>
-                    <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">
+                <div class="module-card" style="background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07); margin-bottom: 15px; border-radius: 8px; padding: 15px;">
+                    <h3 style="font-size: 0.9rem; color: #4d8a98; margin-bottom: 8px;">📋 Estrazione Automatica Date da Testo</h3>
+                    <p style="font-size: 0.8rem; color: #b8b0a0; margin-bottom: 10px;">
                         Incolla qui il testo ufficiale della Regione (es. bollettino o legge regionale) contenente le date di raccolta delle specie di tartufo:
                     </p>
-                    <textarea id="testo-normativa-tartufi" class="mod-input" rows="5" placeholder="Es. Il tartufo bianco pregiato si raccoglie dal 1 ottobre al 31 dicembre. Lo scorzone dal 1 maggio al 31 agosto..." style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 8px; font-size: 0.85rem; width: 100%; box-sizing: border-box;"></textarea>
+                    <textarea id="testo-normativa-tartufi" class="mod-input" rows="5" placeholder="Es. Il tartufo bianco pregiato si raccoglie dal 1 ottobre al 31 dicembre. Lo scorzone dal 1 maggio al 31 agosto..." style="resize: vertical; background: #121610; color: #f6f1e6; border: 1px solid rgba(255,255,255,0.07); padding: 8px; font-size: 0.85rem; width: 100%; box-sizing: border-box;"></textarea>
                     <button class="overlay-btn" style="margin-top: 10px; width: 100%; background: #0284c7; font-weight: bold; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" ${actionAttrs('estraiDateTartufiDaTesto')}>
                         🔍 Estrai e Compila Date
                     </button>
                 </div>
 
                 <!-- Box Note, Fermi Biologici e Decreti Regionali -->
-                <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-bottom: 15px; border-radius: 8px; padding: 15px;">
-                    <h3 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px;">📝 Note, Fermi Biologici & Decreti Regionali</h3>
-                    <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">
+                <div class="module-card" style="background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07); margin-bottom: 15px; border-radius: 8px; padding: 15px;">
+                    <h3 style="font-size: 0.9rem; color: #4d8a98; margin-bottom: 8px;">📝 Note, Fermi Biologici & Decreti Regionali</h3>
+                    <p style="font-size: 0.8rem; color: #b8b0a0; margin-bottom: 10px;">
                         Annota estremi di decreti, limitazioni straordinarie o periodi di fermo biologico per la regione ${regioneSelezionataArchivio}:
                     </p>
-                    <textarea id="nota-regione-speciale" class="mod-input" rows="3" placeholder="Es. Delibera straordinaria: divieto di raccolta o fermo biologico..." style="resize: vertical; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 8px; font-size: 0.85rem; width: 100%; box-sizing: border-box;">${notaCorrenteRegione}</textarea>
+                    <textarea id="nota-regione-speciale" class="mod-input" rows="3" placeholder="Es. Delibera straordinaria: divieto di raccolta o fermo biologico..." style="resize: vertical; background: #121610; color: #f6f1e6; border: 1px solid rgba(255,255,255,0.07); padding: 8px; font-size: 0.85rem; width: 100%; box-sizing: border-box;">${notaCorrenteRegione}</textarea>
                 </div>
             `;
 
             specieTartufiArchivio.forEach((specie, idSpecie) => {
                 let periodoSalvato = datiRegioneArchivio[idSpecie] !== undefined ? datiRegioneArchivio[idSpecie] : '';
-                let borderColor = periodoSalvato ? '#f59e0b' : '#475569';
-                let labelExtra = periodoSalvato ? '' : '<span style="font-size:0.75rem; color:#94a3b8; font-style:italic; margin-left:6px;">⚠️ Nessuna data salvata</span>';
+                let borderColor = periodoSalvato ? '#f59e0b' : '#556152';
+                let labelExtra = periodoSalvato ? '' : '<span style="font-size:0.75rem; color:#b8b0a0; font-style:italic; margin-left:6px;">⚠️ Nessuna data salvata</span>';
 
                 archivioHtml += `
-                    <div class="module-card" style="border-left: 4px solid ${borderColor}; margin-bottom: 10px; background: #1e293b;">
-                        <strong style="color: #f8fafc; font-size: 0.9rem; display: block; margin-bottom: 5px;">🍄 [ID Specie: ${idSpecie}] ${specie}${labelExtra}</strong>
-                        <label style="font-size: 0.75rem; color: #94a3b8;">Periodo di raccolta autorizzato:</label>
+                    <div class="module-card" style="border-left: 4px solid ${borderColor}; margin-bottom: 10px; background: rgba(29,40,30,0.96);">
+                        <strong style="color: #f6f1e6; font-size: 0.9rem; display: block; margin-bottom: 5px;">🍄 [ID Specie: ${idSpecie}] ${specie}${labelExtra}</strong>
+                        <label style="font-size: 0.75rem; color: #b8b0a0;">Periodo di raccolta autorizzato:</label>
                         <input type="text" id="specie-archivio-${idSpecie}" class="mod-input" value="${periodoSalvato}" placeholder="Nessuna data salvata — inserisci il periodo" style="margin-top: 3px; font-size: 0.85rem;">
                     </div>
                 `;
@@ -1627,16 +1627,16 @@ function openModule(moduleName, editMode = false) {
 
             // INSERITO QUI IL BLOCCO DI BACKUP & RIPRISTINO CALENDARI:
             archivioHtml += `
-                <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-bottom: 15px; border-radius: 8px; padding: 15px; margin-top: 15px;">
-                    <h3 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px;">💾 Backup & Ripristino Calendari</h3>
-                    <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">
+                <div class="module-card" style="background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07); margin-bottom: 15px; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                    <h3 style="font-size: 0.9rem; color: #4d8a98; margin-bottom: 8px;">💾 Backup & Ripristino Calendari</h3>
+                    <p style="font-size: 0.8rem; color: #b8b0a0; margin-bottom: 10px;">
                         Esporta i tuoi calendari regionali personalizzati su file/condividili o ripristinali da un backup precedente:
                     </p>
                     <button class="overlay-btn" style="width: 100%; background: #16a34a; font-weight: bold; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-bottom: 10px;" ${actionAttrs('esportaCalendariJSON')}>
                         📥 Scarica o Condividi Calendari (JSON)
                     </button>
                     
-                    <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 4px;">Carica Calendari da File JSON:</label>
+                    <label style="font-size: 0.75rem; color: #b8b0a0; display: block; margin-bottom: 4px;">Carica Calendari da File JSON:</label>
                     <input type="file" id="import-calendari-file" accept=".json" class="mod-input" style="padding: 6px; font-size: 0.8rem;" ${eventActionAttrs('change', 'importaCalendariJSON')}>
                 </div>
             `;
@@ -1681,8 +1681,8 @@ function openModule(moduleName, editMode = false) {
 
     let calHtml = `
         <h2>📅 Calendario Raccolta (GPS)</h2>
-        <p>Regione rilevata: <strong style="color:#38bdf8;">${regioneCal}</strong></p>
-        <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:15px;">Specie con periodo di raccolta attualmente <b>aperto</b>:</p>
+        <p>Regione rilevata: <strong style="color:#4d8a98;">${regioneCal}</strong></p>
+        <p style="font-size:0.85rem; color:#b8b0a0; margin-bottom:15px;">Specie con periodo di raccolta attualmente <b>aperto</b>:</p>
     `;
 
     let specieAperteTrovate = 0;
@@ -1701,9 +1701,9 @@ function openModule(moduleName, editMode = false) {
         if (isOpen) {
             specieAperteTrovate++;
             calHtml += `
-                <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: #1e293b; padding: 10px; border-radius: 6px;">
-                    <strong style="color: #f8fafc; font-size: 0.85rem; display: block;">🍄 [ID: ${id}] ${specie}</strong>
-                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">🗓️ Periodo consentito: ${periodoSalvato}</div>
+                <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: rgba(29,40,30,0.96); padding: 10px; border-radius: 6px;">
+                    <strong style="color: #f6f1e6; font-size: 0.85rem; display: block;">🍄 [ID: ${id}] ${specie}</strong>
+                    <div style="font-size: 0.75rem; color: #b8b0a0; margin-top: 4px;">🗓️ Periodo consentito: ${periodoSalvato}</div>
                     <div style="font-size: 0.75rem; margin-top: 6px;"><span style="color:#22c55e; font-weight:bold;">🟢 RACCOLTA APERTA</span></div>
                 </div>
             `;
@@ -1712,13 +1712,13 @@ function openModule(moduleName, editMode = false) {
 
     if (specieConDateSalvate === 0) {
         calHtml += `
-            <div class="module-card" style="background: #1e293b; border-left: 4px solid #f59e0b; padding: 12px; text-align: center; margin-bottom: 15px;">
-                <p style="color: #f59e0b; font-weight: bold; margin: 0;">⚠️ Nessuna data salvata per la regione ${regioneCal}.<br><span style="font-size:0.8rem; font-weight:normal; color:#94a3b8;">Vai su "📚 Archivio Date per Regione" per inserire i periodi di raccolta.</span></p>
+            <div class="module-card" style="background: rgba(29,40,30,0.96); border-left: 4px solid #f59e0b; padding: 12px; text-align: center; margin-bottom: 15px;">
+                <p style="color: #f59e0b; font-weight: bold; margin: 0;">⚠️ Nessuna data salvata per la regione ${regioneCal}.<br><span style="font-size:0.8rem; font-weight:normal; color:#b8b0a0;">Vai su "📚 Archivio Date per Regione" per inserire i periodi di raccolta.</span></p>
             </div>
         `;
     } else if (specieAperteTrovate === 0) {
         calHtml += `
-            <div class="module-card" style="background: #1e293b; border-left: 4px solid #ef4444; padding: 12px; text-align: center; margin-bottom: 15px;">
+            <div class="module-card" style="background: rgba(29,40,30,0.96); border-left: 4px solid #ef4444; padding: 12px; text-align: center; margin-bottom: 15px;">
                 <p style="color: #ef4444; font-weight: bold; margin: 0;">🔴 Nessuna specie aperta in questo periodo per la regione ${regioneCal}.</p>
             </div>
         `;
@@ -1726,11 +1726,11 @@ function openModule(moduleName, editMode = false) {
 
     if (notaRegionaleCorrente && notaRegionaleCorrente.trim() !== "") {
         calHtml += `
-            <div class="module-card" style="background: #1e293b; border: 1px solid #334155; margin-top: 15px; border-radius: 8px; padding: 15px;">
-                <h4 style="font-size: 0.9rem; color: #38bdf8; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            <div class="module-card" style="background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07); margin-top: 15px; border-radius: 8px; padding: 15px;">
+                <h4 style="font-size: 0.9rem; color: #4d8a98; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
                     📝 Note & Fermi Biologici
                 </h4>
-                <p style="font-size: 0.8rem; color: #cbd5e1; margin: 0; white-space: pre-wrap; line-height: 1.4;">${notaRegionaleCorrente}</p>
+                <p style="font-size: 0.8rem; color: #ddd6c8; margin: 0; white-space: pre-wrap; line-height: 1.4;">${notaRegionaleCorrente}</p>
             </div>
         `;
     }
@@ -2871,7 +2871,7 @@ function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tess
         <div class="module-card" style="text-align: center; background: #fff; padding: 15px; border-radius: 8px;">
             <img src="${base64Data}" style="max-width: 100%; height: auto; border-radius: 6px;" alt="Documento Salvato">
         </div>
-        <button class="overlay-btn" style="background:#475569; margin-top:15px; width:100%;" ${actionAttrs('openModule', [moduloProvenienza])}>← Torna Indietro</button>
+        <button class="overlay-btn" style="background:#556152; margin-top:15px; width:100%;" ${actionAttrs('openModule', [moduloProvenienza])}>← Torna Indietro</button>
     `;
     
     activeView.querySelector('.module-body-content').innerHTML = contentHTML;
@@ -2909,16 +2909,16 @@ function mostraDisclaimerIniziale() {
         `;
         
         modalOverlay.innerHTML = `
-            <div style="background: #1e293b; color: #f8fafc; padding: 25px; border-radius: 12px; max-width: 500px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; font-family: sans-serif;">
+            <div style="background: rgba(29,40,30,0.96); color: #f6f1e6; padding: 25px; border-radius: 12px; max-width: 500px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.07); font-family: sans-serif;">
                 <h3 style="color: #f59e0b; margin-top: 0; font-size: 1.2rem; display: flex; align-items: center; justify-content: space-between;">
                     <span>⚠️ Avviso e Limitazione di Responsabilità</span>
-                    <span id="disclaimer-counter" style="font-size: 0.8rem; color: #94a3b8; font-weight: normal;">1 / 5</span>
+                    <span id="disclaimer-counter" style="font-size: 0.8rem; color: #b8b0a0; font-weight: normal;">1 / 5</span>
                 </h3>
-                <div id="disclaimer-text-container" style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; min-height: 110px; max-height: 55vh; overflow-y: auto; padding-right: 5px; margin: 15px 0;">
+                <div id="disclaimer-text-container" style="font-size: 0.85rem; color: #ddd6c8; line-height: 1.5; min-height: 110px; max-height: 55vh; overflow-y: auto; padding-right: 5px; margin: 15px 0;">
                     ${pagineDisclaimer[0]}
                 </div>
                 <div id="disclaimer-buttons-container">
-                    <button id="btn-avanti-disclaimer" style="background: #3b82f6; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
+                    <button id="btn-avanti-disclaimer" style="background: #627d54; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
                         Avanti
                     </button>
                 </div>
@@ -2937,7 +2937,7 @@ function aggiornaVistaDisclaimer() {
             if (paginaCorrente < pagineDisclaimer.length - 1) {
                 // Pagine intermedie: mostra solo il tasto "Avanti"
                 buttonsContainer.innerHTML = `
-                    <button id="btn-avanti-disclaimer" style="background: #3b82f6; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
+                    <button id="btn-avanti-disclaimer" style="background: #627d54; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
                         Avanti
                     </button>
                 `;
@@ -2951,7 +2951,7 @@ function aggiornaVistaDisclaimer() {
                     <button id="btn-accetta-disclaimer" style="background: #22c55e; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px;">
                         Accetta e Continua
                     </button>
-                    <button id="btn-abbandona-app" style="background: #334155; color: #f87171; border: 1px solid #475569; padding: 10px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer; margin-top: 8px;">
+                    <button id="btn-abbandona-app" style="background: #3a4a3a; color: #f87171; border: 1px solid rgba(255,255,255,0.12); padding: 10px; width: 100%; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer; margin-top: 8px;">
                         Abbandona
                     </button>
                 `;
