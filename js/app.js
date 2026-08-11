@@ -2700,6 +2700,8 @@ async function restoreLatestAutomaticBackup() {
             } else {
                 showToast("Elemento file non trovato. Usa 'Ripristina Backup da File JSON' nella sezione Report & Backup.", 'error');
             }
+        } else {
+            showToast("Nessun backup ripristinato.", 'info');
         }
         return;
     }
