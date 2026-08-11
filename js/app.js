@@ -221,7 +221,7 @@ const ACTION_HANDLERS = {
     deleteSpesa: (_event, index) => deleteSpesa(index),
     esportaDatiCSV: () => esportaDatiCSV(),
     esportaBackupJSON: () => esportaBackupJSON(),
-    runLocalAutomaticBackupNow: () => runLocalAutomaticBackupNow(),
+    forceLocalBackupNow: () => forceLocalBackupNow(),
     restoreLatestAutomaticBackup: () => restoreLatestAutomaticBackup(),
     saveVetClinic: () => saveVetClinic(),
     shareLocationToVetByIndex: (_event, index) => shareLocationToVetByIndex(index),
@@ -301,9 +301,6 @@ function bindDelegatedActions() {
 }
 
 bindDelegatedActions();
-
-const AUTO_BACKUP_INTERVAL_MS = 3 * 60 * 1000;
-setupAutomaticBackupLifecycle();
 
 function sanitizePhoneHref(phoneNumber) {
     return String(phoneNumber ?? '').replace(/[^0-9+]/g, '');
@@ -1436,7 +1433,7 @@ function openModule(moduleName, editMode = false) {
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Backup automatico locale</h3>
                     <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app salva automaticamente un backup locale quando esci e periodicamente durante l'uso (nessuna API cloud).</p>
                     <p id="local-backup-status" style="font-size:0.82rem; color:#b8b0a0; margin:0 0 10px 0;">Stato ultimo backup automatico: non disponibile</p>
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('runLocalAutomaticBackupNow')}>Aggiorna Backup Automatico Ora</button>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('forceLocalBackupNow')}>Aggiorna Backup Automatico Ora</button>
                     <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('restoreLatestAutomaticBackup')}>Ripristina Ultimo Backup Automatico</button>
                 </div>`;
             break;
@@ -2685,14 +2682,16 @@ function syncAutomaticBackupStatusUI() {
     statusEl.textContent = `Stato ultimo backup automatico: ${esito} - ${formatBackupTimestamp(status.savedAt)}`;
 }
 
-async function runLocalAutomaticBackupNow() {
+async function forceLocalBackupNow() {
     const api = getAutomaticBackupStorageApi();
     if (!api) {
         showToast("Storage avanzato non disponibile su questo browser.", 'error');
         return;
     }
-    const result = await api.saveAutomaticBackupSnapshot(buildCompleteBackupData(), 'manual');
+    const backupData = buildCompleteBackupData();
+    const result = await api.saveAutomaticBackupSnapshot(backupData, 'manual');
     if (result && result.ok) {
+        lastAutomaticBackupFingerprint = JSON.stringify(backupData);
         showToast("Backup automatico locale aggiornato.", 'success');
     } else {
         showToast("Backup locale non completato.", 'error');
@@ -2715,7 +2714,7 @@ async function restoreLatestAutomaticBackup() {
     try {
         restoreBackupEntries(snapshot.data);
         showToast("Backup automatico ripristinato!", 'success');
-        location.reload();
+        setTimeout(() => location.reload(), 500);
     } catch (error) {
         showToast("Ripristino backup automatico non riuscito.", 'error');
     }
@@ -2724,26 +2723,59 @@ async function restoreLatestAutomaticBackup() {
 async function runAutomaticLocalBackup(reason) {
     const api = getAutomaticBackupStorageApi();
     if (!api) return;
+    const backupData = buildCompleteBackupData();
+    const fingerprint = JSON.stringify(backupData);
+    if (reason !== 'manual' && fingerprint === lastAutomaticBackupFingerprint) return;
     try {
-        await api.saveAutomaticBackupSnapshot(buildCompleteBackupData(), reason);
+        const result = await api.saveAutomaticBackupSnapshot(backupData, reason);
+        if (result && result.ok) {
+            lastAutomaticBackupFingerprint = fingerprint;
+        }
     } catch (error) {
         console.warn('Backup automatico locale non riuscito.', error);
     }
 }
 
+const AUTO_BACKUP_INTERVAL_MS = 3 * 60 * 1000;
+// Deduplica i trigger di uscita che spesso arrivano in sequenza (visibilitychange/pagehide/beforeunload).
+const AUTO_BACKUP_EXIT_DEDUP_MS = 1200;
+let automaticBackupLifecycleInitialized = false;
+let lastAutomaticBackupFingerprint = '';
+
 function setupAutomaticBackupLifecycle() {
+    if (automaticBackupLifecycleInitialized) return;
+    automaticBackupLifecycleInitialized = true;
+    let lastExitBackupAt = 0;
     const triggerBackup = () => runAutomaticLocalBackup('app-exit');
+    const triggerBackupDeduped = () => {
+        const now = Date.now();
+        if (now - lastExitBackupAt < AUTO_BACKUP_EXIT_DEDUP_MS) return;
+        lastExitBackupAt = now;
+        triggerBackup();
+    };
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
-            triggerBackup();
+            triggerBackupDeduped();
         }
     });
-    window.addEventListener('pagehide', triggerBackup);
-    window.addEventListener('beforeunload', triggerBackup);
-    setInterval(() => {
+    window.addEventListener('pagehide', triggerBackupDeduped);
+    window.addEventListener('beforeunload', triggerBackupDeduped);
+    if (window.__truffleAutoBackupIntervalId) {
+        clearInterval(window.__truffleAutoBackupIntervalId);
+    }
+    const api = getAutomaticBackupStorageApi();
+    if (api && typeof api.getLatestAutomaticBackupSnapshot === 'function') {
+        const latestSnapshot = api.getLatestAutomaticBackupSnapshot();
+        if (latestSnapshot && latestSnapshot.data && typeof latestSnapshot.data === 'object' && !Array.isArray(latestSnapshot.data)) {
+            lastAutomaticBackupFingerprint = JSON.stringify(latestSnapshot.data);
+        }
+    }
+    window.__truffleAutoBackupIntervalId = setInterval(() => {
         runAutomaticLocalBackup('periodic');
     }, AUTO_BACKUP_INTERVAL_MS);
 }
+
+setupAutomaticBackupLifecycle();
 
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');

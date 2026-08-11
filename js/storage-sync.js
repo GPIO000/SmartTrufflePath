@@ -103,7 +103,7 @@
 
   async function saveAutomaticBackupSnapshot(data, reason = 'manual') {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      throw new Error('Payload backup non valido');
+      throw new Error('Dati da salvare non validi');
     }
     try {
       const snapshot = {
