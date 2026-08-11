@@ -674,7 +674,10 @@ function openModule(moduleName, editMode = false) {
             const storicoRicevutePreview = readStorageJSON('storico_vendite', []);
             const prossimaNumerazione = storicoRicevutePreview.length + 1;
             const dataOdiernaCausale = new Date().toLocaleDateString('it-IT');
-            const causaleDefault = `Pagamento ricevuta ${prossimaNumerazione} emessa il ${dataOdiernaCausale}`;
+            const riferimentoNormativoCausale = f24ValidoPreview
+                ? "ai sensi della Legge 145/2018 - Regime Imposta Sostitutiva"
+                : "ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 - Regime Ritenuta d'Acconto";
+            const causaleDefault = `Pagamento della ricevuta n. ${prossimaNumerazione} per la vendita occasionale di tartufi (${riferimentoNormativoCausale}) emessa in data ${dataOdiernaCausale}.`;
             
             const annoCorrenteReg = new Date().getFullYear();
             let f24ValidoPreview = false;
