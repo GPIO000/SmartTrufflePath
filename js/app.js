@@ -221,6 +221,7 @@ const ACTION_HANDLERS = {
     deleteSpesa: (_event, index) => deleteSpesa(index),
     esportaDatiCSV: () => esportaDatiCSV(),
     esportaBackupJSON: () => esportaBackupJSON(),
+    archiviaAnnoPrecedente: () => archiviaAnnoPrecedente(),
     forceLocalBackupNow: () => forceLocalBackupNow(),
     restoreLatestAutomaticBackup: () => restoreLatestAutomaticBackup(),
     saveVetClinic: () => saveVetClinic(),
@@ -1426,6 +1427,7 @@ function openModule(moduleName, editMode = false) {
                     <p>Esporta i dati contabili o gestisci backup locali senza cloud.</p>
                     <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('esportaDatiCSV')}>Scarica Contabilità in CSV</button>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#16a34a;" ${actionAttrs('esportaBackupJSON')}>Esporta Backup Manuale (JSON)</button>
+                    <button class="overlay-btn" style="margin-top:8px; width:100%; background:#7c3aed;" ${actionAttrs('archiviaAnnoPrecedente')}>Archivia e Pulisci Anno Precedente</button>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <label style="font-weight:bold; color:#f6f1e6;">Ripristina Backup da File JSON:</label>
                     <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
@@ -2632,6 +2634,165 @@ function esportaBackupJSON() {
     document.body.appendChild(downloadAnchor); 
     downloadAnchor.click(); 
     downloadAnchor.remove();
+}
+
+function estraiAnnoDaValoreData(valoreData) {
+    if (typeof valoreData === 'number' && Number.isFinite(valoreData)) {
+        const data = new Date(valoreData);
+        return Number.isNaN(data.getTime()) ? null : data.getFullYear();
+    }
+    if (valoreData instanceof Date) {
+        return Number.isNaN(valoreData.getTime()) ? null : valoreData.getFullYear();
+    }
+    if (typeof valoreData !== 'string') return null;
+    const value = valoreData.trim();
+    if (!value) return null;
+    const isoMatch = value.match(/^(\d{4})-\d{2}-\d{2}/);
+    if (isoMatch) return parseInt(isoMatch[1], 10);
+    const itMatch = value.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (itMatch) return parseInt(itMatch[3], 10);
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.getFullYear();
+}
+
+function formattaNomeBackupAnno(anno) {
+    const oggi = new Date().toISOString().slice(0, 10);
+    return `backup_archivio_truffle_${anno}_${oggi}.json`;
+}
+
+function aggiornaRubricaDaStorico(storicoVenditeRimanente) {
+    const rubricaEsistente = readStorageJSON('rubrica_clienti', []);
+    const rubricaMap = new Map();
+    rubricaEsistente.forEach((cliente) => {
+        if (!cliente || typeof cliente.nome !== 'string') return;
+        const key = cliente.nome.trim().toLowerCase();
+        if (!key) return;
+        rubricaMap.set(key, cliente);
+    });
+
+    const aggregati = new Map();
+    storicoVenditeRimanente.forEach((vendita) => {
+        if (!vendita || typeof vendita.acquirente !== 'string') return;
+        const nome = vendita.acquirente.trim();
+        if (!nome) return;
+        const key = nome.toLowerCase();
+        const base = rubricaMap.get(key) || {};
+        const record = aggregati.get(key) || {
+            nome,
+            cf: base.cf || vendita.acquirenteCf || '',
+            indirizzo: base.indirizzo || vendita.acquirenteIndirizzo || '',
+            email: base.email || vendita.acquirenteEmail || '',
+            totaleAcquisti: 0,
+            numeroAcquisti: 0,
+            dataUltimoAcquisto: '',
+            nota: base.nota || ''
+        };
+        record.totaleAcquisti += parseFloat(vendita.importo) || 0;
+        record.numeroAcquisti += 1;
+        const dataCorrente = estraiAnnoDaValoreData(record.dataUltimoAcquisto) ? new Date(record.dataUltimoAcquisto) : null;
+        const dataVendita = new Date(vendita.data || '');
+        if (!dataCorrente || Number.isNaN(dataCorrente.getTime()) || (!Number.isNaN(dataVendita.getTime()) && dataVendita > dataCorrente)) {
+            record.dataUltimoAcquisto = vendita.data || '';
+        }
+        if (!record.cf && vendita.acquirenteCf) record.cf = vendita.acquirenteCf;
+        if (!record.indirizzo && vendita.acquirenteIndirizzo) record.indirizzo = vendita.acquirenteIndirizzo;
+        if (!record.email && vendita.acquirenteEmail) record.email = vendita.acquirenteEmail;
+        aggregati.set(key, record);
+    });
+
+    const rubricaAggiornata = [];
+    rubricaMap.forEach((cliente, key) => {
+        const aggregato = aggregati.get(key);
+        if (aggregato) {
+            rubricaAggiornata.push(aggregato);
+            return;
+        }
+        rubricaAggiornata.push({
+            ...cliente,
+            totaleAcquisti: 0,
+            numeroAcquisti: 0,
+            dataUltimoAcquisto: ''
+        });
+    });
+
+    aggregati.forEach((aggregato, key) => {
+        if (!rubricaMap.has(key)) rubricaAggiornata.push(aggregato);
+    });
+
+    localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaAggiornata));
+}
+
+async function archiviaAnnoPrecedente() {
+    const annoPrecedente = new Date().getFullYear() - 1;
+    const conferma = await appConfirm(`Verrà creato un backup dei dati del ${annoPrecedente} e quei record saranno rimossi dall'app. Continuare?`);
+    if (!conferma) return;
+
+    const regoleArchivio = [
+        { backupKey: 'storicoVendite', storageKey: 'storico_vendite', field: 'data' },
+        { backupKey: 'speseList', storageKey: 'spese_list', field: 'data' },
+        { backupKey: 'storicoRaccolta', storageKey: 'storico_raccolta_giornaliera', field: 'data' },
+        { backupKey: 'vetHistoryList', storageKey: 'vet_history_list', field: 'data' },
+        { backupKey: 'heatDiaryList', storageKey: 'heat_diary_list', field: 'data' },
+        { backupKey: 'poiList', storageKey: 'poi_list', field: 'date' }
+    ];
+
+    const archivio = {
+        tipo: 'archivio_annuale',
+        anno: annoPrecedente,
+        creatoIl: new Date().toISOString(),
+        dati: {}
+    };
+    const conteggi = [];
+    let totaleRecordArchiviati = 0;
+    let storicoVenditeRimanente = readStorageJSON('storico_vendite', []);
+
+    regoleArchivio.forEach((regola) => {
+        const elenco = readStorageJSON(regola.storageKey, []);
+        if (!Array.isArray(elenco) || elenco.length === 0) {
+            archivio.dati[regola.backupKey] = [];
+            conteggi.push({ label: regola.backupKey, archived: 0 });
+            return;
+        }
+        const daArchiviare = [];
+        const daMantenere = [];
+        elenco.forEach((item) => {
+            const annoRecord = estraiAnnoDaValoreData(item && item[regola.field]);
+            if (annoRecord === annoPrecedente) {
+                daArchiviare.push(item);
+            } else {
+                daMantenere.push(item);
+            }
+        });
+        archivio.dati[regola.backupKey] = daArchiviare;
+        localStorage.setItem(regola.storageKey, JSON.stringify(daMantenere));
+        if (regola.storageKey === 'storico_vendite') {
+            storicoVenditeRimanente = daMantenere;
+        }
+        totaleRecordArchiviati += daArchiviare.length;
+        conteggi.push({ label: regola.backupKey, archived: daArchiviare.length });
+    });
+
+    if (totaleRecordArchiviati === 0) {
+        showToast(`Nessun dato del ${annoPrecedente} da archiviare.`, 'info');
+        return;
+    }
+
+    aggiornaRubricaDaStorico(storicoVenditeRimanente);
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(archivio, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", formattaNomeBackupAnno(annoPrecedente));
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    const riepilogo = conteggi
+        .filter((entry) => entry.archived > 0)
+        .map((entry) => `${entry.label}: ${entry.archived}`)
+        .join(' • ');
+    showToast(`Archiviati ${totaleRecordArchiviati} record del ${annoPrecedente}. ${riepilogo}`, 'success');
+    openModule('export');
 }
 
 function importBackupData(event) {
