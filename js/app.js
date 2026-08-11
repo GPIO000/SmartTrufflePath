@@ -780,7 +780,6 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="r-causale" class="mod-input" placeholder="Es. Pagamento tartufi freschi - Ricevuta N. ...">
                     </div>
                     
-                    <p style="font-size:0.82rem; color:#ddd6c8; margin:12px 0 0 0;">Nota importante: anche se l'app salva i dati in memoria e crea backup automatici, è vivamente consigliato conservare una copia cartacea di ogni ricevuta.</p>
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" ${actionAttrs('registerRicevutaSafe')}>Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             setTimeout(() => { toggleRegimeFiscaleFields(); toggleCoordinateBancarie(); }, 50);
@@ -792,6 +791,7 @@ function openModule(moduleName, editMode = false) {
     const filtroClienteRender = escapeHtml(filtroCliente);
 
     let storicoHtml = `<h2>Archivio Storico Ricevute</h2>`;
+    storicoHtml += `<p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">Nota importante: anche se l'app salva i dati in memoria e crea backup automatici, è vivamente consigliato conservare una copia cartacea di ogni ricevuta.</p>`;
 
     // Se c'è un filtro attivo dalla rubrica, mostra il banner e filtra l'array
     if (filtroCliente) {
@@ -2158,6 +2158,16 @@ async function registraVenditaConPrezzoKg() {
 
     if (statoSoglia.superato) {
         await appAlert(`❌ ATTENZIONE: Soglia di blocco di € 7.000 superata!\nIl totale annuo delle vendite raggiungerebbe € ${nuovoTotaleAnno.toFixed(2)}. Registrazione bloccata per limiti normativi.`);
+        return;
+    }
+
+    const messaggioConservazioneCartacea =
+        `Presa visione:\n\n` +
+        `Anche se l'app salva i dati in memoria e crea backup automatici, ` +
+        `è vivamente consigliato conservare una copia cartacea di ogni ricevuta.\n\n` +
+        `Premi OK per confermare la presa visione e continuare.`;
+
+    if (!(await appConfirm(messaggioConservazioneCartacea))) {
         return;
     }
 
