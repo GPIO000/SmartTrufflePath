@@ -326,22 +326,26 @@ function viewStoredDocument(storageKey, title, moduleName) {
 }
 
 function normalizeBackupEntry(entryValue, fallbackValue) {
+    if (entryValue === null || entryValue === undefined) {
+        return JSON.stringify(fallbackValue);
+    }
+
     let parsedValue = entryValue;
     if (typeof entryValue === 'string') {
         try {
             parsedValue = JSON.parse(entryValue);
         } catch (error) {
-            throw new Error('Voce backup non valida');
+            return JSON.stringify(fallbackValue);
         }
     }
 
     if (Array.isArray(fallbackValue) && !Array.isArray(parsedValue)) {
-        throw new Error('Formato array non valido');
+        return JSON.stringify(fallbackValue);
     }
 
     if (fallbackValue && typeof fallbackValue === 'object' && !Array.isArray(fallbackValue)) {
         if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
-            throw new Error('Formato oggetto non valido');
+            return JSON.stringify(fallbackValue);
         }
     }
 
