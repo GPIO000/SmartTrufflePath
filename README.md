@@ -14,7 +14,7 @@
   * Generatore di ricevute di vendita conformi (Reg. CE 178/02 & DPR 633/1972) con supporto alla stampa e salvataggio in PDF.
   * Gestione dell'imposta sostitutiva F24 ELIDE (Codice Tributo 1853 - Legge 145/2018).
   * Contabilità e bilancio annuo con esportazione dei dati in formato **CSV** per il commercialista.
-* **Gestione Cani & Salute**: Profilo del cane da tartufo (con numero di microchip), diario di ricerca e libretto sanitario digitale (scadenze vaccini e antiparassitari).
+* **Gestione Cani & Salute**: Anagrafica cani da tartufo (con numero di microchip), diario di ricerca e libretti sanitari cani digitali (scadenze vaccini e antiparassitari).
 * **Sicurezza & Emergenze**: 
   * Pulsante **SOS** rapido per l'invio immediato di SMS con le coordinate GPS correnti.
   * Sezione di pronto soccorso cinofilo H24 (esche avvelenate/vipere) e numeri utili (112, CNSAS, Forestali).

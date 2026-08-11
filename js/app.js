@@ -1097,7 +1097,7 @@ function openModule(moduleName, editMode = false) {
                 });
             } else { optionsHtml += `<option value="${nomeCaneDefault}">${nomeCaneDefault}</option>`; }
             let vetHtml = `
-                <h2>Libretto Sanitario & Profilassi</h2>
+                <h2>Libretti Sanitari Cani & Profilassi</h2>
                 <p>Storico trattamenti, vaccini e visite per il cane:</p>
                 <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
                     <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Trattamento / Visita</h3>
@@ -3547,7 +3547,7 @@ async function mostraInfoModulo(moduleName) {
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
         'canidiary': "ℹ️ **Guida - Anagrafica Cane**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo razza, sesso, data di nascita e numero di microchip.",
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
-        'vet': "ℹ️ **Guida - Libretto Sanitario & Profilassi**\n\nRegistra lo storico dei trattamenti veterinari, dei vaccini e della somministrazione di antiparassitari per i tuoi cani. Per le cagne femmine è disponibile il diario del calore con previsione del prossimo ciclo.",
+        'vet': "ℹ️ **Guida - Libretti Sanitari Cani & Profilassi**\n\nRegistra lo storico dei trattamenti veterinari, dei vaccini e della somministrazione di antiparassitari per i tuoi cani. Per le cagne femmine è disponibile il diario del calore con previsione del prossimo ciclo.",
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
