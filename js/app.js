@@ -1410,10 +1410,10 @@ function openModule(moduleName, editMode = false) {
                     <input type="file" id="import-file" accept=".json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Backup automatico locale</h3>
-                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app salva automaticamente un backup locale ad ogni modifica dei dati e quando esci (nessuna API cloud).</p>
+                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app salva automaticamente il file <strong>backup_truffle_automatico.json</strong> nella cartella Download ad ogni modifica dei dati (sovrascrive il precedente). Nessun cloud.</p>
                     <p id="local-backup-status" style="font-size:0.82rem; color:#b8b0a0; margin:0 0 10px 0;">Stato ultimo backup automatico: non disponibile</p>
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('forceLocalBackupNow')}>Aggiorna Backup Automatico Ora</button>
-                    <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('restoreLatestAutomaticBackup')}>Ripristina Ultimo Backup Automatico</button>
+                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('forceLocalBackupNow')}>💾 Salva Backup Ora</button>
+                    <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('restoreLatestAutomaticBackup')}>📂 Ripristina da File...</button>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#b45309;">🗂️ Archiviazione per Anno</h3>
                     <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">Crea un file di backup JSON con i dati dell'anno precedente (ricevute vendita, registro raccolta, spese) e rimuove dall'app <strong>soltanto quei record</strong>, lasciando intatti tutti i dati dell'anno corrente e di qualsiasi altro anno.</p>
@@ -2638,12 +2638,6 @@ function importBackupData(event) {
     reader.readAsText(file);
 }
 
-function getAutomaticBackupStorageApi() {
-    return window.TruffleStorage && typeof window.TruffleStorage.saveAutomaticBackupSnapshot === 'function'
-        ? window.TruffleStorage
-        : null;
-}
-
 function formatBackupTimestamp(isoDate) {
     if (!isoDate) return 'n/d';
     const date = new Date(isoDate);
@@ -2651,68 +2645,68 @@ function formatBackupTimestamp(isoDate) {
     return date.toLocaleString('it-IT');
 }
 
+let lastAutomaticBackupSavedAt = null;
+
 function syncAutomaticBackupStatusUI() {
-    const api = getAutomaticBackupStorageApi();
     const statusEl = document.getElementById('local-backup-status');
     if (!statusEl) return;
-    if (!api) return;
-    const status = api.getAutomaticBackupStatus && api.getAutomaticBackupStatus();
-    if (!status || !status.savedAt) {
+    if (!lastAutomaticBackupSavedAt) {
         statusEl.textContent = 'Stato ultimo backup automatico: non disponibile';
         return;
     }
-    const esito = status.ok ? 'OK' : 'Errore';
-    statusEl.textContent = `Stato ultimo backup automatico: ${esito} - ${formatBackupTimestamp(status.savedAt)}`;
+    statusEl.textContent = `Stato ultimo backup automatico: OK - ${formatBackupTimestamp(lastAutomaticBackupSavedAt)}`;
 }
 
-async function forceLocalBackupNow() {
-    const api = getAutomaticBackupStorageApi();
-    if (!api) {
-        showToast("Storage avanzato non disponibile su questo browser.", 'error');
-        return;
-    }
-    const backupData = buildCompleteBackupData();
-    const result = await api.saveAutomaticBackupSnapshot(backupData, 'manual');
-    if (result && result.ok) {
-        lastAutomaticBackupFingerprint = JSON.stringify(backupData);
-        showToast("Backup automatico locale aggiornato.", 'success');
-    } else {
-        showToast("Backup locale non completato.", 'error');
-    }
+function downloadBackupFile(data) {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+    const a = document.createElement('a');
+    a.setAttribute('href', dataStr);
+    a.setAttribute('download', 'backup_truffle_automatico.json');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    lastAutomaticBackupSavedAt = new Date().toISOString();
     syncAutomaticBackupStatusUI();
 }
 
+function forceLocalBackupNow() {
+    const backupData = buildCompleteBackupData();
+    downloadBackupFile(backupData);
+    lastAutomaticBackupFingerprint = JSON.stringify(backupData);
+    showToast("Backup salvato nella cartella Download.", 'success');
+}
+
 async function restoreLatestAutomaticBackup() {
-    const api = getAutomaticBackupStorageApi();
-    if (!api || typeof api.getLatestAutomaticBackupSnapshotAsync !== 'function') {
-        showToast("Storage avanzato non disponibile su questo browser.", 'error');
-        return;
-    }
-    const snapshot = await api.getLatestAutomaticBackupSnapshotAsync();
-    if (!snapshot || !snapshot.data || typeof snapshot.data !== 'object' || Array.isArray(snapshot.data)) {
-        const fallback = await appConfirm(
-            "Nessun backup automatico disponibile (la cache potrebbe essere stata cancellata).\n\nVuoi selezionare manualmente un file di backup JSON?"
-        );
-        if (fallback) {
-            const fileInput = document.getElementById('import-file');
-            if (fileInput) {
-                fileInput.click();
-            } else {
-                showToast("Elemento file non trovato. Usa 'Ripristina Backup da File JSON' nella sezione Report & Backup.", 'error');
-            }
-        } else {
-            showToast("Nessun backup ripristinato.", 'info');
+    if (!await appConfirm("Scegli il file di backup automatico (backup_truffle_automatico.json) dalla cartella Download del dispositivo.")) return;
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+    fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        fileInput.remove();
+        if (!file) {
+            showToast("Nessun file selezionato.", 'info');
+            return;
         }
-        return;
-    }
-    if (!await appConfirm("Vuoi ripristinare l'ultimo backup automatico locale?")) return;
-    try {
-        restoreBackupEntries(snapshot.data);
-        showToast("Backup automatico ripristinato!", 'success');
-        setTimeout(() => location.reload(), 500);
-    } catch (error) {
-        showToast("Ripristino backup automatico non riuscito.", 'error');
-    }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (!data || typeof data !== 'object' || Array.isArray(data)) {
+                    throw new Error('Backup non valido');
+                }
+                restoreBackupEntries(data);
+                showToast("Backup ripristinato!", 'success');
+                setTimeout(() => location.reload(), 500);
+            } catch {
+                showToast("Errore lettura backup.", 'error');
+            }
+        };
+        reader.readAsText(file);
+    });
+    fileInput.click();
 }
 
 async function archiviaAnnoPrecedente() {
@@ -2771,23 +2765,14 @@ async function archiviaAnnoPrecedente() {
     showToast(`✅ Archivio ${annoPrecedente} creato. Dati dell'anno rimossi dall'app.`, 'success');
 }
 
-async function runAutomaticLocalBackup(reason) {
-    const api = getAutomaticBackupStorageApi();
-    if (!api) return;
+function runAutomaticLocalBackup() {
     const backupData = buildCompleteBackupData();
-    try {
-        const result = await api.saveAutomaticBackupSnapshot(backupData, reason);
-        if (result && result.ok) {
-            lastAutomaticBackupFingerprint = JSON.stringify(backupData);
-            syncAutomaticBackupStatusUI();
-        }
-    } catch (error) {
-        console.warn('Backup automatico locale non riuscito.', error);
-    }
+    const fingerprint = JSON.stringify(backupData);
+    if (fingerprint === lastAutomaticBackupFingerprint) return;
+    downloadBackupFile(backupData);
+    lastAutomaticBackupFingerprint = fingerprint;
 }
 
-// Deduplica i trigger di uscita che spesso arrivano in sequenza (visibilitychange/pagehide/beforeunload).
-const AUTO_BACKUP_EXIT_DEDUP_MS = 1200;
 const AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS = 500;
 let automaticBackupLifecycleInitialized = false;
 let lastAutomaticBackupFingerprint = '';
@@ -2796,32 +2781,11 @@ let dataChangeDebounceTimer = null;
 function setupAutomaticBackupLifecycle() {
     if (automaticBackupLifecycleInitialized) return;
     automaticBackupLifecycleInitialized = true;
-    let lastExitBackupAt = 0;
-    const triggerBackup = () => runAutomaticLocalBackup('app-exit');
-    const triggerBackupDeduped = () => {
-        const now = Date.now();
-        if (now - lastExitBackupAt < AUTO_BACKUP_EXIT_DEDUP_MS) return;
-        lastExitBackupAt = now;
-        triggerBackup();
-    };
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            triggerBackupDeduped();
-        }
-    });
-    window.addEventListener('pagehide', triggerBackupDeduped);
-    window.addEventListener('beforeunload', triggerBackupDeduped);
-    const api = getAutomaticBackupStorageApi();
-    if (api && typeof api.getLatestAutomaticBackupSnapshot === 'function') {
-        const latestSnapshot = api.getLatestAutomaticBackupSnapshot();
-        if (latestSnapshot && latestSnapshot.data && typeof latestSnapshot.data === 'object' && !Array.isArray(latestSnapshot.data)) {
-            lastAutomaticBackupFingerprint = JSON.stringify(latestSnapshot.data);
-        }
-    }
+    const api = window.TruffleStorage;
     if (api && typeof api.setDataChangeListener === 'function') {
         api.setDataChangeListener(() => {
             clearTimeout(dataChangeDebounceTimer);
-            dataChangeDebounceTimer = setTimeout(() => runAutomaticLocalBackup('data-change'), AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS);
+            dataChangeDebounceTimer = setTimeout(() => runAutomaticLocalBackup(), AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS);
         });
     }
 }
@@ -3602,7 +3566,7 @@ async function mostraInfoModulo(moduleName) {
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
-        'export': "ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV, crea un backup manuale JSON e usa il backup automatico locale (uscita app + salvataggio periodico) senza servizi cloud.",
+        'export': "ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV o crea un backup manuale JSON.\n\nIl backup automatico salva il file **backup_truffle_automatico.json** nella cartella Download del dispositivo ogni volta che modifichi un dato (sovrascrive sempre lo stesso file). Usa '💾 Salva Backup Ora' per forzarlo manualmente. Per ripristinare, premi '📂 Ripristina da File...' e scegli il file dalla cartella Download.",
         'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
         'clienti': "ℹ️ **Guida - Rubrica Clienti & Acquirenti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico e gestisci le note dedicate.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
