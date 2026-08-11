@@ -1438,7 +1438,7 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('restoreLatestAutomaticBackup')}>Ripristina Ultimo Backup Automatico</button>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#b45309;">🗂️ Archiviazione per Anno</h3>
-                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">Crea un backup JSON con i dati dell'anno precedente (ricevute, raccolta, spese) e li rimuove dall'app per mantenerla più ordinata.</p>
+                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">Crea un file di backup JSON con i dati dell'anno precedente (ricevute vendita, registro raccolta, spese) e rimuove dall'app <strong>soltanto quei record</strong>, lasciando intatti tutti i dati dell'anno corrente e di qualsiasi altro anno.</p>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#b45309;" ${actionAttrs('archiviaAnnoPrecedente')}>🗂️ Archivia & Pulisci Anno Precedente</button>
                 </div>`;
             break;
