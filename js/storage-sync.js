@@ -102,10 +102,10 @@
   }
 
   async function saveAutomaticBackupSnapshot(data, reason = 'manual') {
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      throw new Error('Dati da salvare non validi');
-    }
     try {
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new Error('Dati da salvare non validi');
+      }
       const snapshot = {
         schemaVersion: 1,
         savedAt: new Date().toISOString(),
