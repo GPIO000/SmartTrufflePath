@@ -15,7 +15,8 @@ const ASSET_PATHS = [
 ];
 
 function toScopedPath(assetPath = '') {
-  return new URL(assetPath, self.registration.scope).pathname;
+  const scopeBaseUrl = `${self.location.origin}${self.location.pathname.replace(/[^/]*$/, '')}`;
+  return new URL(assetPath, scopeBaseUrl).href;
 }
 
 const ASSETS = ASSET_PATHS.map((assetPath) => toScopedPath(assetPath));
