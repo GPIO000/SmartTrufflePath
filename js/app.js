@@ -13,9 +13,11 @@ try {
     console.warn('Inizializzazione storage avanzato non riuscita.', error);
 }
 
+const serviceWorkerUrl = `${import.meta.env.BASE_URL}sw.js`;
+
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/SmartTrufflePath/sw.js')
+        navigator.serviceWorker.register(serviceWorkerUrl)
             .then((reg) => console.log('Service Worker registrato con successo:', reg.scope))
             .catch((err) => console.log('Registrazione Service Worker fallita:', err));
     });
