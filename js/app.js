@@ -2748,6 +2748,7 @@ async function downloadBackupFile(data) {
     if (window.showSaveFilePicker) {
         try {
             if (!_automaticBackupFileHandle) {
+                await appAlert("📁 **Dove salvare il backup?**\n\nTi verrà chiesto dove salvare il file di backup.\n\n💡 **Consiglio importante:** Crea (o scegli) una cartella chiamata **SmartTrufflePath** nella memoria del dispositivo e salva il file lì dentro. Così, anche dopo la cancellazione della cache del browser, potrai sempre trovare e sovrascrivere lo stesso file navigando in quella cartella.");
                 _automaticBackupFileHandle = await window.showSaveFilePicker({
                     suggestedName: fileName,
                     types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
@@ -3712,7 +3713,7 @@ async function mostraInfoModulo(moduleName) {
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
-        'export': "ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV o crea un backup manuale JSON.\n\nIl backup automatico salva il file **backup_truffle_automatico.json** nella cartella Download del dispositivo ogni volta che modifichi un dato (sovrascrive sempre lo stesso file). Usa '💾 Salva Backup Ora' per forzarlo manualmente. Per ripristinare, premi '📂 Ripristina da File...' e scegli il file dalla cartella Download.",
+        'export': "ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV o crea un backup manuale JSON.\n\nIl backup automatico salva il file **backup_truffle_automatico.json** nella cartella Download del dispositivo ogni volta che modifichi un dato (sovrascrive sempre lo stesso file). Usa '💾 Salva Backup Ora' per forzarlo manualmente. Per ripristinare, premi '📂 Ripristina da File...' e scegli il file dalla cartella Download.\n\n💡 **Suggerimento:** Per trovare facilmente il file di recupero e mantenerlo al sicuro anche dopo la cancellazione della cache, crea una cartella chiamata **SmartTrufflePath** nella memoria del dispositivo e sposta lì il file di backup. In questo modo il file sarà sempre nello stesso posto e non verrà mai perso.",
         'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
         'clienti': "ℹ️ **Guida - Rubrica Clienti & Acquirenti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico e gestisci le note dedicate.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
