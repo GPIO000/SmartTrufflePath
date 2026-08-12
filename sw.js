@@ -55,8 +55,10 @@ self.addEventListener('fetch', (e) => {
   // Ignora richieste non GET
   if (e.request.method !== 'GET') return;
 
+  const requestUrl = new URL(e.request.url);
+
   // Gestione speciale per le tile delle mappe (OpenStreetMap) o risorse esterne dinamiche
-  if (e.request.url.includes('tile.openstreetmap.org')) {
+  if (requestUrl.hostname === 'tile.openstreetmap.org') {
     e.respondWith(
       caches.match(e.request).then((cachedResponse) => {
         return cachedResponse || fetch(e.request).then((networkResponse) => {
