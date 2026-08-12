@@ -3066,13 +3066,20 @@ async function installApp() {
     const promptEvent = deferredInstallPrompt;
     deferredInstallPrompt = null;
 
-    await promptEvent.prompt();
-    const choiceResult = await promptEvent.userChoice;
-    if (choiceResult.outcome === 'accepted') {
-        console.log('[PWA] Installazione accettata');
-    } else {
-        console.log('[PWA] Installazione rifiutata');
+    try {
+        await promptEvent.prompt();
+        const choiceResult = await promptEvent.userChoice;
+        if (choiceResult.outcome === 'accepted') {
+            console.log('[PWA] Installazione accettata');
+        } else {
+            console.log('[PWA] Installazione rifiutata');
+        }
+    } catch (err) {
+        console.warn('[PWA] Errore durante il prompt di installazione:', err);
+        deferredInstallPrompt = promptEvent;
+        showToast("Installazione non disponibile. Su iOS usa Safari > 'Aggiungi alla schermata Home'.", 'info');
     }
+
     updateInstallCallToAction();
 }
 
