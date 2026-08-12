@@ -3029,15 +3029,9 @@ function updateInstallCallToAction() {
     if (!btn || !badge) return;
 
     const isInstalled = isPwaInstalled();
-
-    if (isInstalled) {
-        btn.style.display = 'none';
-        badge.style.display = 'block';
-        return;
-    }
-
-    badge.style.display = 'none';
-    btn.style.display = shouldShowInstallButton({ isInstalled }) ? '' : 'none';
+    const shouldShowButton = shouldShowInstallButton({ isInstalled });
+    btn.style.display = shouldShowButton ? '' : 'none';
+    badge.style.display = shouldShowButton ? 'none' : 'block';
 }
 
 window.addEventListener('beforeinstallprompt', (e) => {
