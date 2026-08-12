@@ -1,6 +1,7 @@
 import * as TruffleStorage from './storage-sync.js';
 import { normalizeBackupEntry } from './backup-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
+import { getInstallUnavailableMessage } from './install-utils.js';
 
 window.TruffleStorage = TruffleStorage;
 
@@ -3059,7 +3060,7 @@ function installApp() {
     }
 
     if (!deferredInstallPrompt) {
-        showToast("Installazione non disponibile. Su iOS usa Safari > 'Aggiungi alla schermata Home'.", 'info');
+        showToast(getInstallUnavailableMessage(window.navigator), 'info');
         return;
     }
 
