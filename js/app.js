@@ -1,7 +1,7 @@
 import * as TruffleStorage from './storage-sync.js';
 import { normalizeBackupEntry } from './backup-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
-import { getInstallUnavailableMessage } from './install-utils.js';
+import { getInstallUnavailableMessage, shouldShowInstallButton } from './install-utils.js';
 
 window.TruffleStorage = TruffleStorage;
 
@@ -3035,7 +3035,7 @@ function updateInstallCallToAction() {
     }
 
     badge.style.display = 'none';
-    btn.style.display = deferredInstallPrompt ? '' : 'none';
+    btn.style.display = shouldShowInstallButton({ isInstalled: false, hasPrompt: Boolean(deferredInstallPrompt) }) ? '' : 'none';
 }
 
 window.addEventListener('beforeinstallprompt', (e) => {

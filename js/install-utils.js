@@ -20,3 +20,7 @@ export function getInstallUnavailableMessage(navigatorLike = {}) {
 
   return "Installazione non disponibile al momento. Usa il menu del browser per installare l'app o aggiungerla alla schermata Home.";
 }
+
+export function shouldShowInstallButton({ isInstalled } = {}) {
+  return !isInstalled;
+}
