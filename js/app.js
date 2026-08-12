@@ -3040,12 +3040,20 @@ function updateInstallCallToAction() {
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredInstallPrompt = e;
-    updateInstallCallToAction();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updateInstallCallToAction, { once: true });
+    } else {
+        updateInstallCallToAction();
+    }
 });
 
 window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
-    updateInstallCallToAction();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updateInstallCallToAction, { once: true });
+    } else {
+        updateInstallCallToAction();
+    }
 });
 
 function installApp() {
@@ -3071,7 +3079,11 @@ function installApp() {
     });
 }
 
-updateInstallCallToAction();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateInstallCallToAction, { once: true });
+} else {
+    updateInstallCallToAction();
+}
 
 function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tesserino') {
     if (!isSafeDataUrl(base64Data)) return;
@@ -3687,7 +3699,7 @@ async function mostraInfoModulo(moduleName) {
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto (Imposta Sostitutiva o Ritenuta d'Acconto) in base alla presenza di un F24 valido.",
-        'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\Consulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
+        'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\nConsulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
         'canidiary': "ℹ️ **Guida - Anagrafica Cane**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo razza, sesso, data di nascita e numero di microchip.",
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
