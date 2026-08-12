@@ -3054,7 +3054,6 @@ window.addEventListener('appinstalled', () => {
 
 function installApp() {
     if (isPwaInstalled()) {
-        showToast("L'app è già installata.", 'info');
         updateInstallCallToAction();
         return;
     }
