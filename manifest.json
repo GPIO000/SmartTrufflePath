@@ -1,10 +1,10 @@
 {
-  "id": "./",
+  "id": "./index.html",
   "name": "SmartTruffle Path",
   "short_name": "SmartTruffle",
   "description": "App mobile per la raccolta, gestione fiscale e contabilità dei tartufi. Conforme alla Legge 145/2018.",
   "lang": "it",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
