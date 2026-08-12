@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getInstallUnavailableMessage } from '../js/install-utils.js';
+import { getInstallUnavailableMessage, shouldShowInstallButton } from '../js/install-utils.js';
 
 describe('getInstallUnavailableMessage', () => {
   it('mostra le istruzioni iOS su iPhone/iPad', () => {
@@ -25,5 +25,15 @@ describe('getInstallUnavailableMessage', () => {
     });
 
     expect(message).toContain('Usa il menu del browser');
+  });
+});
+
+describe('shouldShowInstallButton', () => {
+  it("mostra il pulsante quando l'app non è installata", () => {
+    expect(shouldShowInstallButton({ isInstalled: false })).toBe(true);
+  });
+
+  it("nasconde il pulsante quando l'app è installata", () => {
+    expect(shouldShowInstallButton({ isInstalled: true })).toBe(false);
   });
 });
