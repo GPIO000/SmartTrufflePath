@@ -3034,7 +3034,7 @@ function updateInstallCallToAction() {
     }
 
     badge.style.display = 'none';
-    btn.style.display = deferredInstallPrompt ? '' : 'none';
+    btn.style.display = '';
 }
 
 window.addEventListener('beforeinstallprompt', (e) => {
