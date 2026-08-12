@@ -302,7 +302,11 @@ function sanitizePhoneHref(phoneNumber) {
 }
 
 function isSafeDataUrl(value) {
-    return /^data:(image\/[a-z0-9.+-]+|application\/pdf);base64,[a-z0-9+/=\s]+$/i.test(String(value ?? ''));
+    return /^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\s]+$/i.test(String(value ?? ''));
+}
+
+function isImageFile(file) {
+    return Boolean(file && typeof file.type === 'string' && file.type.startsWith('image/'));
 }
 
 function getStoredDocumentData(storageKey) {
@@ -624,7 +628,7 @@ function openModule(moduleName, editMode = false) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${tData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('tesserino_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Tesserino"></div>`;
                         visualizzaBtnHTML = `<button class="overlay-btn btn-info" ${actionAttrs('viewStoredDocument', ['tesserino_data', 'Tesserino Digitale', 'tesserino'])}>👁️ Visualizza Immagine</button>`;
                     } else {
-                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${tData.nomeFile || 'File PDF'}</p>`;
+                        filePreviewHTML = `<p style="margin-top:10px; color:#b8b0a0;"><strong>Allegato non visualizzabile:</strong> carica un'immagine per visualizzarla nell'app.</p>`;
                     }
                 } else {
                     filePreviewHTML = `<p style="margin-top:10px; color:#b8b0a0;">Nessun file allegato.</p>`;
@@ -664,8 +668,9 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="t-regione" class="mod-input" value="${tData.regione || ''}" placeholder="Es. Molise / Abruzzo">
                         <label>Numero Tesserino:</label>
                         <input type="text" id="t-num" class="mod-input" value="${tData.num || ''}" placeholder="Numero autorizzazione">
-                        <label style="margin-top:10px;">Carica Tesserino (Foto o PDF - Max 1.5MB):</label>
-                        <input type="file" id="t-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
+                        <label style="margin-top:10px;">Carica Tesserino (solo immagine - Max 1.5MB):</label>
+                        <input type="file" id="t-file" accept="image/*" class="mod-input" style="padding:8px;">
+                        <p style="margin-top:6px; color:#b8b0a0; font-size:0.8rem;">Consiglio: usa immagini leggere per un salvataggio più veloce.</p>
                         <p style="margin-top:14px; margin-bottom:6px; color:#b8b0a0; font-size:0.8rem; text-transform:uppercase; border-top:1px dashed rgba(255,255,255,0.07); padding-top:10px;">💳 Coordinate Bancarie (per bonifico)</p>
                         <label>IBAN:</label>
                         <input type="text" id="t-iban" class="mod-input" value="${tData.iban || ''}" placeholder="Es. IT60 X054 2811 1010 0000 0123 456">
@@ -685,14 +690,14 @@ function openModule(moduleName, editMode = false) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${pData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('pagopa_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Quietanza PagoPA"></div>`;
                         visualizzaBtnHTML = `<button class="overlay-btn btn-info" ${actionAttrs('viewStoredDocument', ['pagopa_data', 'Quietanza PagoPA', 'pagopa'])}>👁️ Visualizza Immagine</button>`;
                     } else {
-                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${pData.nomeFile || 'File PDF'}</p>`;
+                        filePreviewHTML = `<p style="margin-top:10px; color:#b8b0a0;"><strong>Allegato non visualizzabile:</strong> carica un'immagine per visualizzarla nell'app.</p>`;
                     }
                 } else {
                     filePreviewHTML = `<p style="margin-top:10px; color:#b8b0a0;">Nessun file allegato.</p>`;
                 }
 
                 contentHTML = `
-                    <h2>Ricevuta PagoPA & PDF</h2>
+                    <h2>Ricevuta PagoPA</h2>
                     <div class="module-card card-green-border">
                         <p style="color:#22c55e; font-weight:bold; margin-bottom:10px;">✔ Quietanza Attiva</p>
                         <p><strong>ID Transazione:</strong> ${pData.id}</p>
@@ -706,15 +711,16 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
             } else {
                 contentHTML = `
-                    <h2>Ricevuta PagoPA & PDF</h2>
+                    <h2>Ricevuta PagoPA</h2>
                     <p>Registra la quietanza di pagamento della tassa regionale:</p>
                     <div class="module-card">
                         <label>ID Transazione / Codice Avviso:</label>
                         <input type="text" id="p-id" class="mod-input" value="${pData.id || ''}" placeholder="Es. TRN123456789">
                         <label>Data Pagamento:</label>
                         <input type="date" id="p-data" class="mod-input" value="${pData.data || new Date().toISOString().slice(0,10)}">
-                        <label>Carica Ricevuta (Immagine o PDF - Obbligatorio):</label>
-                        <input type="file" id="p-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
+                        <label>Carica Ricevuta (solo immagine - Obbligatorio):</label>
+                        <input type="file" id="p-file" accept="image/*" class="mod-input" style="padding:8px;">
+                        <p style="margin-top:6px; color:#b8b0a0; font-size:0.8rem;">Consiglio: carica immagini di piccole dimensioni.</p>
                         <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('savePagoPAWithFile')}>Archivia Ricevuta PagoPA</button>
                     </div>`;
             }
@@ -909,7 +915,7 @@ function openModule(moduleName, editMode = false) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${fData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('f24_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="F24 ELIDE"></div>`;
                         visualizzaBtnHTML = `<button class="overlay-btn btn-info" ${actionAttrs('viewStoredDocument', ['f24_data', 'F24 ELIDE', 'f24'])}>👁️ Visualizza Immagine</button>`;
                     } else {
-                        filePreviewHTML = `<p style="margin-top:10px;"><strong>Documento PDF Allegato:</strong> ${fData.nomeFile || 'File PDF'}</p>`;
+                        filePreviewHTML = `<p style="margin-top:10px; color:#b8b0a0;"><strong>Allegato non visualizzabile:</strong> carica un'immagine per visualizzarla nell'app.</p>`;
                     }
                 } else {
                     filePreviewHTML = `<p style="margin-top:10px; color:#b8b0a0;">Nessun file allegato.</p>`;
@@ -1000,8 +1006,9 @@ function openModule(moduleName, editMode = false) {
                         <label>Data di Versamento:</label>
                         <input type="date" id="f-data-pagamento" class="mod-input" value="${fData.dataPagamento || new Date().toISOString().slice(0,10)}">
                         
-                        <label>Carica Quietanza F24 (PDF o Immagine - Obbligatorio):</label>
-                        <input type="file" id="f-file" accept="image/*,application/pdf" class="mod-input" style="padding:8px;">
+                        <label>Carica Quietanza F24 (solo immagine - Obbligatorio):</label>
+                        <input type="file" id="f-file" accept="image/*" class="mod-input" style="padding:8px;">
+                        <p style="margin-top:6px; color:#b8b0a0; font-size:0.8rem;">Consiglio: carica immagini di piccole dimensioni.</p>
                         
                         <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveF24WithFile')}>Archivia F24 ELIDE</button>
                     </div>`;
@@ -1843,9 +1850,12 @@ function saveTesserino() {
     };
 
     if (file) {
-        // Controllo della dimensione del file
+        if (!isImageFile(file)) {
+            showToast("Formato non supportato: carica solo immagini.", 'error');
+            return;
+        }
         if (file.size > 1.5 * 1024 * 1024) {
-            showToast("File troppo grande. Max 1.5 MB.", 'error');
+            showToast("Immagine troppo grande. Max 1.5 MB.", 'error');
             return;
         }
 
@@ -1894,8 +1904,12 @@ function saveF24WithFile() {
     };
 
     if (file) {
+        if (!isImageFile(file)) {
+            showToast("Formato non supportato: carica solo immagini.", 'error');
+            return;
+        }
         if (file.size > 1.5 * 1024 * 1024) {
-            showToast("File troppo grande. Max 1.5 MB.", 'error');
+            showToast("Immagine troppo grande. Max 1.5 MB.", 'error');
             return;
         }
         const reader = new FileReader();
@@ -1938,8 +1952,12 @@ function savePagoPAWithFile() {
     };
 
     if (file) {
+        if (!isImageFile(file)) {
+            showToast("Formato non supportato: carica solo immagini.", 'error');
+            return;
+        }
         if (file.size > 1.5 * 1024 * 1024) {
-            showToast("File troppo grande. Max 1.5 MB.", 'error');
+            showToast("Immagine troppo grande. Max 1.5 MB.", 'error');
             return;
         }
         const reader = new FileReader();
@@ -2997,28 +3015,42 @@ function shareAppUrl() {
 // --- PWA Install ---
 let deferredInstallPrompt = null;
 
+function isPwaInstalled() {
+    return window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches
+        || window.matchMedia('(display-mode: minimal-ui)').matches
+        || window.navigator.standalone === true;
+}
+
+function updateInstallCallToAction() {
+    const btn = document.getElementById('btn-installa-app');
+    const badge = document.getElementById('app-installato-badge');
+    if (!btn || !badge) return;
+
+    if (isPwaInstalled()) {
+        btn.style.display = 'none';
+        badge.style.display = 'block';
+        return;
+    }
+
+    badge.style.display = 'none';
+    btn.style.display = deferredInstallPrompt ? '' : 'none';
+}
+
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredInstallPrompt = e;
-    const btn = document.getElementById('btn-installa-app');
-    if (btn) btn.style.display = '';
+    updateInstallCallToAction();
 });
 
 window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
-    const btn = document.getElementById('btn-installa-app');
-    if (btn) btn.style.display = 'none';
+    updateInstallCallToAction();
 });
 
 function installApp() {
-    // Già in esecuzione come PWA installata (standalone / fullscreen / minimal-ui)
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-        || window.matchMedia('(display-mode: fullscreen)').matches
-        || window.matchMedia('(display-mode: minimal-ui)').matches
-        || window.navigator.standalone === true;
-
-    if (isStandalone) {
-        showToast("L'app è già installata.", 'info');
+    if (isPwaInstalled()) {
+        updateInstallCallToAction();
         return;
     }
 
@@ -3035,8 +3067,11 @@ function installApp() {
             console.log('[PWA] Installazione rifiutata');
         }
         deferredInstallPrompt = null;
+        updateInstallCallToAction();
     });
 }
+
+updateInstallCallToAction();
 
 function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tesserino') {
     if (!isSafeDataUrl(base64Data)) return;
@@ -3649,8 +3684,8 @@ function importaCalendariJSON(event) {
 async function mostraInfoModulo(moduleName) {
     const guideTesti = {
         'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
-        'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto o un PDF del documento (max 1.5MB) per averlo sempre a portata di mano.",
-        'pagopa': "ℹ️ **Guida - Ricevuta PagoPA & PDF**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
+        'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
+        'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto (Imposta Sostitutiva o Ritenuta d'Acconto) in base alla presenza di un F24 valido.",
         'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\Consulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
