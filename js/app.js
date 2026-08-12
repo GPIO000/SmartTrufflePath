@@ -1,7 +1,7 @@
 import * as TruffleStorage from './storage-sync.js';
 import { normalizeBackupEntry } from './backup-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
-import { getInstallUnavailableMessage, shouldShowInstallButton } from './install-utils.js';
+import { getInstallUiState, getInstallUnavailableMessage, isStandaloneMode } from './install-utils.js';
 
 window.TruffleStorage = TruffleStorage;
 
@@ -3014,13 +3014,12 @@ function shareAppUrl() {
 }
 
 // --- PWA Install ---
-let deferredInstallPrompt = null;
+const installState = {
+    deferredPrompt: null
+};
 
 function isPwaInstalled() {
-    return window.matchMedia('(display-mode: standalone)').matches
-        || window.matchMedia('(display-mode: fullscreen)').matches
-        || window.matchMedia('(display-mode: minimal-ui)').matches
-        || window.navigator.standalone === true;
+    return isStandaloneMode(window);
 }
 
 function updateInstallCallToAction() {
@@ -3028,62 +3027,81 @@ function updateInstallCallToAction() {
     const badge = document.getElementById('app-installato-badge');
     if (!btn || !badge) return;
 
-    const isInstalled = isPwaInstalled();
-    const shouldShowButton = shouldShowInstallButton({ isInstalled });
-    btn.style.display = shouldShowButton ? '' : 'none';
-    badge.style.display = shouldShowButton ? 'none' : 'block';
+    const uiState = getInstallUiState({
+        isInstalled: isPwaInstalled(),
+        canPrompt: Boolean(installState.deferredPrompt),
+        navigatorLike: window.navigator
+    });
+
+    btn.style.display = uiState.showButton ? '' : 'none';
+    btn.textContent = uiState.buttonLabel;
+    btn.setAttribute('aria-label', uiState.buttonLabel.replace(/^📲\s*/, ''));
+    badge.style.display = uiState.showBadge ? 'block' : 'none';
 }
 
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
+function syncInstallCallToAction() {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', updateInstallCallToAction, { once: true });
-    } else {
-        updateInstallCallToAction();
+        return;
     }
+
+    updateInstallCallToAction();
+}
+
+window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    installState.deferredPrompt = event;
+    syncInstallCallToAction();
 });
 
 window.addEventListener('appinstalled', () => {
-    deferredInstallPrompt = null;
+    installState.deferredPrompt = null;
+    showToast('App installata con successo.', 'success');
     updateInstallCallToAction();
+});
+
+window.addEventListener('pageshow', updateInstallCallToAction);
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        updateInstallCallToAction();
+    }
 });
 
 async function installApp() {
     if (isPwaInstalled()) {
+        showToast("L'app risulta già installata su questo dispositivo.", 'info');
         updateInstallCallToAction();
         return;
     }
 
-    if (!deferredInstallPrompt) {
+    const promptEvent = installState.deferredPrompt;
+    if (!promptEvent || typeof promptEvent.prompt !== 'function') {
         showToast(getInstallUnavailableMessage(window.navigator), 'info');
+        updateInstallCallToAction();
         return;
     }
 
-    const promptEvent = deferredInstallPrompt;
-    deferredInstallPrompt = null;
+    installState.deferredPrompt = null;
 
     try {
         await promptEvent.prompt();
         const choiceResult = await promptEvent.userChoice;
-        if (choiceResult.outcome === 'accepted') {
+
+        if (choiceResult?.outcome === 'accepted') {
             console.log('[PWA] Installazione accettata');
         } else {
-            console.log('[PWA] Installazione rifiutata');
+            console.log('[PWA] Installazione annullata');
+            showToast('Installazione annullata.', 'info');
         }
     } catch (err) {
         console.warn('[PWA] Errore durante il prompt di installazione:', err);
-        deferredInstallPrompt = promptEvent;
+        showToast(getInstallUnavailableMessage(window.navigator), 'error');
     }
 
     updateInstallCallToAction();
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', updateInstallCallToAction, { once: true });
-} else {
-    updateInstallCallToAction();
-}
+syncInstallCallToAction();
 
 function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tesserino') {
     if (!isSafeDataUrl(base64Data)) return;

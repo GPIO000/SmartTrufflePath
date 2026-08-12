@@ -6,9 +6,12 @@ const ASSETS = [
   '/SmartTrufflePath/manifest.json',
   '/SmartTrufflePath/icon-192.png',
   '/SmartTrufflePath/icon-512.png',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+  '/SmartTrufflePath/css/style.css',
+  '/SmartTrufflePath/js/app.js',
+  '/SmartTrufflePath/js/install-utils.js',
+  '/SmartTrufflePath/js/backup-utils.js',
+  '/SmartTrufflePath/js/fiscal-utils.js',
+  '/SmartTrufflePath/js/storage-sync.js'
 ];
 
 function serviceUnavailableResponse() {
@@ -85,9 +88,9 @@ self.addEventListener('fetch', (e) => {
       }).catch(() => {
         // Fallback di sicurezza offline per pagine HTML
         if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
-          return caches.match('./index.html').then((offlinePage) => {
+        return caches.match('/SmartTrufflePath/index.html').then((offlinePage) => {
             return offlinePage || serviceUnavailableResponse();
-          });
+        });
         }
         return serviceUnavailableResponse();
       });
