@@ -3052,7 +3052,7 @@ window.addEventListener('appinstalled', () => {
     updateInstallCallToAction();
 });
 
-function installApp() {
+async function installApp() {
     if (isPwaInstalled()) {
         updateInstallCallToAction();
         return;
@@ -3066,15 +3066,14 @@ function installApp() {
     const promptEvent = deferredInstallPrompt;
     deferredInstallPrompt = null;
 
-    promptEvent.prompt();
-    promptEvent.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === 'accepted') {
-            console.log('[PWA] Installazione accettata');
-        } else {
-            console.log('[PWA] Installazione rifiutata');
-        }
-        updateInstallCallToAction();
-    });
+    await promptEvent.prompt();
+    const choiceResult = await promptEvent.userChoice;
+    if (choiceResult.outcome === 'accepted') {
+        console.log('[PWA] Installazione accettata');
+    } else {
+        console.log('[PWA] Installazione rifiutata');
+    }
+    updateInstallCallToAction();
 }
 
 if (document.readyState === 'loading') {

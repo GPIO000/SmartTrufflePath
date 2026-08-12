@@ -27,11 +27,9 @@ function serviceUnavailableResponse() {
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+      return cache.addAll(ASSETS).then(() => self.skipWaiting());
     })
   );
-  // Forza l'attivazione immediata del nuovo service worker
-  self.skipWaiting();
 });
 
 // Attivazione e pulizia delle vecchie cache
