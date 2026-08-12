@@ -84,7 +84,7 @@ self.addEventListener('fetch', (e) => {
         if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
         return caches.match('/SmartTrufflePath/index.html').then((offlinePage) => {
             return offlinePage || serviceUnavailableResponse();
-          });
+        });
         }
         return serviceUnavailableResponse();
       });

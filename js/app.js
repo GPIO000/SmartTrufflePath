@@ -3069,7 +3069,7 @@ document.addEventListener('visibilitychange', () => {
 
 async function installApp() {
     if (isPwaInstalled()) {
-        showToast('L’app risulta già installata su questo dispositivo.', 'info');
+        showToast("L'app risulta già installata su questo dispositivo.", 'info');
         updateInstallCallToAction();
         return;
     }
@@ -3091,7 +3091,7 @@ async function installApp() {
             console.log('[PWA] Installazione accettata');
         } else {
             console.log('[PWA] Installazione annullata');
-            showToast(getInstallUnavailableMessage(window.navigator), 'info');
+            showToast('Installazione annullata.', 'info');
         }
     } catch (err) {
         console.warn('[PWA] Errore durante il prompt di installazione:', err);
