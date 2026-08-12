@@ -1,18 +1,26 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-12';
-const ASSETS = [
-  '/SmartTrufflePath/',
-  '/SmartTrufflePath/index.html',
-  '/SmartTrufflePath/manifest.json',
-  '/SmartTrufflePath/icon-192.png',
-  '/SmartTrufflePath/icon-512.png',
-  '/SmartTrufflePath/css/style.css',
-  '/SmartTrufflePath/js/app.js',
-  '/SmartTrufflePath/js/install-utils.js',
-  '/SmartTrufflePath/js/backup-utils.js',
-  '/SmartTrufflePath/js/fiscal-utils.js',
-  '/SmartTrufflePath/js/storage-sync.js'
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-12b';
+const ASSET_PATHS = [
+  '',
+  'index.html',
+  'manifest.json',
+  'icon-192.png',
+  'icon-512.png',
+  'css/style.css',
+  'js/app.js',
+  'js/install-utils.js',
+  'js/backup-utils.js',
+  'js/fiscal-utils.js',
+  'js/storage-sync.js'
 ];
+
+function toScopedPath(assetPath = '') {
+  const scopeBaseUrl = `${self.location.origin}${self.location.pathname.replace(/[^/]*$/, '')}`;
+  return new URL(assetPath, scopeBaseUrl).href;
+}
+
+const ASSETS = ASSET_PATHS.map((assetPath) => toScopedPath(assetPath));
+const OFFLINE_PAGE_PATH = toScopedPath('index.html');
 
 function serviceUnavailableResponse() {
   return new Response('Service Unavailable', {
@@ -88,7 +96,7 @@ self.addEventListener('fetch', (e) => {
       }).catch(() => {
         // Fallback di sicurezza offline per pagine HTML
         if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
-        return caches.match('/SmartTrufflePath/index.html').then((offlinePage) => {
+        return caches.match(OFFLINE_PAGE_PATH).then((offlinePage) => {
             return offlinePage || serviceUnavailableResponse();
         });
         }
