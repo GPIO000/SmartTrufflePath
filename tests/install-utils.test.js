@@ -7,16 +7,6 @@ describe('getInstallUnavailableMessage', () => {
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
     });
 
-    describe('shouldShowInstallButton', () => {
-      it("mostra il pulsante quando l'app non è installata", () => {
-        expect(shouldShowInstallButton({ isInstalled: false })).toBe(true);
-      });
-
-      it("nasconde il pulsante quando l'app è installata", () => {
-        expect(shouldShowInstallButton({ isInstalled: true })).toBe(false);
-      });
-    });
-
     expect(message).toContain('Su iOS usa Safari');
   });
 
@@ -35,5 +25,15 @@ describe('getInstallUnavailableMessage', () => {
     });
 
     expect(message).toContain('Usa il menu del browser');
+  });
+});
+
+describe('shouldShowInstallButton', () => {
+  it("mostra il pulsante quando l'app non è installata", () => {
+    expect(shouldShowInstallButton({ isInstalled: false })).toBe(true);
+  });
+
+  it("nasconde il pulsante quando l'app è installata", () => {
+    expect(shouldShowInstallButton({ isInstalled: true })).toBe(false);
   });
 });
