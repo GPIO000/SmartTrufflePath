@@ -1,26 +1,19 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-12b';
-const ASSET_PATHS = [
-  '',
-  'index.html',
-  'manifest.json',
-  'icon-192.png',
-  'icon-512.png',
-  'css/style.css',
-  'js/app.js',
-  'js/install-utils.js',
-  'js/backup-utils.js',
-  'js/fiscal-utils.js',
-  'js/storage-sync.js'
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-12';
+const ASSETS = [
+  './',
+  './index.html',
+  './css/style.css',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './js/app.js',
+  './js/storage-sync.js',
+  './js/fiscal-utils.js',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
-
-function toScopedPath(assetPath = '') {
-  const scopeBaseUrl = `${self.location.origin}${self.location.pathname.replace(/[^/]*$/, '')}`;
-  return new URL(assetPath, scopeBaseUrl).href;
-}
-
-const ASSETS = ASSET_PATHS.map((assetPath) => toScopedPath(assetPath));
-const OFFLINE_PAGE_PATH = toScopedPath('index.html');
 
 function serviceUnavailableResponse() {
   return new Response('Service Unavailable', {
@@ -34,11 +27,9 @@ function serviceUnavailableResponse() {
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+      return cache.addAll(ASSETS).then(() => self.skipWaiting());
     })
   );
-  // Forza l'attivazione immediata del nuovo service worker
-  self.skipWaiting();
 });
 
 // Attivazione e pulizia delle vecchie cache
@@ -64,8 +55,10 @@ self.addEventListener('fetch', (e) => {
   // Ignora richieste non GET
   if (e.request.method !== 'GET') return;
 
+  const requestUrl = new URL(e.request.url);
+
   // Gestione speciale per le tile delle mappe (OpenStreetMap) o risorse esterne dinamiche
-  if (e.request.url.includes('tile.openstreetmap.org')) {
+  if (requestUrl.hostname === 'tile.openstreetmap.org') {
     e.respondWith(
       caches.match(e.request).then((cachedResponse) => {
         return cachedResponse || fetch(e.request).then((networkResponse) => {
@@ -96,9 +89,9 @@ self.addEventListener('fetch', (e) => {
       }).catch(() => {
         // Fallback di sicurezza offline per pagine HTML
         if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
-        return caches.match(OFFLINE_PAGE_PATH).then((offlinePage) => {
+          return caches.match('./index.html').then((offlinePage) => {
             return offlinePage || serviceUnavailableResponse();
-        });
+          });
         }
         return serviceUnavailableResponse();
       });

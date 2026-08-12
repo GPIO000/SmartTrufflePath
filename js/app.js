@@ -1,7 +1,6 @@
 import * as TruffleStorage from './storage-sync.js';
 import { normalizeBackupEntry } from './backup-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
-import { getInstallUiState, getInstallUnavailableMessage, isStandaloneMode } from './install-utils.js';
 
 window.TruffleStorage = TruffleStorage;
 
@@ -13,11 +12,9 @@ try {
     console.warn('Inizializzazione storage avanzato non riuscita.', error);
 }
 
-const serviceWorkerUrl = `${import.meta.env.BASE_URL}sw.js`;
-
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register(serviceWorkerUrl)
+        navigator.serviceWorker.register('./sw.js')
             .then((reg) => console.log('Service Worker registrato con successo:', reg.scope))
             .catch((err) => console.log('Registrazione Service Worker fallita:', err));
     });
@@ -3016,12 +3013,14 @@ function shareAppUrl() {
 }
 
 // --- PWA Install ---
-const installState = {
-    deferredPrompt: null
-};
+let deferredInstallPrompt = null;
+const installUnavailableMessage = "Installazione non disponibile al momento. Usa il menu del browser per installare l'app o aggiungerla alla schermata Home.";
 
 function isPwaInstalled() {
-    return isStandaloneMode(window);
+    return window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches
+        || window.matchMedia('(display-mode: minimal-ui)').matches
+        || window.navigator.standalone === true;
 }
 
 function updateInstallCallToAction() {
@@ -3029,81 +3028,67 @@ function updateInstallCallToAction() {
     const badge = document.getElementById('app-installato-badge');
     if (!btn || !badge) return;
 
-    const uiState = getInstallUiState({
-        isInstalled: isPwaInstalled(),
-        canPrompt: Boolean(installState.deferredPrompt),
-        navigatorLike: window.navigator
-    });
-
-    btn.style.display = uiState.showButton ? '' : 'none';
-    btn.textContent = uiState.buttonLabel;
-    btn.setAttribute('aria-label', uiState.buttonLabel.replace(/^📲\s*/, ''));
-    badge.style.display = uiState.showBadge ? 'block' : 'none';
-}
-
-function syncInstallCallToAction() {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', updateInstallCallToAction, { once: true });
+    if (isPwaInstalled()) {
+        btn.style.display = 'none';
+        badge.style.display = 'block';
         return;
     }
 
-    updateInstallCallToAction();
+    badge.style.display = 'none';
+    btn.style.display = '';
 }
 
-window.addEventListener('beforeinstallprompt', (event) => {
-    event.preventDefault();
-    installState.deferredPrompt = event;
-    syncInstallCallToAction();
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updateInstallCallToAction, { once: true });
+    } else {
+        updateInstallCallToAction();
+    }
 });
 
 window.addEventListener('appinstalled', () => {
-    installState.deferredPrompt = null;
-    showToast('App installata con successo.', 'success');
+    deferredInstallPrompt = null;
     updateInstallCallToAction();
-});
-
-window.addEventListener('pageshow', updateInstallCallToAction);
-document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-        updateInstallCallToAction();
-    }
 });
 
 async function installApp() {
     if (isPwaInstalled()) {
-        showToast("L'app risulta già installata su questo dispositivo.", 'info');
         updateInstallCallToAction();
         return;
     }
 
-    const promptEvent = installState.deferredPrompt;
-    if (!promptEvent || typeof promptEvent.prompt !== 'function') {
-        showToast(getInstallUnavailableMessage(window.navigator), 'info');
-        updateInstallCallToAction();
+    if (!deferredInstallPrompt) {
+        showToast(installUnavailableMessage, 'info');
         return;
     }
 
-    installState.deferredPrompt = null;
+    const promptEvent = deferredInstallPrompt;
+    deferredInstallPrompt = null;
 
     try {
         await promptEvent.prompt();
         const choiceResult = await promptEvent.userChoice;
-
-        if (choiceResult?.outcome === 'accepted') {
+        if (choiceResult.outcome === 'accepted') {
             console.log('[PWA] Installazione accettata');
         } else {
-            console.log('[PWA] Installazione annullata');
-            showToast('Installazione annullata.', 'info');
+            console.log('[PWA] Installazione rifiutata');
         }
     } catch (err) {
         console.warn('[PWA] Errore durante il prompt di installazione:', err);
-        showToast(getInstallUnavailableMessage(window.navigator), 'error');
+        deferredInstallPrompt = promptEvent;
+        showToast(installUnavailableMessage, 'info');
     }
 
     updateInstallCallToAction();
 }
 
-syncInstallCallToAction();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateInstallCallToAction, { once: true });
+} else {
+    updateInstallCallToAction();
+}
 
 function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tesserino') {
     if (!isSafeDataUrl(base64Data)) return;
