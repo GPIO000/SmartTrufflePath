@@ -3049,11 +3049,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', updateInstallCallToAction, { once: true });
-    } else {
-        updateInstallCallToAction();
-    }
+    updateInstallCallToAction();
 });
 
 function installApp() {
