@@ -2748,6 +2748,7 @@ async function downloadBackupFile(data) {
     if (window.showSaveFilePicker) {
         try {
             if (!_automaticBackupFileHandle) {
+                await appAlert("📁 **Dove salvare il backup?**\n\nTi verrà chiesto dove salvare il file di backup.\n\n💡 **Consiglio importante:** Crea (o scegli) una cartella chiamata **SmartTrufflePath** nella memoria del dispositivo e salva il file lì dentro. Così, anche dopo la cancellazione della cache del browser, potrai sempre trovare e sovrascrivere lo stesso file navigando in quella cartella.");
                 _automaticBackupFileHandle = await window.showSaveFilePicker({
                     suggestedName: fileName,
                     types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
