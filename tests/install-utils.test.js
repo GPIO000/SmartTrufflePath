@@ -33,6 +33,10 @@ describe('shouldShowInstallButton', () => {
     expect(shouldShowInstallButton({ isInstalled: false })).toBe(true);
   });
 
+  it("mostra comunque il pulsante senza prompt nativo quando l'app non è installata", () => {
+    expect(shouldShowInstallButton({ isInstalled: false, hasPrompt: false })).toBe(true);
+  });
+
   it("nasconde il pulsante quando l'app è installata", () => {
     expect(shouldShowInstallButton({ isInstalled: true })).toBe(false);
   });

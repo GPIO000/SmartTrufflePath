@@ -3035,7 +3035,7 @@ function updateInstallCallToAction() {
     }
 
     badge.style.display = 'none';
-    btn.style.display = shouldShowInstallButton({ isInstalled: false, hasPrompt: Boolean(deferredInstallPrompt) }) ? '' : 'none';
+    btn.style.display = shouldShowInstallButton({ isInstalled: false }) ? '' : 'none';
 }
 
 window.addEventListener('beforeinstallprompt', (e) => {
