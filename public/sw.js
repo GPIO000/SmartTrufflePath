@@ -1,11 +1,11 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
 const CACHE_NAME = 'smarttruffle-path-' + '2026-08-12';
 const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
+  '/SmartTrufflePath/',
+  '/SmartTrufflePath/index.html',
+  '/SmartTrufflePath/manifest.json',
+  '/SmartTrufflePath/icon-192.png',
+  '/SmartTrufflePath/icon-512.png',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
