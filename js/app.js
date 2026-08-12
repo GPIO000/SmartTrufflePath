@@ -3063,14 +3063,16 @@ function installApp() {
         return;
     }
 
-    deferredInstallPrompt.prompt();
-    deferredInstallPrompt.userChoice.then((choiceResult) => {
+    const promptEvent = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+
+    promptEvent.prompt();
+    promptEvent.userChoice.then((choiceResult) => {
         if (choiceResult.outcome === 'accepted') {
             console.log('[PWA] Installazione accettata');
         } else {
             console.log('[PWA] Installazione rifiutata');
         }
-        deferredInstallPrompt = null;
         updateInstallCallToAction();
     });
 }
