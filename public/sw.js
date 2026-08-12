@@ -5,7 +5,13 @@ const ASSETS = [
   '/SmartTrufflePath/index.html',
   '/SmartTrufflePath/manifest.json',
   '/SmartTrufflePath/icon-192.png',
-  '/SmartTrufflePath/icon-512.png'
+  '/SmartTrufflePath/icon-512.png',
+  '/SmartTrufflePath/css/style.css',
+  '/SmartTrufflePath/js/app.js',
+  '/SmartTrufflePath/js/install-utils.js',
+  '/SmartTrufflePath/js/backup-utils.js',
+  '/SmartTrufflePath/js/fiscal-utils.js',
+  '/SmartTrufflePath/js/storage-sync.js'
 ];
 
 function serviceUnavailableResponse() {
