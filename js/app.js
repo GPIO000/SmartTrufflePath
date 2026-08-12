@@ -3014,6 +3014,7 @@ function shareAppUrl() {
 
 // --- PWA Install ---
 let deferredInstallPrompt = null;
+const installUnavailableMessage = "Installazione non disponibile al momento. Usa il menu del browser per installare l'app o aggiungerla alla schermata Home.";
 
 function isPwaInstalled() {
     return window.matchMedia('(display-mode: standalone)').matches
@@ -3059,7 +3060,7 @@ async function installApp() {
     }
 
     if (!deferredInstallPrompt) {
-        showToast("Installazione non disponibile. Su iOS usa Safari > 'Aggiungi alla schermata Home'.", 'info');
+        showToast(installUnavailableMessage, 'info');
         return;
     }
 
@@ -3077,7 +3078,7 @@ async function installApp() {
     } catch (err) {
         console.warn('[PWA] Errore durante il prompt di installazione:', err);
         deferredInstallPrompt = promptEvent;
-        showToast("Installazione non disponibile. Su iOS usa Safari > 'Aggiungi alla schermata Home'.", 'info');
+        showToast(installUnavailableMessage, 'info');
     }
 
     updateInstallCallToAction();
