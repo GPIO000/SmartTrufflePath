@@ -3028,14 +3028,16 @@ function updateInstallCallToAction() {
     const badge = document.getElementById('app-installato-badge');
     if (!btn || !badge) return;
 
-    if (isPwaInstalled()) {
+    const isInstalled = isPwaInstalled();
+
+    if (isInstalled) {
         btn.style.display = 'none';
         badge.style.display = 'block';
         return;
     }
 
     badge.style.display = 'none';
-    btn.style.display = shouldShowInstallButton({ isInstalled: false }) ? '' : 'none';
+    btn.style.display = shouldShowInstallButton({ isInstalled }) ? '' : 'none';
 }
 
 window.addEventListener('beforeinstallprompt', (e) => {
