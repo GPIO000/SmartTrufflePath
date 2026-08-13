@@ -967,6 +967,12 @@ function openModule(moduleName, editMode = false) {
                     <label style="margin-top:8px;">Immagine ricevuta rinnovo (facoltativa - max 1.5MB):</label>
                     <input type="file" id="ad-rinnovo-file" accept="image/*" class="mod-input" style="padding:8px;">
                     ${isArchivioDocumentoEditMode && archivioDocumentoInModifica?.nomeFileRinnovo ? `<p style="margin-top:6px; color:#b8b0a0; font-size:0.8rem;">File attuale rinnovo: <strong>${escapeHtml(archivioDocumentoInModifica.nomeFileRinnovo)}</strong></p>` : ''}
+                    ${isArchivioDocumentoEditMode && archivioDocumentoInModifica?.contenutoBase64Rinnovo ? `
+                        <label style="display:flex; align-items:center; gap:8px; margin-top:8px; color:#ddd6c8;">
+                            <input type="checkbox" id="ad-remove-rinnovo">
+                            Rimuovi ricevuta rinnovo attuale
+                        </label>
+                    ` : ''}
                     <div class="btn-row">
                         <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveArchivioDocumenti')}>${isArchivioDocumentoEditMode ? 'Aggiorna Documento' : 'Salva Documento'}</button>
                         <button class="overlay-btn btn-neutral btn-full mt-15" style="${isArchivioDocumentoEditMode ? '' : 'display:none;'}" ${actionAttrs('cancelArchivioDocumentoEdit')}>Annulla Modifica</button>
@@ -2143,6 +2149,7 @@ async function saveArchivioDocumenti() {
     const scadenza = document.getElementById('ad-scadenza').value;
     const fileDocumento = (document.getElementById('ad-doc-file') || {}).files?.[0] || null;
     const fileRinnovo = (document.getElementById('ad-rinnovo-file') || {}).files?.[0] || null;
+    const removeRinnovo = Boolean(document.getElementById('ad-remove-rinnovo')?.checked);
     const archivioDocumenti = readStorageJSON('archivio_documenti_list', []);
     const isEditing = Number.isInteger(editingArchivioDocumentoIndex)
         && editingArchivioDocumentoIndex >= 0
@@ -2187,7 +2194,7 @@ async function saveArchivioDocumenti() {
             : (documentoEsistente?.contenutoBase64Documento || null);
         const contenutoBase64Rinnovo = fileRinnovo
             ? await readImageAsDataUrl(fileRinnovo)
-            : (documentoEsistente?.contenutoBase64Rinnovo || null);
+            : (removeRinnovo ? null : (documentoEsistente?.contenutoBase64Rinnovo || null));
         const documentoAggiornato = {
             tipo,
             numero,
@@ -2195,8 +2202,8 @@ async function saveArchivioDocumenti() {
             nomeFileDocumento: fileDocumento ? fileDocumento.name : (documentoEsistente?.nomeFileDocumento || null),
             tipoFileDocumento: fileDocumento ? fileDocumento.type : (documentoEsistente?.tipoFileDocumento || null),
             contenutoBase64Documento,
-            nomeFileRinnovo: fileRinnovo ? fileRinnovo.name : (documentoEsistente?.nomeFileRinnovo || null),
-            tipoFileRinnovo: fileRinnovo ? fileRinnovo.type : (documentoEsistente?.tipoFileRinnovo || null),
+            nomeFileRinnovo: fileRinnovo ? fileRinnovo.name : (removeRinnovo ? null : (documentoEsistente?.nomeFileRinnovo || null)),
+            tipoFileRinnovo: fileRinnovo ? fileRinnovo.type : (removeRinnovo ? null : (documentoEsistente?.tipoFileRinnovo || null)),
             contenutoBase64Rinnovo,
             creatoIl: documentoEsistente?.creatoIl || new Date().toISOString(),
             aggiornatoIl: new Date().toISOString()
@@ -2234,8 +2241,10 @@ async function deleteArchivioDocumento(index) {
         const archivioDocumenti = readStorageJSON('archivio_documenti_list', []);
         archivioDocumenti.splice(index, 1);
         localStorage.setItem('archivio_documenti_list', JSON.stringify(archivioDocumenti));
-        if (Number.isInteger(editingArchivioDocumentoIndex) && editingArchivioDocumentoIndex === index) editingArchivioDocumentoIndex = null;
-        else if (Number.isInteger(editingArchivioDocumentoIndex) && editingArchivioDocumentoIndex > index) editingArchivioDocumentoIndex -= 1;
+        if (Number.isInteger(editingArchivioDocumentoIndex) && editingArchivioDocumentoIndex === index) {
+            editingArchivioDocumentoIndex = null;
+            showToast("Documento in modifica eliminato.", 'info');
+        } else if (Number.isInteger(editingArchivioDocumentoIndex) && editingArchivioDocumentoIndex > index) editingArchivioDocumentoIndex -= 1;
         openModule('archivio_documenti');
     }
 }
