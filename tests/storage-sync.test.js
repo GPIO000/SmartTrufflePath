@@ -222,7 +222,7 @@ describe('saveDirectoryHandle / loadDirectoryHandle', () => {
   });
 });
 
-describe('init con localStorage patchato', () => {
+describe('init con localStorage aggiornato', () => {
   function createIndexedDbStub() {
     const kvStore = new Map();
     const handlesStore = new Map();

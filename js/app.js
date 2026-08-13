@@ -3130,13 +3130,7 @@ async function _storeBackupDirHandle(dirHandle) {
 async function _requestBackupDirHandle() {
     while (true) {
         await appAlert(`📁 **Cartella backup predefinita**\n\nIl backup automatico viene salvato sempre nello stesso percorso:\n**${_BACKUP_RELATIVE_PATH}**\n\nAlla prima configurazione apri la cartella **Download** del dispositivo e seleziona la cartella **${_BACKUP_DIRECTORY_NAME}**.\n\nSe non esiste ancora, creala prima di confermare la selezione.`);
-        let dirHandle;
-        try {
-            dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-        } catch (error) {
-            if (error?.name === 'AbortError') throw error;
-            throw error;
-        }
+        const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
         if (dirHandle?.name === _BACKUP_DIRECTORY_NAME) {
             await _storeBackupDirHandle(dirHandle);
             return dirHandle;
@@ -3388,7 +3382,7 @@ async function runAutomaticLocalBackup() {
         const fingerprint = JSON.stringify(backupData);
         if (fingerprint === lastAutomaticBackupFingerprint) return;
         const snapshotResult = await persistAutomaticBackupSnapshot(backupData, 'data-change');
-        if (!snapshotResult?.ok) return;
+        if (!snapshotResult?.ok && !snapshotResult?.skipped) return;
         lastAutomaticBackupFingerprint = fingerprint;
         await downloadBackupFile(backupData, {
             allowPrompt: false,
