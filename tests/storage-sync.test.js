@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  init,
   getAutomaticBackupStatus,
   getLatestAutomaticBackupSnapshot,
   getLatestAutomaticBackupSnapshotAsync,
@@ -224,9 +223,14 @@ describe('saveDirectoryHandle / loadDirectoryHandle', () => {
 });
 
 describe('init con localStorage patchato', () => {
-  function createIndexedDbStub({ failWrites = false } = {}) {
+  function createIndexedDbStub() {
     const kvStore = new Map();
     const handlesStore = new Map();
+    let failWrites = false;
+
+    function setFailWrites(value) {
+      failWrites = Boolean(value);
+    }
 
     function makeRequest(executor) {
       const request = { result: undefined, error: null, onsuccess: null, onerror: null };
@@ -266,6 +270,7 @@ describe('init con localStorage patchato', () => {
 
             Promise.resolve().then(() => {
               if (failWrites && storeName === 'kv') {
+                tx.error = new Error('indexedDB write failed');
                 if (typeof tx.onerror === 'function') tx.onerror();
                 return;
               }
@@ -292,6 +297,7 @@ describe('init con localStorage patchato', () => {
         });
         return req;
       },
+      setFailWrites,
     };
   }
 
@@ -301,10 +307,12 @@ describe('init con localStorage patchato', () => {
 
   it('non genera errori quando un nuovo salvataggio fallisce su IndexedDB', async () => {
     vi.resetModules();
-    vi.stubGlobal('indexedDB', createIndexedDbStub({ failWrites: true }));
+    const indexedDbStub = createIndexedDbStub();
+    vi.stubGlobal('indexedDB', indexedDbStub);
 
     const storage = await import('../js/storage-sync.js');
     await storage.init();
+    indexedDbStub.setFailWrites(true);
 
     expect(() => {
       localStorage.setItem('storico_vendite', '[]');
