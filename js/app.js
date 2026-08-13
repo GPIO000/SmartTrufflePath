@@ -236,6 +236,17 @@ function getRenderableStorageJSON(key, fallbackValue) {
     return sanitizeRenderable(readStorageJSON(key, fallbackValue));
 }
 
+function aggiungiLuogoRaccolta(luogo) {
+    if (!luogo || typeof luogo !== 'string') return;
+    const trimmed = luogo.trim();
+    if (!trimmed) return;
+    const lista = readStorageJSON('luoghi_raccolta', []);
+    if (!lista.includes(trimmed)) {
+        lista.push(trimmed);
+        lista.sort((a, b) => a.localeCompare(b, 'it'));
+        localStorage.setItem('luoghi_raccolta', JSON.stringify(lista));
+    }
+}
 
 function encodeActionArgs(args = []) {
     return escapeHtml(JSON.stringify(args));
@@ -324,6 +335,9 @@ const ACTION_HANDLERS = {
     modificaRicevuta: (_event, index) => modificaRicevuta(index),
     salvaModificaRicevuta: (_event, index) => salvaModificaRicevuta(index),
     eliminaRicevutaConDoppiaConferma: (_event, index) => eliminaRicevutaConDoppiaConferma(index),
+    salvaLuogoRaccoltaNuovo: () => salvaLuogoRaccoltaNuovo(),
+    eliminaLuogoRaccoltaDaArchivio: (_event, index) => eliminaLuogoRaccoltaDaArchivio(index),
+    aggiornaLuogoRaccoltaInArchivio: (_event, index) => aggiornaLuogoRaccoltaInArchivio(index),
     calcolaTotale: () => calcolaTotale(),
     calcolaRitenutaAcconto: () => calcolaRitenutaAcconto(),
     toggleCoordinateBancarie: () => toggleCoordinateBancarie(),
@@ -431,6 +445,7 @@ function restoreBackupEntries(data) {
         archivioDocumentiList: { storageKey: 'archivio_documenti_list', fallbackValue: [] },
         f24: { storageKey: 'f24_data', fallbackValue: {} },
         storicoVendite: { storageKey: 'storico_vendite', fallbackValue: [] },
+        luoghiRaccolta: { storageKey: 'luoghi_raccolta', fallbackValue: [] },
         poiList: { storageKey: 'poi_list', fallbackValue: [] },
         dogsList: { storageKey: 'dogs_list', fallbackValue: [] },
         caneData: { storageKey: 'cane_data', fallbackValue: {} },
@@ -913,7 +928,8 @@ function openModule(moduleName, editMode = false) {
                     </div>
 
                     <label>Luogo / Area di Raccolta e Provincia <span style="color:#ef4444;">*</span>:</label>
-                    <input type="text" id="r-comune" class="mod-input" placeholder="Es. Comune / Località (Provincia) - Obbligatorio">
+                    <input type="text" id="r-comune" class="mod-input" list="luoghi-raccolta-list" placeholder="Es. Comune / Località (Provincia) - Obbligatorio" autocomplete="off">
+                    <datalist id="luoghi-raccolta-list">${readStorageJSON('luoghi_raccolta', []).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist>
                     
                     <label>Codice Lotto / Tracciabilità:</label>
                     <input type="text" id="r-lotto" class="mod-input" value="LOTTO-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-01" placeholder="Codice lotto">
@@ -1010,6 +1026,35 @@ function openModule(moduleName, editMode = false) {
 
             contentHTML = archivioDocumentiHtml;
             break;
+
+        case 'archivio_luoghi': {
+            const luoghi = getRenderableStorageJSON('luoghi_raccolta', []);
+            let luoghiHtml = `<h2>📍 Archivio Luoghi / Aree di Raccolta</h2>
+                <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 12px 0;">Gestisci le aree di raccolta memorizzate. Vengono suggerite automaticamente nella compilazione delle ricevute.</p>
+                <div class="module-card">
+                    <label>Aggiungi nuovo luogo:</label>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" id="nuovo-luogo-input" class="mod-input" placeholder="Es. Norcia (PG)" style="flex:1; margin:0;">
+                        <button class="overlay-btn btn-success" style="white-space:nowrap;" ${actionAttrs('salvaLuogoRaccoltaNuovo')}>➕ Aggiungi</button>
+                    </div>
+                </div>`;
+            if (luoghi.length === 0) {
+                luoghiHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun luogo salvato. Verrà popolato automaticamente alla prima emissione di ricevuta.</p></div>`;
+            } else {
+                luoghi.forEach((luogo, idx) => {
+                    luoghiHtml += `
+                        <div class="module-card" style="border-left:4px solid #16a34a; margin-bottom:10px;">
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                <input type="text" id="luogo-edit-${idx}" class="mod-input" value="${escapeHtml(luogo)}" style="flex:1; margin:0; min-width:180px;">
+                                <button class="overlay-btn btn-success" style="padding:6px 10px; font-size:0.8rem;" ${actionAttrs('aggiornaLuogoRaccoltaInArchivio', [idx])}>💾 Salva</button>
+                                <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.8rem;" ${actionAttrs('eliminaLuogoRaccoltaDaArchivio', [idx])}>🗑️ Elimina</button>
+                            </div>
+                        </div>`;
+                });
+            }
+            contentHTML = luoghiHtml;
+            break;
+        }
 
            case 'storico_ricevute':
     let storicoVendite = readStorageJSON('storico_vendite', []);
@@ -2645,6 +2690,7 @@ async function registraVenditaConPrezzoKg() {
     
     storico.push(vendita);
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
+    aggiungiLuogoRaccolta(luogoAreaRaccolta);
     
     const nuovoIndice = storico.length - 1;
 
@@ -2910,9 +2956,44 @@ function salvaModificaRicevuta(index) {
     };
 
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
+    aggiungiLuogoRaccolta((document.getElementById('r-comune') || {}).value?.trim() || '');
     showToast("Ricevuta aggiornata!", 'success');
     openModule('storico_ricevute');
 }
+
+function salvaLuogoRaccoltaNuovo() {
+    const input = document.getElementById('nuovo-luogo-input');
+    const val = input ? input.value.trim() : '';
+    if (!val) { showToast('Inserisci un luogo valido.', 'error'); return; }
+    const lista = readStorageJSON('luoghi_raccolta', []);
+    if (lista.includes(val)) { showToast('Luogo già presente.', 'warning'); return; }
+    aggiungiLuogoRaccolta(val);
+    showToast('Luogo aggiunto!', 'success');
+    openModule('archivio_luoghi');
+}
+
+function eliminaLuogoRaccoltaDaArchivio(index) {
+    const lista = readStorageJSON('luoghi_raccolta', []);
+    if (index < 0 || index >= lista.length) return;
+    lista.splice(index, 1);
+    localStorage.setItem('luoghi_raccolta', JSON.stringify(lista));
+    showToast('Luogo eliminato.', 'success');
+    openModule('archivio_luoghi');
+}
+
+function aggiornaLuogoRaccoltaInArchivio(index) {
+    const lista = readStorageJSON('luoghi_raccolta', []);
+    if (index < 0 || index >= lista.length) return;
+    const input = document.getElementById(`luogo-edit-${index}`);
+    const val = input ? input.value.trim() : '';
+    if (!val) { showToast('Il luogo non può essere vuoto.', 'error'); return; }
+    lista[index] = val;
+    lista.sort((a, b) => a.localeCompare(b, 'it'));
+    localStorage.setItem('luoghi_raccolta', JSON.stringify(lista));
+    showToast('Luogo aggiornato!', 'success');
+    openModule('archivio_luoghi');
+}
+
 async function condividiRicevuta(index) {
     const storico = readStorageJSON('storico_vendite', []);
     const v = storico[index];
@@ -3024,6 +3105,7 @@ function buildCompleteBackupData() {
         archivioDocumentiList: localStorage.getItem('archivio_documenti_list'),
         f24: localStorage.getItem('f24_data'),
         storicoVendite: localStorage.getItem('storico_vendite'), 
+        luoghiRaccolta: localStorage.getItem('luoghi_raccolta'),
         poiList: localStorage.getItem('poi_list'),
         dogsList: localStorage.getItem('dogs_list'),
         caneData: localStorage.getItem('cane_data'),
@@ -4141,6 +4223,7 @@ async function mostraInfoModulo(moduleName) {
         'archivio_documenti': "ℹ️ **Guida - Archivio Altri Documenti**\n\nSalva altri documenti (es. carta d'identità o autorizzazione funghi) indicando numero documento, scadenza e immagine del documento. Puoi anche allegare l'immagine della ricevuta di rinnovo.",
         'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto (Imposta Sostitutiva o Ritenuta d'Acconto) in base alla presenza di un F24 valido.",
         'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\nConsulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
+        'archivio_luoghi': "ℹ️ **Guida - Archivio Luoghi di Raccolta**\n\nGestisci l'elenco dei luoghi e aree di raccolta memorizzati. Questi vengono suggeriti automaticamente nel campo 'Luogo / Area di Raccolta' durante l'emissione di nuove ricevute. Puoi aggiungere, rinominare o eliminare qualsiasi voce.",
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
         'canidiary': "ℹ️ **Guida - Anagrafica Cane**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo razza, sesso, data di nascita e numero di microchip.",
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
