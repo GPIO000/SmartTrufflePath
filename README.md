@@ -45,7 +45,7 @@ SmartTruffle Path è una web app **mobile-first e PWA** per supportare il tartuf
 - **Backup, export e offline**
   - Export contabilità in CSV
   - Backup completo JSON (manuale)
-  - Backup automatico locale
+  - Backup automatico locale guidato in `Download/SmartTrufflePath/file backup`
   - Import backup JSON e ripristino
   - Service Worker con cache offline
   - Sincronizzazione `localStorage` ↔ `IndexedDB`
