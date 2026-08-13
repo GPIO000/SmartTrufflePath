@@ -2403,18 +2403,24 @@ async function deleteRaccoltaGiornaliera(index) {
     }
 }
 function calcolaTotale() {
-    const grammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
-    const prezzoKg = parseFloat(document.getElementById('prezzoKg').value) || 0;
+    const elPeso = document.getElementById('pesoGrammi');
+    const elPrezzo = document.getElementById('prezzoKg');
+    const elImporto = document.getElementById('importoTotale');
+    if (!elPeso || !elPrezzo || !elImporto) return;
+    const grammi = parseFloat(elPeso.value) || 0;
+    const prezzoKg = parseFloat(elPrezzo.value) || 0;
     
     if (grammi > 0 && prezzoKg > 0) {
         const totale = calcolaImportoTotale(grammi, prezzoKg);
-        document.getElementById('importoTotale').value = totale.toFixed(2);
+        elImporto.value = totale.toFixed(2);
         calcolaRitenutaAcconto();
     }
 }
 
 function toggleRegimeFiscaleFields() {
-    const regime = document.getElementById('r-regime').value;
+    const elRegime = document.getElementById('r-regime');
+    if (!elRegime) return;
+    const regime = elRegime.value;
     const containerF24 = document.getElementById('container-f24-field');
     const containerRitenuta = document.getElementById('container-ritenuta');
     
@@ -2444,10 +2450,13 @@ function toggleCoordinateBancarie() {
 }
 
 function calcolaRitenutaAcconto() {
-    const regime = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
+    const elRegime = document.getElementById('r-regime');
+    const regime = elRegime ? elRegime.value : 'sostitutiva';
     if (regime !== 'ritenuta') return;
     
-    const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const elImporto = document.getElementById('importoTotale');
+    if (!elImporto) return;
+    const importoTotale = parseFloat(elImporto.value) || 0;
     
     const { ritenuta, netto } = calcolaDettaglioRitenuta(importoTotale);
     
@@ -2504,8 +2513,8 @@ async function registraVenditaConPrezzoKg() {
     }
 
     // 5. GESTIONE ACQUIRENTE
-    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
-    const acquirenteCf = document.getElementById('r-cf-acquirente').value.trim();
+    const acquirenteNome = (document.getElementById('r-acquirente') || {}).value?.trim() || '';
+    const acquirenteCf = (document.getElementById('r-cf-acquirente') || {}).value?.trim() || '';
     const acquirenteIndirizzo = document.getElementById('r-indirizzo-acquirente') ? document.getElementById('r-indirizzo-acquirente').value.trim() : '';
     const acquirenteEmail = document.getElementById('r-email-acquirente') ? document.getElementById('r-email-acquirente').value.trim() : '';
     
@@ -2523,9 +2532,9 @@ async function registraVenditaConPrezzoKg() {
     const causaleVenditore = metodoPagamento === 'bonifico' ? (document.getElementById('r-causale') || {}).value?.trim() || '' : '';
 
     // 6. CALCOLI FINANZIARI
-    const pesoGrammi = parseFloat(document.getElementById('pesoGrammi').value) || 0;
-    const qualitaScelta = document.getElementById('r-qualita').value;
-    const importoTotale = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const pesoGrammi = parseFloat((document.getElementById('pesoGrammi') || {}).value) || 0;
+    const qualitaScelta = (document.getElementById('r-qualita') || {}).value || '';
+    const importoTotale = parseFloat((document.getElementById('importoTotale') || {}).value) || 0;
     const dataOdierna = new Date().toLocaleDateString();
     
     let importoRitenuta = '0.00';
@@ -2607,7 +2616,7 @@ async function registraVenditaConPrezzoKg() {
         acquirenteCf: acquirenteCf,
         acquirenteIndirizzo: acquirenteIndirizzo,
         acquirenteEmail: acquirenteEmail,
-        specie: document.getElementById('r-specie').value, 
+        specie: (document.getElementById('r-specie') || {}).value || '', 
         qualita: qualitaScelta,
         peso: pesoGrammi, 
         importo: importoTotale.toFixed(2),
@@ -2615,7 +2624,7 @@ async function registraVenditaConPrezzoKg() {
         ritenuta: importoRitenuta,
         netto: importoNetto,
         luogoRaccolta: luogoAreaRaccolta, 
-        lotto: document.getElementById('r-lotto').value.trim(), 
+        lotto: (document.getElementById('r-lotto') || {}).value?.trim() || '', 
         f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto 23% su 78%)', 
         metodoPagamento,
         ibanVenditore,
@@ -2847,7 +2856,7 @@ function salvaModificaRicevuta(index) {
     const tData = readStorageJSON('tesserino_data', {});
     const f24SavedData = readStorageJSON('f24_data', {});
     
-    const acquirenteNome = document.getElementById('r-acquirente').value.trim();
+    const acquirenteNome = (document.getElementById('r-acquirente') || {}).value?.trim() || '';
     if (!acquirenteNome) {
         showToast("Inserisci il nome dell'acquirente.", 'error');
         return;
@@ -2861,7 +2870,7 @@ function salvaModificaRicevuta(index) {
         regimeScelto = 'ritenuta';
     }
 
-    const importoCorrente = parseFloat(document.getElementById('importoTotale').value) || 0;
+    const importoCorrente = parseFloat((document.getElementById('importoTotale') || {}).value) || 0;
     const dettagliRitenuta = calcolaDettaglioRitenuta(importoCorrente);
     const importoRitenuta = regimeScelto === 'ritenuta' ? dettagliRitenuta.ritenuta.toFixed(2) : '0.00';
     const importoNetto = regimeScelto === 'ritenuta' ? dettagliRitenuta.netto.toFixed(2) : importoCorrente.toFixed(2);
@@ -2872,16 +2881,16 @@ function salvaModificaRicevuta(index) {
         venditoreTesserino: tData.num || storico[index].venditoreTesserino, 
         venditoreRegione: tData.regione || storico[index].venditoreRegione,
         acquirente: acquirenteNome, 
-        acquirenteCf: document.getElementById('r-cf-acquirente').value.trim(),
-        specie: document.getElementById('r-specie').value, 
-        qualita: document.getElementById('r-qualita').value,
-        peso: document.getElementById('pesoGrammi').value, 
+        acquirenteCf: (document.getElementById('r-cf-acquirente') || {}).value?.trim() || '',
+        specie: (document.getElementById('r-specie') || {}).value || '',
+        qualita: (document.getElementById('r-qualita') || {}).value || '',
+        peso: (document.getElementById('pesoGrammi') || {}).value || '',
         importo: importoCorrente.toFixed(2),
         regime: regimeScelto,
         ritenuta: importoRitenuta,
         netto: importoNetto,
-        comune: document.getElementById('r-comune').value.trim(), 
-        lotto: document.getElementById('r-lotto').value.trim(), 
+        comune: (document.getElementById('r-comune') || {}).value?.trim() || '',
+        lotto: (document.getElementById('r-lotto') || {}).value?.trim() || '',
         f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto)',
         metodoPagamento: (document.getElementById('r-metodo-pagamento') || {}).value || storico[index].metodoPagamento || 'contanti',
         ibanVenditore: (document.getElementById('r-iban') || {}).value?.trim() || storico[index].ibanVenditore || '',
