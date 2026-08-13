@@ -200,6 +200,9 @@ const ACTION_HANDLERS = {
     clearData: (_event, storageKey, moduleName) => clearData(storageKey, moduleName),
     saveTesserino: () => saveTesserino(),
     savePagoPAWithFile: () => savePagoPAWithFile(),
+    saveArchivioDocumenti: () => saveArchivioDocumenti(),
+    deleteArchivioDocumento: (_event, index) => deleteArchivioDocumento(index),
+    viewArchivioDocumentoImage: (_event, index, imageType) => viewArchivioDocumentoImage(index, imageType),
     saveF24WithFile: () => saveF24WithFile(),
     saveNewCane: () => saveNewCane(),
     deleteDog: (_event, index) => deleteDog(index),
@@ -309,6 +312,15 @@ function isImageFile(file) {
     return Boolean(file && typeof file.type === 'string' && file.type.startsWith('image/'));
 }
 
+function readImageAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target.result);
+        reader.onerror = () => reject(new Error('Errore lettura file immagine.'));
+        reader.readAsDataURL(file);
+    });
+}
+
 function getStoredDocumentData(storageKey) {
     const data = readStorageJSON(storageKey, {});
     return isSafeDataUrl(data.contenutoBase64) ? data.contenutoBase64 : '';
@@ -327,6 +339,7 @@ function restoreBackupEntries(data) {
     const backupSchema = {
         tesserino: { storageKey: 'tesserino_data', fallbackValue: {} },
         pagopa: { storageKey: 'pagopa_data', fallbackValue: {} },
+        archivioDocumentiList: { storageKey: 'archivio_documenti_list', fallbackValue: [] },
         f24: { storageKey: 'f24_data', fallbackValue: {} },
         storicoVendite: { storageKey: 'storico_vendite', fallbackValue: [] },
         poiList: { storageKey: 'poi_list', fallbackValue: [] },
@@ -842,6 +855,49 @@ function openModule(moduleName, editMode = false) {
                     <button class="overlay-btn" style="margin-top:15px; width:100%;" ${actionAttrs('registerRicevutaSafe')}>Registra e Genera Ricevuta Conforme</button>
                 </div>`;
             setTimeout(() => { toggleRegimeFiscaleFields(); toggleCoordinateBancarie(); }, 50);
+            break;
+
+        case 'archivio_documenti':
+            const archivioDocumenti = getRenderableStorageJSON('archivio_documenti_list', []);
+            let archivioDocumentiHtml = `
+                <h2>Archivio Altri Documenti</h2>
+                <p>Archivia carta d'identità, autorizzazioni funghi e altri documenti con numero, scadenza e immagini.</p>
+                <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
+                    <label>Tipo documento:</label>
+                    <input type="text" id="ad-tipo" class="mod-input" placeholder="Es. Carta d'identità / Autorizzazione funghi">
+                    <label>Numero documento:</label>
+                    <input type="text" id="ad-numero" class="mod-input" placeholder="Es. AZ-123456">
+                    <label>Data scadenza:</label>
+                    <input type="date" id="ad-scadenza" class="mod-input">
+                    <label>Immagine documento (obbligatoria - max 1.5MB):</label>
+                    <input type="file" id="ad-doc-file" accept="image/*" class="mod-input" style="padding:8px;">
+                    <label style="margin-top:8px;">Immagine ricevuta rinnovo (facoltativa - max 1.5MB):</label>
+                    <input type="file" id="ad-rinnovo-file" accept="image/*" class="mod-input" style="padding:8px;">
+                    <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveArchivioDocumenti')}>Salva Documento</button>
+                </div>
+            `;
+
+            if (archivioDocumenti.length === 0) {
+                archivioDocumentiHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun documento archiviato.</p></div>`;
+            } else {
+                archivioDocumentiHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Documenti archiviati:</h3>`;
+                archivioDocumenti.forEach((doc, idx) => {
+                    archivioDocumentiHtml += `
+                        <div class="module-card" style="border-left: 4px solid #4d8a98; margin-bottom: 12px;">
+                            <p><strong>Tipo:</strong> ${doc.tipo || 'N/D'}</p>
+                            <p><strong>Numero:</strong> ${doc.numero || 'N/D'}</p>
+                            <p><strong>Scadenza:</strong> ${doc.scadenza || 'N/D'}</p>
+                            <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                                <button class="overlay-btn btn-info" ${actionAttrs('viewArchivioDocumentoImage', [idx, 'documento'])}>👁️ Documento</button>
+                                ${doc.contenutoBase64Rinnovo ? `<button class="overlay-btn btn-info" ${actionAttrs('viewArchivioDocumentoImage', [idx, 'rinnovo'])}>👁️ Ricevuta Rinnovo</button>` : ''}
+                                <button class="overlay-btn btn-danger" ${actionAttrs('deleteArchivioDocumento', [idx])}>🗑️ Elimina</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            contentHTML = archivioDocumentiHtml;
             break;
 
            case 'storico_ricevute':
@@ -1970,6 +2026,95 @@ function savePagoPAWithFile() {
     }
 }
 
+async function saveArchivioDocumenti() {
+    const tipo = document.getElementById('ad-tipo').value.trim();
+    const numero = document.getElementById('ad-numero').value.trim();
+    const scadenza = document.getElementById('ad-scadenza').value;
+    const fileDocumento = (document.getElementById('ad-doc-file') || {}).files?.[0] || null;
+    const fileRinnovo = (document.getElementById('ad-rinnovo-file') || {}).files?.[0] || null;
+
+    if (!tipo || !numero || !scadenza) {
+        showToast("Compila tipo, numero documento e scadenza.", 'error');
+        return;
+    }
+
+    if (!fileDocumento) {
+        showToast("Carica l'immagine del documento.", 'error');
+        return;
+    }
+
+    if (!isImageFile(fileDocumento)) {
+        showToast("Il documento deve essere un'immagine valida.", 'error');
+        return;
+    }
+    if (fileDocumento.size > 1.5 * 1024 * 1024) {
+        showToast("Immagine documento troppo grande. Max 1.5 MB.", 'error');
+        return;
+    }
+
+    if (fileRinnovo) {
+        if (!isImageFile(fileRinnovo)) {
+            showToast("La ricevuta rinnovo deve essere un'immagine valida.", 'error');
+            return;
+        }
+        if (fileRinnovo.size > 1.5 * 1024 * 1024) {
+            showToast("Immagine ricevuta rinnovo troppo grande. Max 1.5 MB.", 'error');
+            return;
+        }
+    }
+
+    try {
+        const contenutoBase64Documento = await readImageAsDataUrl(fileDocumento);
+        const contenutoBase64Rinnovo = fileRinnovo ? await readImageAsDataUrl(fileRinnovo) : null;
+        const archivioDocumenti = readStorageJSON('archivio_documenti_list', []);
+        archivioDocumenti.push({
+            tipo,
+            numero,
+            scadenza,
+            nomeFileDocumento: fileDocumento.name,
+            tipoFileDocumento: fileDocumento.type,
+            contenutoBase64Documento,
+            nomeFileRinnovo: fileRinnovo ? fileRinnovo.name : null,
+            tipoFileRinnovo: fileRinnovo ? fileRinnovo.type : null,
+            contenutoBase64Rinnovo,
+            creatoIl: new Date().toISOString()
+        });
+        localStorage.setItem('archivio_documenti_list', JSON.stringify(archivioDocumenti));
+        showToast("Documento archiviato!", 'success');
+        openModule('archivio_documenti');
+    } catch (error) {
+        showToast("Errore nel salvataggio del documento.", 'error');
+        console.error(error);
+    }
+}
+
+async function deleteArchivioDocumento(index) {
+    if (await appConfirm("Vuoi davvero eliminare questo documento archiviato?")) {
+        const archivioDocumenti = readStorageJSON('archivio_documenti_list', []);
+        archivioDocumenti.splice(index, 1);
+        localStorage.setItem('archivio_documenti_list', JSON.stringify(archivioDocumenti));
+        openModule('archivio_documenti');
+    }
+}
+
+function viewArchivioDocumentoImage(index, imageType) {
+    const archivioDocumenti = readStorageJSON('archivio_documenti_list', []);
+    const record = archivioDocumenti[index];
+    if (!record) {
+        showToast("Documento non trovato.", 'error');
+        return;
+    }
+
+    const base64Data = imageType === 'rinnovo' ? record.contenutoBase64Rinnovo : record.contenutoBase64Documento;
+    if (!isSafeDataUrl(base64Data)) {
+        showToast("Immagine non disponibile.", 'error');
+        return;
+    }
+
+    const titolo = imageType === 'rinnovo' ? 'Ricevuta Rinnovo Documento' : 'Documento Archiviato';
+    visualizzaImmagineSalvata(base64Data, titolo, 'archivio_documenti');
+}
+
 function saveNewCane() {
     const nome = document.getElementById('c-nome').value.trim();
     const razza = document.getElementById('c-razza').value.trim();
@@ -2670,6 +2815,7 @@ function buildCompleteBackupData() {
     return { 
         tesserino: localStorage.getItem('tesserino_data'), 
         pagopa: localStorage.getItem('pagopa_data'),
+        archivioDocumentiList: localStorage.getItem('archivio_documenti_list'),
         f24: localStorage.getItem('f24_data'),
         storicoVendite: localStorage.getItem('storico_vendite'), 
         poiList: localStorage.getItem('poi_list'),
@@ -3704,6 +3850,7 @@ async function mostraInfoModulo(moduleName) {
         'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
+        'archivio_documenti': "ℹ️ **Guida - Archivio Altri Documenti**\n\nSalva altri documenti (es. carta d'identità o autorizzazione funghi) indicando numero documento, scadenza e immagine del documento. Puoi anche allegare l'immagine della ricevuta di rinnovo.",
         'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto (Imposta Sostitutiva o Ritenuta d'Acconto) in base alla presenza di un F24 valido.",
         'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\nConsulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
