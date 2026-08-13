@@ -1167,7 +1167,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="text" id="c-razza" class="mod-input" value="${dogToEdit?.razza || 'Lagotto Romagnolo'}">
                     <label>Sesso:</label>
                     <select id="c-sesso" class="mod-input">
-                        <option value="Maschio" ${dogToEdit?.sesso !== 'Femmina' ? 'selected' : ''}>🐕 Maschio</option>
+                        <option value="Maschio" ${!dogToEdit || dogToEdit.sesso === 'Maschio' ? 'selected' : ''}>🐕 Maschio</option>
                         <option value="Femmina" ${dogToEdit?.sesso === 'Femmina' ? 'selected' : ''}>🐩 Femmina</option>
                     </select>
                     <label>Data di Nascita:</label>
@@ -2261,7 +2261,7 @@ async function deleteDog(index) {
         dogsList.splice(index, 1);
         localStorage.setItem('dogs_list', JSON.stringify(dogsList));
         if (editingDogIndex === index) editingDogIndex = null;
-        if (Number.isInteger(editingDogIndex) && editingDogIndex > index) editingDogIndex -= 1;
+        else if (Number.isInteger(editingDogIndex) && editingDogIndex > index) editingDogIndex -= 1;
         syncCurrentDogData(dogsList, { removedDog });
         openModule('canidiary');
     }
