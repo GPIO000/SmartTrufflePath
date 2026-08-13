@@ -133,6 +133,81 @@ function readStorageJSON(key, fallbackValue) {
     }
 }
 
+let editingDogIndex = null;
+
+function formatDogAge(birthDate) {
+    if (!birthDate) return 'Non disponibile';
+
+    const birth = new Date(`${birthDate}T00:00:00`);
+    if (Number.isNaN(birth.getTime())) return 'Non disponibile';
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (birth > today) return 'Non disponibile';
+
+    let years = today.getFullYear() - birth.getFullYear();
+    let months = today.getMonth() - birth.getMonth();
+
+    if (today.getDate() < birth.getDate()) {
+        months -= 1;
+    }
+
+    if (months < 0) {
+        years -= 1;
+        months += 12;
+    }
+
+    if (years < 0) return 'Non disponibile';
+    if (years === 0 && months === 0) return 'Meno di 1 mese';
+    if (years === 0) return `${months} ${months === 1 ? 'mese' : 'mesi'}`;
+
+    const yearsLabel = `${years} ${years === 1 ? 'anno' : 'anni'}`;
+    if (months === 0) return yearsLabel;
+
+    return `${yearsLabel} e ${months} ${months === 1 ? 'mese' : 'mesi'}`;
+}
+
+function areDogsEquivalent(firstDog, secondDog) {
+    if (!firstDog || !secondDog) return false;
+
+    return ['nome', 'razza', 'sesso', 'nascita', 'microchip']
+        .every((field) => (firstDog[field] || '') === (secondDog[field] || ''));
+}
+
+function syncCurrentDogData(dogsList, { preferredDog = null, replacedDog = null, removedDog = null } = {}) {
+    if (!Array.isArray(dogsList) || dogsList.length === 0) {
+        localStorage.removeItem('cane_data');
+        return;
+    }
+
+    const currentDogData = readStorageJSON('cane_data', {});
+    const hasCurrentDogData = currentDogData && Object.keys(currentDogData).length > 0;
+
+    if (!hasCurrentDogData) {
+        localStorage.setItem('cane_data', JSON.stringify(preferredDog || dogsList[dogsList.length - 1]));
+        return;
+    }
+
+    if (replacedDog && areDogsEquivalent(currentDogData, replacedDog)) {
+        localStorage.setItem('cane_data', JSON.stringify(preferredDog || dogsList[dogsList.length - 1]));
+        return;
+    }
+
+    if (removedDog && areDogsEquivalent(currentDogData, removedDog)) {
+        localStorage.setItem('cane_data', JSON.stringify(dogsList[dogsList.length - 1]));
+        return;
+    }
+
+    const matchingDog = dogsList.find((dog) => areDogsEquivalent(dog, currentDogData));
+    if (matchingDog) {
+        localStorage.setItem('cane_data', JSON.stringify(matchingDog));
+        return;
+    }
+
+    localStorage.setItem('cane_data', JSON.stringify(preferredDog || dogsList[dogsList.length - 1]));
+}
+
 function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, (char) => ({
         '&': '&amp;',
@@ -205,6 +280,9 @@ const ACTION_HANDLERS = {
     viewArchivioDocumentoImage: (_event, index, imageType) => viewArchivioDocumentoImage(index, imageType),
     saveF24WithFile: () => saveF24WithFile(),
     saveNewCane: () => saveNewCane(),
+    cancelDogEdit: () => cancelDogEdit(),
+    editDog: (_event, index) => editDog(index),
+    updateDog: () => updateDog(),
     deleteDog: (_event, index) => deleteDog(index),
     savePolizza: () => savePolizza(),
     deletePolizza: (_event, index) => deletePolizza(index),
@@ -603,6 +681,7 @@ function triggerSOS() {
 function openModule(moduleName, editMode = false) {
     const drawer = document.getElementById('app-drawer');
     if (drawer && drawer.classList.contains('drawer-open')) toggleDrawer();
+    if (moduleName !== 'canidiary') editingDogIndex = null;
     let activeView = document.getElementById('active-module-view');
     if (!activeView) {
         activeView = document.createElement('div');
@@ -1074,26 +1153,31 @@ function openModule(moduleName, editMode = false) {
             }
             break;
         case 'canidiary':
-            const dogsList = getRenderableStorageJSON('dogs_list', []);
+            const dogsList = readStorageJSON('dogs_list', []);
+            const isDogEditMode = Number.isInteger(editingDogIndex) && editingDogIndex >= 0 && editingDogIndex < dogsList.length;
+            const dogToEdit = isDogEditMode ? dogsList[editingDogIndex] : null;
             let dogsHtml = `
                 <h2>Anagrafica Cane</h2>
                 <p>Gestisci i tuoi cani da tartufo:</p>
                 <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
-                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Nuovo Cane</h3>
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">${isDogEditMode ? '✏️ Modifica Cane' : '➕ Aggiungi Nuovo Cane'}</h3>
                     <label>Nome del Cane:</label>
-                    <input type="text" id="c-nome" class="mod-input" placeholder="Es. Argo">
+                    <input type="text" id="c-nome" class="mod-input" placeholder="Es. Argo" value="${escapeHtml(dogToEdit?.nome || '')}">
                     <label>Razza:</label>
-                    <input type="text" id="c-razza" class="mod-input" value="Lagotto Romagnolo">
+                    <input type="text" id="c-razza" class="mod-input" value="${escapeHtml(dogToEdit?.razza || 'Lagotto Romagnolo')}">
                     <label>Sesso:</label>
                     <select id="c-sesso" class="mod-input">
-                        <option value="Maschio">🐕 Maschio</option>
-                        <option value="Femmina">🐩 Femmina</option>
+                        <option value="Maschio" ${!dogToEdit || dogToEdit.sesso === 'Maschio' ? 'selected' : ''}>🐕 Maschio</option>
+                        <option value="Femmina" ${dogToEdit?.sesso === 'Femmina' ? 'selected' : ''}>🐩 Femmina</option>
                     </select>
                     <label>Data di Nascita:</label>
-                    <input type="date" id="c-nascita" class="mod-input">
+                    <input type="date" id="c-nascita" class="mod-input" value="${escapeHtml(dogToEdit?.nascita || '')}">
                     <label>Numero Microchip:</label>
-                    <input type="text" id="c-microchip" class="mod-input" placeholder="Codice microchip">
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveNewCane')}>Salva Nuovo Cane</button>
+                    <input type="text" id="c-microchip" class="mod-input" placeholder="Codice microchip" value="${escapeHtml(dogToEdit?.microchip || '')}">
+                    <div class="btn-row">
+                        <button id="c-save-btn" class="overlay-btn" style="background:#2563eb;" ${isDogEditMode ? actionAttrs('updateDog') : actionAttrs('saveNewCane')}>${isDogEditMode ? 'Aggiorna Cane' : 'Salva Nuovo Cane'}</button>
+                        <button id="c-cancel-edit-btn" class="overlay-btn btn-neutral" style="${isDogEditMode ? '' : 'display:none;'}" ${actionAttrs('cancelDogEdit')}>Annulla Modifica</button>
+                    </div>
                 </div>`;
             if (dogsList.length === 0) {
                 dogsHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun cane registrato.</p></div>`;
@@ -1101,14 +1185,19 @@ function openModule(moduleName, editMode = false) {
                 dogsHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">I tuoi cani registrati:</h3>`;
                 dogsList.forEach((dog, idx) => {
                     const sessoIcon = dog.sesso === 'Femmina' ? '🐩' : '🐕';
+                    const etaCane = formatDogAge(dog.nascita);
                     dogsHtml += `
                         <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
-                            <strong style="color:#f6f1e6; font-size:1rem;">${sessoIcon} ${dog.nome}</strong>
-                            <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">Razza: ${dog.razza}</p>
-                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">⚥ Sesso: ${dog.sesso || 'Non specificato'}</p>
-                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Nascita: ${dog.nascita || 'Non specificata'}</p>
-                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">Microchip: ${dog.microchip || 'Non inserito'}</p>
-                            <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteDog', [idx])}>🗑️ Elimina</button>
+                            <strong style="color:#f6f1e6; font-size:1rem;">${sessoIcon} ${escapeHtml(dog.nome || '')}</strong>
+                            <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">Razza: ${escapeHtml(dog.razza || '')}</p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">⚥ Sesso: ${escapeHtml(dog.sesso || 'Non specificato')}</p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Nascita: ${escapeHtml(dog.nascita || 'Non specificata')}</p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">🎂 Età: ${etaCane}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">Microchip: ${escapeHtml(dog.microchip || 'Non inserito')}</p>
+                            <div class="btn-row">
+                                <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('editDog', [idx])}>✏️ Modifica</button>
+                                <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteDog', [idx])}>🗑️ Elimina</button>
+                            </div>
                         </div>`;
                 });
             }
@@ -1855,6 +1944,7 @@ function openModule(moduleName, editMode = false) {
 }
 
 function closeActiveModule() {
+    editingDogIndex = null;
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
 }
@@ -2119,26 +2209,62 @@ function viewArchivioDocumentoImage(index, imageType) {
 }
 
 function saveNewCane() {
+    saveDogRecord();
+}
+
+function updateDog() {
+    saveDogRecord(editingDogIndex);
+}
+
+function saveDogRecord(index = null) {
     const nome = document.getElementById('c-nome').value.trim();
     const razza = document.getElementById('c-razza').value.trim();
     const sesso = document.getElementById('c-sesso').value;
     const nascita = document.getElementById('c-nascita').value;
     const microchip = document.getElementById('c-microchip').value.trim();
     if (!nome) { showToast("Inserisci il nome del cane.", 'error'); return; }
+
+    const dogData = { nome, razza, sesso, nascita, microchip };
     let dogsList = readStorageJSON('dogs_list', []);
-    dogsList.push({ nome, razza, sesso, nascita, microchip });
+    const isEditing = Number.isInteger(index) && index >= 0 && index < dogsList.length;
+    const previousDog = isEditing ? dogsList[index] : null;
+
+    if (isEditing) {
+        dogsList[index] = dogData;
+    } else {
+        dogsList.push(dogData);
+    }
+
     localStorage.setItem('dogs_list', JSON.stringify(dogsList));
-    localStorage.setItem('cane_data', JSON.stringify({ nome, razza, sesso, nascita, microchip }));
-    showToast("Cane aggiunto!", 'success');
+    syncCurrentDogData(dogsList, { preferredDog: dogData, replacedDog: previousDog });
+    editingDogIndex = null;
+    showToast(isEditing ? "Cane aggiornato!" : "Cane aggiunto!", 'success');
     openModule('canidiary');
 }
+
+function editDog(index) {
+    const dogsList = readStorageJSON('dogs_list', []);
+    const dog = dogsList[index];
+    if (!dog) return;
+    editingDogIndex = index;
+    openModule('canidiary');
+}
+
+function cancelDogEdit() {
+    editingDogIndex = null;
+    openModule('canidiary');
+}
+
 async function deleteDog(index) {
     if (await appConfirm("Vuoi davvero rimuovere questo cane?")) {
         let dogsList = readStorageJSON('dogs_list', []);
+        const removedDog = dogsList[index];
+        if (!removedDog) return;
         dogsList.splice(index, 1);
         localStorage.setItem('dogs_list', JSON.stringify(dogsList));
-        if (dogsList.length > 0) { localStorage.setItem('cane_data', JSON.stringify(dogsList[dogsList.length - 1])); }
-        else { localStorage.removeItem('cane_data'); }
+        if (Number.isInteger(editingDogIndex) && editingDogIndex === index) editingDogIndex = null;
+        else if (Number.isInteger(editingDogIndex) && editingDogIndex > index) editingDogIndex -= 1;
+        syncCurrentDogData(dogsList, { removedDog });
         openModule('canidiary');
     }
 }
