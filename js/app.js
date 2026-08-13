@@ -2450,10 +2450,13 @@ function toggleCoordinateBancarie() {
 }
 
 function calcolaRitenutaAcconto() {
-    const regime = document.getElementById('r-regime') ? document.getElementById('r-regime').value : 'sostitutiva';
+    const elRegime = document.getElementById('r-regime');
+    const regime = elRegime ? elRegime.value : 'sostitutiva';
     if (regime !== 'ritenuta') return;
     
-    const importoTotale = parseFloat((document.getElementById('importoTotale') || {}).value) || 0;
+    const elImporto = document.getElementById('importoTotale');
+    if (!elImporto) return;
+    const importoTotale = parseFloat(elImporto.value) || 0;
     
     const { ritenuta, netto } = calcolaDettaglioRitenuta(importoTotale);
     
