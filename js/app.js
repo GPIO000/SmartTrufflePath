@@ -312,6 +312,8 @@ function isImageFile(file) {
     return Boolean(file && typeof file.type === 'string' && file.type.startsWith('image/'));
 }
 
+const MAX_IMAGE_SIZE_BYTES = 1.5 * 1024 * 1024;
+
 function readImageAsDataUrl(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -882,14 +884,15 @@ function openModule(moduleName, editMode = false) {
             } else {
                 archivioDocumentiHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Documenti archiviati:</h3>`;
                 archivioDocumenti.forEach((doc, idx) => {
+                    const safeDoc = sanitizeRenderable(doc);
                     archivioDocumentiHtml += `
                         <div class="module-card" style="border-left: 4px solid #4d8a98; margin-bottom: 12px;">
-                            <p><strong>Tipo:</strong> ${doc.tipo || 'N/D'}</p>
-                            <p><strong>Numero:</strong> ${doc.numero || 'N/D'}</p>
-                            <p><strong>Scadenza:</strong> ${doc.scadenza || 'N/D'}</p>
+                            <p><strong>Tipo:</strong> ${safeDoc.tipo || 'N/D'}</p>
+                            <p><strong>Numero:</strong> ${safeDoc.numero || 'N/D'}</p>
+                            <p><strong>Scadenza:</strong> ${safeDoc.scadenza || 'N/D'}</p>
                             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                                 <button class="overlay-btn btn-info" ${actionAttrs('viewArchivioDocumentoImage', [idx, 'documento'])}>👁️ Documento</button>
-                                ${doc.contenutoBase64Rinnovo ? `<button class="overlay-btn btn-info" ${actionAttrs('viewArchivioDocumentoImage', [idx, 'rinnovo'])}>👁️ Ricevuta Rinnovo</button>` : ''}
+                                ${safeDoc.contenutoBase64Rinnovo ? `<button class="overlay-btn btn-info" ${actionAttrs('viewArchivioDocumentoImage', [idx, 'rinnovo'])}>👁️ Ricevuta Rinnovo</button>` : ''}
                                 <button class="overlay-btn btn-danger" ${actionAttrs('deleteArchivioDocumento', [idx])}>🗑️ Elimina</button>
                             </div>
                         </div>
@@ -1910,7 +1913,7 @@ function saveTesserino() {
             showToast("Formato non supportato: carica solo immagini.", 'error');
             return;
         }
-        if (file.size > 1.5 * 1024 * 1024) {
+        if (file.size > MAX_IMAGE_SIZE_BYTES) {
             showToast("Immagine troppo grande. Max 1.5 MB.", 'error');
             return;
         }
@@ -1964,7 +1967,7 @@ function saveF24WithFile() {
             showToast("Formato non supportato: carica solo immagini.", 'error');
             return;
         }
-        if (file.size > 1.5 * 1024 * 1024) {
+        if (file.size > MAX_IMAGE_SIZE_BYTES) {
             showToast("Immagine troppo grande. Max 1.5 MB.", 'error');
             return;
         }
@@ -2012,7 +2015,7 @@ function savePagoPAWithFile() {
             showToast("Formato non supportato: carica solo immagini.", 'error');
             return;
         }
-        if (file.size > 1.5 * 1024 * 1024) {
+        if (file.size > MAX_IMAGE_SIZE_BYTES) {
             showToast("Immagine troppo grande. Max 1.5 MB.", 'error');
             return;
         }
@@ -2047,7 +2050,7 @@ async function saveArchivioDocumenti() {
         showToast("Il documento deve essere un'immagine valida.", 'error');
         return;
     }
-    if (fileDocumento.size > 1.5 * 1024 * 1024) {
+    if (fileDocumento.size > MAX_IMAGE_SIZE_BYTES) {
         showToast("Immagine documento troppo grande. Max 1.5 MB.", 'error');
         return;
     }
@@ -2057,7 +2060,7 @@ async function saveArchivioDocumenti() {
             showToast("La ricevuta rinnovo deve essere un'immagine valida.", 'error');
             return;
         }
-        if (fileRinnovo.size > 1.5 * 1024 * 1024) {
+        if (fileRinnovo.size > MAX_IMAGE_SIZE_BYTES) {
             showToast("Immagine ricevuta rinnovo troppo grande. Max 1.5 MB.", 'error');
             return;
         }
