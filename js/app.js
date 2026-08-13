@@ -134,6 +134,7 @@ function readStorageJSON(key, fallbackValue) {
 }
 
 let editingDogIndex = null;
+let editingArchivioDocumentoIndex = null;
 
 function formatDogAge(birthDate) {
     if (!birthDate) return 'Non disponibile';
@@ -276,6 +277,8 @@ const ACTION_HANDLERS = {
     saveTesserino: () => saveTesserino(),
     savePagoPAWithFile: () => savePagoPAWithFile(),
     saveArchivioDocumenti: () => saveArchivioDocumenti(),
+    editArchivioDocumento: (_event, index) => editArchivioDocumento(index),
+    cancelArchivioDocumentoEdit: () => cancelArchivioDocumentoEdit(),
     deleteArchivioDocumento: (_event, index) => deleteArchivioDocumento(index),
     viewArchivioDocumentoImage: (_event, index, imageType) => viewArchivioDocumentoImage(index, imageType),
     saveF24WithFile: () => saveF24WithFile(),
@@ -682,6 +685,7 @@ function openModule(moduleName, editMode = false) {
     const drawer = document.getElementById('app-drawer');
     if (drawer && drawer.classList.contains('drawer-open')) toggleDrawer();
     if (moduleName !== 'canidiary') editingDogIndex = null;
+    if (moduleName !== 'archivio_documenti') editingArchivioDocumentoIndex = null;
     let activeView = document.getElementById('active-module-view');
     if (!activeView) {
         activeView = document.createElement('div');
@@ -940,21 +944,33 @@ function openModule(moduleName, editMode = false) {
 
         case 'archivio_documenti':
             const archivioDocumenti = getRenderableStorageJSON('archivio_documenti_list', []);
+            const isArchivioDocumentoEditMode = Number.isInteger(editingArchivioDocumentoIndex)
+                && editingArchivioDocumentoIndex >= 0
+                && editingArchivioDocumentoIndex < archivioDocumenti.length;
+            const archivioDocumentoInModifica = isArchivioDocumentoEditMode
+                ? archivioDocumenti[editingArchivioDocumentoIndex]
+                : null;
             let archivioDocumentiHtml = `
                 <h2>Archivio Altri Documenti</h2>
                 <p>Archivia carta d'identità, autorizzazioni funghi e altri documenti con numero, scadenza e immagini.</p>
                 <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">${isArchivioDocumentoEditMode ? '✏️ Modifica Documento' : '➕ Aggiungi Documento'}</h3>
                     <label>Tipo documento:</label>
-                    <input type="text" id="ad-tipo" class="mod-input" placeholder="Es. Carta d'identità / Autorizzazione funghi">
+                    <input type="text" id="ad-tipo" class="mod-input" placeholder="Es. Carta d'identità / Autorizzazione funghi" value="${escapeHtml(archivioDocumentoInModifica?.tipo || '')}">
                     <label>Numero documento:</label>
-                    <input type="text" id="ad-numero" class="mod-input" placeholder="Es. AZ-123456">
+                    <input type="text" id="ad-numero" class="mod-input" placeholder="Es. AZ-123456" value="${escapeHtml(archivioDocumentoInModifica?.numero || '')}">
                     <label>Data scadenza:</label>
-                    <input type="date" id="ad-scadenza" class="mod-input">
-                    <label>Immagine documento (obbligatoria - max 1.5MB):</label>
+                    <input type="date" id="ad-scadenza" class="mod-input" value="${escapeHtml(archivioDocumentoInModifica?.scadenza || '')}">
+                    <label>Immagine documento (${isArchivioDocumentoEditMode ? 'facoltativa se già presente' : 'obbligatoria'} - max 1.5MB):</label>
                     <input type="file" id="ad-doc-file" accept="image/*" class="mod-input" style="padding:8px;">
+                    ${isArchivioDocumentoEditMode && archivioDocumentoInModifica?.nomeFileDocumento ? `<p style="margin-top:6px; color:#b8b0a0; font-size:0.8rem;">File attuale documento: <strong>${escapeHtml(archivioDocumentoInModifica.nomeFileDocumento)}</strong></p>` : ''}
                     <label style="margin-top:8px;">Immagine ricevuta rinnovo (facoltativa - max 1.5MB):</label>
                     <input type="file" id="ad-rinnovo-file" accept="image/*" class="mod-input" style="padding:8px;">
-                    <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveArchivioDocumenti')}>Salva Documento</button>
+                    ${isArchivioDocumentoEditMode && archivioDocumentoInModifica?.nomeFileRinnovo ? `<p style="margin-top:6px; color:#b8b0a0; font-size:0.8rem;">File attuale rinnovo: <strong>${escapeHtml(archivioDocumentoInModifica.nomeFileRinnovo)}</strong></p>` : ''}
+                    <div class="btn-row">
+                        <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveArchivioDocumenti')}>${isArchivioDocumentoEditMode ? 'Aggiorna Documento' : 'Salva Documento'}</button>
+                        <button class="overlay-btn btn-neutral btn-full mt-15" style="${isArchivioDocumentoEditMode ? '' : 'display:none;'}" ${actionAttrs('cancelArchivioDocumentoEdit')}>Annulla Modifica</button>
+                    </div>
                 </div>
             `;
 
@@ -972,6 +988,7 @@ function openModule(moduleName, editMode = false) {
                             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                                 <button class="overlay-btn btn-info" ${actionAttrs('viewArchivioDocumentoImage', [idx, 'documento'])}>👁️ Documento</button>
                                 ${safeDoc.contenutoBase64Rinnovo ? `<button class="overlay-btn btn-info" ${actionAttrs('viewArchivioDocumentoImage', [idx, 'rinnovo'])}>👁️ Ricevuta Rinnovo</button>` : ''}
+                                <button class="overlay-btn btn-primary" ${actionAttrs('editArchivioDocumento', [idx])}>✏️ Modifica</button>
                                 <button class="overlay-btn btn-danger" ${actionAttrs('deleteArchivioDocumento', [idx])}>🗑️ Elimina</button>
                             </div>
                         </div>
@@ -1945,6 +1962,7 @@ function openModule(moduleName, editMode = false) {
 
 function closeActiveModule() {
     editingDogIndex = null;
+    editingArchivioDocumentoIndex = null;
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
 }
@@ -2125,24 +2143,31 @@ async function saveArchivioDocumenti() {
     const scadenza = document.getElementById('ad-scadenza').value;
     const fileDocumento = (document.getElementById('ad-doc-file') || {}).files?.[0] || null;
     const fileRinnovo = (document.getElementById('ad-rinnovo-file') || {}).files?.[0] || null;
+    const archivioDocumenti = readStorageJSON('archivio_documenti_list', []);
+    const isEditing = Number.isInteger(editingArchivioDocumentoIndex)
+        && editingArchivioDocumentoIndex >= 0
+        && editingArchivioDocumentoIndex < archivioDocumenti.length;
+    const documentoEsistente = isEditing ? archivioDocumenti[editingArchivioDocumentoIndex] : null;
 
     if (!tipo || !numero || !scadenza) {
         showToast("Compila tipo, numero documento e scadenza.", 'error');
         return;
     }
 
-    if (!fileDocumento) {
+    if (!fileDocumento && !documentoEsistente?.contenutoBase64Documento) {
         showToast("Carica l'immagine del documento.", 'error');
         return;
     }
 
-    if (!isImageFile(fileDocumento)) {
-        showToast("Il documento deve essere un'immagine valida.", 'error');
-        return;
-    }
-    if (fileDocumento.size > MAX_IMAGE_SIZE_BYTES) {
-        showToast("Immagine documento troppo grande. Max 1.5 MB.", 'error');
-        return;
+    if (fileDocumento) {
+        if (!isImageFile(fileDocumento)) {
+            showToast("Il documento deve essere un'immagine valida.", 'error');
+            return;
+        }
+        if (fileDocumento.size > MAX_IMAGE_SIZE_BYTES) {
+            showToast("Immagine documento troppo grande. Max 1.5 MB.", 'error');
+            return;
+        }
     }
 
     if (fileRinnovo) {
@@ -2157,23 +2182,33 @@ async function saveArchivioDocumenti() {
     }
 
     try {
-        const contenutoBase64Documento = await readImageAsDataUrl(fileDocumento);
-        const contenutoBase64Rinnovo = fileRinnovo ? await readImageAsDataUrl(fileRinnovo) : null;
-        const archivioDocumenti = readStorageJSON('archivio_documenti_list', []);
-        archivioDocumenti.push({
+        const contenutoBase64Documento = fileDocumento
+            ? await readImageAsDataUrl(fileDocumento)
+            : (documentoEsistente?.contenutoBase64Documento || null);
+        const contenutoBase64Rinnovo = fileRinnovo
+            ? await readImageAsDataUrl(fileRinnovo)
+            : (documentoEsistente?.contenutoBase64Rinnovo || null);
+        const documentoAggiornato = {
             tipo,
             numero,
             scadenza,
-            nomeFileDocumento: fileDocumento.name,
-            tipoFileDocumento: fileDocumento.type,
+            nomeFileDocumento: fileDocumento ? fileDocumento.name : (documentoEsistente?.nomeFileDocumento || null),
+            tipoFileDocumento: fileDocumento ? fileDocumento.type : (documentoEsistente?.tipoFileDocumento || null),
             contenutoBase64Documento,
-            nomeFileRinnovo: fileRinnovo ? fileRinnovo.name : null,
-            tipoFileRinnovo: fileRinnovo ? fileRinnovo.type : null,
+            nomeFileRinnovo: fileRinnovo ? fileRinnovo.name : (documentoEsistente?.nomeFileRinnovo || null),
+            tipoFileRinnovo: fileRinnovo ? fileRinnovo.type : (documentoEsistente?.tipoFileRinnovo || null),
             contenutoBase64Rinnovo,
-            creatoIl: new Date().toISOString()
-        });
+            creatoIl: documentoEsistente?.creatoIl || new Date().toISOString(),
+            aggiornatoIl: new Date().toISOString()
+        };
+        if (isEditing) {
+            archivioDocumenti[editingArchivioDocumentoIndex] = documentoAggiornato;
+        } else {
+            archivioDocumenti.push(documentoAggiornato);
+        }
         localStorage.setItem('archivio_documenti_list', JSON.stringify(archivioDocumenti));
-        showToast("Documento archiviato!", 'success');
+        editingArchivioDocumentoIndex = null;
+        showToast(isEditing ? "Documento aggiornato!" : "Documento archiviato!", 'success');
         openModule('archivio_documenti');
     } catch (error) {
         showToast("Errore nel salvataggio del documento.", 'error');
@@ -2181,11 +2216,26 @@ async function saveArchivioDocumenti() {
     }
 }
 
+function editArchivioDocumento(index) {
+    const archivioDocumenti = readStorageJSON('archivio_documenti_list', []);
+    const record = archivioDocumenti[index];
+    if (!record) return;
+    editingArchivioDocumentoIndex = index;
+    openModule('archivio_documenti');
+}
+
+function cancelArchivioDocumentoEdit() {
+    editingArchivioDocumentoIndex = null;
+    openModule('archivio_documenti');
+}
+
 async function deleteArchivioDocumento(index) {
     if (await appConfirm("Vuoi davvero eliminare questo documento archiviato?")) {
         const archivioDocumenti = readStorageJSON('archivio_documenti_list', []);
         archivioDocumenti.splice(index, 1);
         localStorage.setItem('archivio_documenti_list', JSON.stringify(archivioDocumenti));
+        if (Number.isInteger(editingArchivioDocumentoIndex) && editingArchivioDocumentoIndex === index) editingArchivioDocumentoIndex = null;
+        else if (Number.isInteger(editingArchivioDocumentoIndex) && editingArchivioDocumentoIndex > index) editingArchivioDocumentoIndex -= 1;
         openModule('archivio_documenti');
     }
 }
