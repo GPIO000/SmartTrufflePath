@@ -1642,7 +1642,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="file" id="import-file" accept=".json,application/json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Backup automatico locale</h3>
-                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app salva automaticamente il file <strong>${_BACKUP_FILE_NAME}</strong> sempre nel percorso <strong>${_BACKUP_RELATIVE_PATH}</strong>. Alla prima configurazione, se la cartella non esiste, ti guiderà alla sua creazione/selezione. Nessun cloud.</p>
+                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app crea automaticamente uno snapshot locale dei dati ad ogni modifica. Se la cartella di backup è già configurata, aggiorna anche il file <strong>${_BACKUP_FILE_NAME}</strong> nel percorso <strong>${_BACKUP_RELATIVE_PATH}</strong>. Nessun cloud.</p>
                     <p id="local-backup-status" style="font-size:0.82rem; color:#b8b0a0; margin:0 0 10px 0;">Stato ultimo backup automatico: non disponibile</p>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('forceLocalBackupNow')}>💾 Salva Backup Ora</button>
                     <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('restoreLatestAutomaticBackup')}>📂 Ripristina da File...</button>
@@ -3071,19 +3071,34 @@ function formatBackupTimestamp(isoDate) {
 }
 
 let lastAutomaticBackupSavedAt = null;
+let lastAutomaticBackupStatus = null;
+let lastAutomaticBackupFingerprint = '';
 const _BACKUP_DIR_HANDLE_KEY = 'backup_dir_handle';
 const _BACKUP_DIRECTORY_NAME = 'backup_SmartTrufflePath';
 const _BACKUP_FILE_NAME = 'backup_truffle_automatico.json';
 const _BACKUP_RELATIVE_PATH = `Download/${_BACKUP_DIRECTORY_NAME}/${_BACKUP_FILE_NAME}`;
 
+function applyAutomaticBackupStatus(status) {
+    lastAutomaticBackupStatus = status && typeof status === 'object' ? status : null;
+    lastAutomaticBackupSavedAt = lastAutomaticBackupStatus?.savedAt || lastAutomaticBackupStatus?.updatedAt || null;
+    syncAutomaticBackupStatusUI();
+}
+
 function syncAutomaticBackupStatusUI() {
     const statusEl = document.getElementById('local-backup-status');
     if (!statusEl) return;
-    if (!lastAutomaticBackupSavedAt) {
+    if (!lastAutomaticBackupStatus && !lastAutomaticBackupSavedAt) {
         statusEl.textContent = 'Stato ultimo backup automatico: non disponibile';
         return;
     }
-    statusEl.textContent = `Stato ultimo backup automatico: OK - ${formatBackupTimestamp(lastAutomaticBackupSavedAt)}`;
+    if (lastAutomaticBackupStatus?.ok === false) {
+        statusEl.textContent = `Stato ultimo backup automatico: errore - ${lastAutomaticBackupStatus.message || 'salvataggio non riuscito'}`;
+        return;
+    }
+    const timestamp = formatBackupTimestamp(lastAutomaticBackupSavedAt);
+    statusEl.textContent = timestamp === 'n/d'
+        ? 'Stato ultimo backup automatico: OK'
+        : `Stato ultimo backup automatico: OK - ${timestamp}`;
 }
 
 let _automaticBackupDirHandle = null;
@@ -3147,48 +3162,97 @@ async function _writeBackupFileToDirectory(dirHandle, jsonStr) {
     await writable.close();
 }
 
-async function downloadBackupFile(data) {
+async function persistAutomaticBackupSnapshot(backupData, reason = 'data-change') {
+    if (!window.TruffleStorage || typeof window.TruffleStorage.saveAutomaticBackupSnapshot !== 'function') {
+        return { ok: false, skipped: true };
+    }
+    try {
+        const result = await window.TruffleStorage.saveAutomaticBackupSnapshot(backupData, reason);
+        if (result?.ok && result.snapshot) {
+            applyAutomaticBackupStatus({
+                ok: true,
+                savedAt: result.snapshot.savedAt,
+                updatedAt: result.snapshot.savedAt,
+                reason: result.snapshot.reason
+            });
+        } else if (typeof window.TruffleStorage.getAutomaticBackupStatus === 'function') {
+            applyAutomaticBackupStatus(window.TruffleStorage.getAutomaticBackupStatus());
+        }
+        return result || { ok: false };
+    } catch (error) {
+        console.warn('Backup automatico locale interno non riuscito.', error);
+        if (typeof window.TruffleStorage.getAutomaticBackupStatus === 'function') {
+            applyAutomaticBackupStatus(window.TruffleStorage.getAutomaticBackupStatus());
+        }
+        return { ok: false, error };
+    }
+}
+
+async function downloadBackupFile(data, options = {}) {
+    const { allowPrompt = true, allowDownloadFallback = true, reason = 'manual-file' } = options;
     const jsonStr = JSON.stringify(data, null, 2);
 
     if (window.showDirectoryPicker) {
         try {
             let dirHandle = await _loadBackupDirHandle();
             if (!dirHandle) {
+                if (!allowPrompt) return { ok: false, skipped: true, reason: 'directory-not-configured' };
                 dirHandle = await _requestBackupDirHandle();
             } else {
                 const permissionGranted = await _ensureBackupDirPermission(dirHandle);
                 if (!permissionGranted) {
                     await _storeBackupDirHandle(null);
+                    if (!allowPrompt) return { ok: false, skipped: true, reason: 'permission-not-granted' };
                     await appAlert(`⚠️ **Permesso negato**\n\nL'accesso alla cartella di backup predefinita è stato negato.\n\nSeleziona di nuovo **${_BACKUP_DIRECTORY_NAME}** nel percorso:\n**${_BACKUP_RELATIVE_PATH}**`);
                     dirHandle = await _requestBackupDirHandle();
                 }
             }
             await _writeBackupFileToDirectory(dirHandle, jsonStr);
-            lastAutomaticBackupSavedAt = new Date().toISOString();
-            syncAutomaticBackupStatusUI();
-            return;
+            const savedAt = new Date().toISOString();
+            applyAutomaticBackupStatus({
+                ok: true,
+                savedAt,
+                updatedAt: savedAt,
+                reason
+            });
+            return { ok: true, persistedToFile: true, savedAt };
         } catch (err) {
             if (err && err.name === 'AbortError') {
                 await _storeBackupDirHandle(null);
-                return;
+                return { ok: false, aborted: true };
             }
             // Directory handle is no longer valid (folder moved, deleted, or cache cleared): clear it and re-prompt
             await _storeBackupDirHandle(null);
+            if (!allowPrompt) {
+                console.warn('Scrittura backup automatico su file non riuscita.', err);
+                return { ok: false, skipped: true, reason: 'file-write-failed', error: err };
+            }
             await appAlert(`⚠️ **Cartella di backup non accessibile**\n\nLa cartella predefinita non è più disponibile.\n\nVerifica che esista ancora il percorso:\n**${_BACKUP_RELATIVE_PATH}**\n\ne seleziona di nuovo la cartella **${_BACKUP_DIRECTORY_NAME}**.`);
             try {
                 const newDirHandle = await _requestBackupDirHandle();
                 await _writeBackupFileToDirectory(newDirHandle, jsonStr);
-                lastAutomaticBackupSavedAt = new Date().toISOString();
-                syncAutomaticBackupStatusUI();
-                return;
+                const savedAt = new Date().toISOString();
+                applyAutomaticBackupStatus({
+                    ok: true,
+                    savedAt,
+                    updatedAt: savedAt,
+                    reason
+                });
+                return { ok: true, persistedToFile: true, savedAt };
             } catch (retryErr) {
                 if (retryErr && retryErr.name === 'AbortError') {
                     await _storeBackupDirHandle(null);
-                    return;
+                    return { ok: false, aborted: true };
                 }
                 await _storeBackupDirHandle(null);
+                console.warn('Scrittura backup manuale su file non riuscita.', retryErr);
+                return { ok: false, error: retryErr };
             }
         }
+    }
+
+    if (!allowDownloadFallback) {
+        return { ok: false, skipped: true, reason: 'download-fallback-disabled' };
     }
 
     // Fallback: anchor download
@@ -3199,15 +3263,34 @@ async function downloadBackupFile(data) {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    lastAutomaticBackupSavedAt = new Date().toISOString();
-    syncAutomaticBackupStatusUI();
+    const savedAt = new Date().toISOString();
+    applyAutomaticBackupStatus({
+        ok: true,
+        savedAt,
+        updatedAt: savedAt,
+        reason
+    });
+    return { ok: true, persistedToFile: false, usedDownloadFallback: true, savedAt };
 }
 
 async function forceLocalBackupNow() {
     const backupData = buildCompleteBackupData();
-    await downloadBackupFile(backupData);
+    await persistAutomaticBackupSnapshot(backupData, 'manual');
+    const result = await downloadBackupFile(backupData, {
+        allowPrompt: true,
+        allowDownloadFallback: true,
+        reason: 'manual-file'
+    });
+    if (!result.ok) {
+        if (result.aborted) {
+            showToast("Backup annullato.", 'info');
+            return;
+        }
+        showToast("Errore durante il salvataggio del backup.", 'error');
+        return;
+    }
     lastAutomaticBackupFingerprint = JSON.stringify(backupData);
-    showToast(`Backup salvato in ${_BACKUP_RELATIVE_PATH}.`, 'success');
+    showToast(result.usedDownloadFallback ? "Backup scaricato con successo." : `Backup salvato in ${_BACKUP_RELATIVE_PATH}.`, 'success');
 }
 
 async function restoreLatestAutomaticBackup() {
@@ -3300,16 +3383,25 @@ async function archiviaAnnoPrecedente() {
 }
 
 async function runAutomaticLocalBackup() {
-    const backupData = buildCompleteBackupData();
-    const fingerprint = JSON.stringify(backupData);
-    if (fingerprint === lastAutomaticBackupFingerprint) return;
-    await downloadBackupFile(backupData);
-    lastAutomaticBackupFingerprint = fingerprint;
+    try {
+        const backupData = buildCompleteBackupData();
+        const fingerprint = JSON.stringify(backupData);
+        if (fingerprint === lastAutomaticBackupFingerprint) return;
+        const snapshotResult = await persistAutomaticBackupSnapshot(backupData, 'data-change');
+        if (!snapshotResult?.ok) return;
+        lastAutomaticBackupFingerprint = fingerprint;
+        await downloadBackupFile(backupData, {
+            allowPrompt: false,
+            allowDownloadFallback: false,
+            reason: 'data-change-file'
+        });
+    } catch (error) {
+        console.warn('Backup automatico non riuscito.', error);
+    }
 }
 
 const AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS = 500;
 let automaticBackupLifecycleInitialized = false;
-let lastAutomaticBackupFingerprint = '';
 let dataChangeDebounceTimer = null;
 
 function setupAutomaticBackupLifecycle() {
@@ -3319,12 +3411,42 @@ function setupAutomaticBackupLifecycle() {
     if (api && typeof api.setDataChangeListener === 'function') {
         api.setDataChangeListener(() => {
             clearTimeout(dataChangeDebounceTimer);
-            dataChangeDebounceTimer = setTimeout(() => runAutomaticLocalBackup(), AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS);
+            dataChangeDebounceTimer = setTimeout(() => {
+                void runAutomaticLocalBackup();
+            }, AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS);
         });
     }
 }
 
 setupAutomaticBackupLifecycle();
+
+async function initializeAutomaticBackupState() {
+    const api = window.TruffleStorage;
+    if (!api) return;
+    try {
+        if (typeof api.getAutomaticBackupStatus === 'function') {
+            applyAutomaticBackupStatus(api.getAutomaticBackupStatus());
+        }
+        if (typeof api.getLatestAutomaticBackupSnapshotAsync === 'function') {
+            const latestSnapshot = await api.getLatestAutomaticBackupSnapshotAsync();
+            if (latestSnapshot?.data && typeof latestSnapshot.data === 'object' && !Array.isArray(latestSnapshot.data)) {
+                lastAutomaticBackupFingerprint = JSON.stringify(latestSnapshot.data);
+                if (!lastAutomaticBackupStatus) {
+                    applyAutomaticBackupStatus({
+                        ok: true,
+                        savedAt: latestSnapshot.savedAt,
+                        updatedAt: latestSnapshot.savedAt,
+                        reason: latestSnapshot.reason
+                    });
+                }
+            }
+        }
+    } catch (error) {
+        console.warn('Inizializzazione stato backup automatico non riuscita.', error);
+    }
+}
+
+void initializeAutomaticBackupState();
 
 function toggleDrawer() {
     const drawer = document.getElementById('app-drawer');
@@ -4135,7 +4257,7 @@ async function mostraInfoModulo(moduleName) {
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
-        'export': `ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV o crea un backup manuale JSON.\n\nIl backup automatico salva il file **${_BACKUP_FILE_NAME}** sempre nel percorso **${_BACKUP_RELATIVE_PATH}** e sovrascrive il precedente ad ogni modifica. Alla prima configurazione, se la cartella **${_BACKUP_DIRECTORY_NAME}** non esiste ancora dentro **Download**, l'app ti guiderà alla sua creazione/selezione. Usa '💾 Salva Backup Ora' per forzarlo manualmente. Per ripristinare, premi '📂 Ripristina da File...' e scegli il file dallo stesso percorso.`,
+        'export': `ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV o crea un backup manuale JSON.\n\nIl backup automatico aggiorna sempre uno snapshot locale dei dati ad ogni modifica. Se la cartella **${_BACKUP_DIRECTORY_NAME}** è già configurata, aggiorna anche il file **${_BACKUP_FILE_NAME}** nel percorso **${_BACKUP_RELATIVE_PATH}** senza interrompere il salvataggio dei dati. Usa '💾 Salva Backup Ora' per creare o aggiornare manualmente il file. Per ripristinare, premi '📂 Ripristina da File...' e scegli il file dallo stesso percorso.`,
         'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
         'clienti': "ℹ️ **Guida - Rubrica Clienti & Acquirenti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico e gestisci le note dedicate.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
