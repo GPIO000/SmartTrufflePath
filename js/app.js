@@ -2261,7 +2261,7 @@ async function deleteDog(index) {
         const removedDog = dogsList[index];
         dogsList.splice(index, 1);
         localStorage.setItem('dogs_list', JSON.stringify(dogsList));
-        if (editingDogIndex === index) editingDogIndex = null;
+        if (Number.isInteger(editingDogIndex) && editingDogIndex === index) editingDogIndex = null;
         else if (Number.isInteger(editingDogIndex) && editingDogIndex > index) editingDogIndex -= 1;
         syncCurrentDogData(dogsList, { removedDog });
         openModule('canidiary');
