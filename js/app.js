@@ -282,7 +282,7 @@ const ACTION_HANDLERS = {
     saveNewCane: () => saveNewCane(),
     cancelDogEdit: () => cancelDogEdit(),
     editDog: (_event, index) => editDog(index),
-    updateDog: (_event, index) => updateDog(index),
+    updateDog: () => updateDog(),
     deleteDog: (_event, index) => deleteDog(index),
     savePolizza: () => savePolizza(),
     deletePolizza: (_event, index) => deletePolizza(index),
@@ -1175,7 +1175,7 @@ function openModule(moduleName, editMode = false) {
                     <label>Numero Microchip:</label>
                     <input type="text" id="c-microchip" class="mod-input" placeholder="Codice microchip" value="${dogToEdit?.microchip || ''}">
                     <div class="btn-row">
-                        <button id="c-save-btn" class="overlay-btn" style="background:#2563eb;" ${isDogEditMode ? actionAttrs('updateDog', [editingDogIndex]) : actionAttrs('saveNewCane')}>${isDogEditMode ? 'Aggiorna Cane' : 'Salva Nuovo Cane'}</button>
+                        <button id="c-save-btn" class="overlay-btn" style="background:#2563eb;" ${isDogEditMode ? actionAttrs('updateDog') : actionAttrs('saveNewCane')}>${isDogEditMode ? 'Aggiorna Cane' : 'Salva Nuovo Cane'}</button>
                         <button id="c-cancel-edit-btn" class="overlay-btn btn-neutral" style="${isDogEditMode ? '' : 'display:none;'}" ${actionAttrs('cancelDogEdit')}>Annulla Modifica</button>
                     </div>
                 </div>`;
@@ -2212,8 +2212,8 @@ function saveNewCane() {
     saveDogRecord();
 }
 
-function updateDog(index) {
-    saveDogRecord(index);
+function updateDog() {
+    saveDogRecord(editingDogIndex);
 }
 
 function saveDogRecord(index = null) {
@@ -2254,6 +2254,7 @@ function cancelDogEdit() {
     editingDogIndex = null;
     openModule('canidiary');
 }
+
 async function deleteDog(index) {
     if (await appConfirm("Vuoi davvero rimuovere questo cane?")) {
         let dogsList = readStorageJSON('dogs_list', []);
