@@ -3105,7 +3105,11 @@ async function _loadBackupDirHandle() {
 
 async function _storeBackupDirHandle(dirHandle) {
     _automaticBackupDirHandle = dirHandle;
-    await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, dirHandle);
+    try {
+        await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, dirHandle);
+    } catch (error) {
+        console.warn('Impossibile aggiornare il riferimento della cartella backup.', error);
+    }
 }
 
 async function _requestBackupDirHandle() {
@@ -3126,6 +3130,7 @@ async function _ensureBackupDirPermission(dirHandle) {
         const permission = await dirHandle.queryPermission({ mode: 'readwrite' });
         if (permission === 'granted') return true;
     }
+    if (typeof dirHandle.requestPermission !== 'function') return false;
     return (await dirHandle.requestPermission({ mode: 'readwrite' })) === 'granted';
 }
 
@@ -3147,7 +3152,7 @@ async function downloadBackupFile(data) {
             } else {
                 const permissionGranted = await _ensureBackupDirPermission(dirHandle);
                 if (!permissionGranted) {
-                    await _storeBackupDirHandle(null).catch(() => {});
+                    await _storeBackupDirHandle(null);
                     await appAlert(`⚠️ **Permesso negato**\n\nL'accesso alla cartella di backup predefinita è stato negato.\n\nSeleziona di nuovo **${_BACKUP_DIRECTORY_NAME}** nel percorso:\n**${_BACKUP_RELATIVE_PATH}**`);
                     dirHandle = await _requestBackupDirHandle();
                 }
@@ -3162,7 +3167,7 @@ async function downloadBackupFile(data) {
                 return;
             }
             // Directory handle is no longer valid (folder moved, deleted, or cache cleared): clear it and re-prompt
-            await _storeBackupDirHandle(null).catch(() => {});
+            await _storeBackupDirHandle(null);
             await appAlert(`⚠️ **Cartella di backup non accessibile**\n\nLa cartella predefinita non è più disponibile.\n\nVerifica che esista ancora il percorso:\n**${_BACKUP_RELATIVE_PATH}**\n\ne seleziona di nuovo la cartella **${_BACKUP_DIRECTORY_NAME}**.`);
             try {
                 const newDirHandle = await _requestBackupDirHandle();
@@ -3176,7 +3181,7 @@ async function downloadBackupFile(data) {
                     return;
                 }
                 _automaticBackupDirHandle = null;
-                await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
+                await _storeBackupDirHandle(null);
             }
         }
     }
