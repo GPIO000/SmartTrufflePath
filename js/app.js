@@ -1153,7 +1153,7 @@ function openModule(moduleName, editMode = false) {
             }
             break;
         case 'canidiary':
-            const dogsList = getRenderableStorageJSON('dogs_list', []);
+            const dogsList = readStorageJSON('dogs_list', []);
             const isDogEditMode = Number.isInteger(editingDogIndex) && editingDogIndex >= 0 && editingDogIndex < dogsList.length;
             const dogToEdit = isDogEditMode ? dogsList[editingDogIndex] : null;
             let dogsHtml = `
@@ -1162,18 +1162,18 @@ function openModule(moduleName, editMode = false) {
                 <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
                     <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">${isDogEditMode ? '✏️ Modifica Cane' : '➕ Aggiungi Nuovo Cane'}</h3>
                     <label>Nome del Cane:</label>
-                    <input type="text" id="c-nome" class="mod-input" placeholder="Es. Argo" value="${dogToEdit?.nome || ''}">
+                    <input type="text" id="c-nome" class="mod-input" placeholder="Es. Argo" value="${escapeHtml(dogToEdit?.nome || '')}">
                     <label>Razza:</label>
-                    <input type="text" id="c-razza" class="mod-input" value="${dogToEdit?.razza || 'Lagotto Romagnolo'}">
+                    <input type="text" id="c-razza" class="mod-input" value="${escapeHtml(dogToEdit?.razza || 'Lagotto Romagnolo')}">
                     <label>Sesso:</label>
                     <select id="c-sesso" class="mod-input">
                         <option value="Maschio" ${!dogToEdit || dogToEdit.sesso === 'Maschio' ? 'selected' : ''}>🐕 Maschio</option>
                         <option value="Femmina" ${dogToEdit?.sesso === 'Femmina' ? 'selected' : ''}>🐩 Femmina</option>
                     </select>
                     <label>Data di Nascita:</label>
-                    <input type="date" id="c-nascita" class="mod-input" value="${dogToEdit?.nascita || ''}">
+                    <input type="date" id="c-nascita" class="mod-input" value="${escapeHtml(dogToEdit?.nascita || '')}">
                     <label>Numero Microchip:</label>
-                    <input type="text" id="c-microchip" class="mod-input" placeholder="Codice microchip" value="${dogToEdit?.microchip || ''}">
+                    <input type="text" id="c-microchip" class="mod-input" placeholder="Codice microchip" value="${escapeHtml(dogToEdit?.microchip || '')}">
                     <div class="btn-row">
                         <button id="c-save-btn" class="overlay-btn" style="background:#2563eb;" ${isDogEditMode ? actionAttrs('updateDog') : actionAttrs('saveNewCane')}>${isDogEditMode ? 'Aggiorna Cane' : 'Salva Nuovo Cane'}</button>
                         <button id="c-cancel-edit-btn" class="overlay-btn btn-neutral" style="${isDogEditMode ? '' : 'display:none;'}" ${actionAttrs('cancelDogEdit')}>Annulla Modifica</button>
@@ -1188,12 +1188,12 @@ function openModule(moduleName, editMode = false) {
                     const etaCane = formatDogAge(dog.nascita);
                     dogsHtml += `
                         <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
-                            <strong style="color:#f6f1e6; font-size:1rem;">${sessoIcon} ${dog.nome}</strong>
-                            <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">Razza: ${dog.razza}</p>
-                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">⚥ Sesso: ${dog.sesso || 'Non specificato'}</p>
-                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Nascita: ${dog.nascita || 'Non specificata'}</p>
+                            <strong style="color:#f6f1e6; font-size:1rem;">${sessoIcon} ${escapeHtml(dog.nome || '')}</strong>
+                            <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">Razza: ${escapeHtml(dog.razza || '')}</p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">⚥ Sesso: ${escapeHtml(dog.sesso || 'Non specificato')}</p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Nascita: ${escapeHtml(dog.nascita || 'Non specificata')}</p>
                             <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">🎂 Età: ${etaCane}</p>
-                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">Microchip: ${dog.microchip || 'Non inserito'}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">Microchip: ${escapeHtml(dog.microchip || 'Non inserito')}</p>
                             <div class="btn-row">
                                 <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('editDog', [idx])}>✏️ Modifica</button>
                                 <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteDog', [idx])}>🗑️ Elimina</button>
@@ -2259,6 +2259,7 @@ async function deleteDog(index) {
     if (await appConfirm("Vuoi davvero rimuovere questo cane?")) {
         let dogsList = readStorageJSON('dogs_list', []);
         const removedDog = dogsList[index];
+        if (!removedDog) return;
         dogsList.splice(index, 1);
         localStorage.setItem('dogs_list', JSON.stringify(dogsList));
         if (Number.isInteger(editingDogIndex) && editingDogIndex === index) editingDogIndex = null;
