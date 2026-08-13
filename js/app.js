@@ -3082,22 +3082,42 @@ function syncAutomaticBackupStatusUI() {
     statusEl.textContent = `Stato ultimo backup automatico: OK - ${formatBackupTimestamp(lastAutomaticBackupSavedAt)}`;
 }
 
-let _automaticBackupFileHandle = null;
+let _automaticBackupDirHandle = null;
+const _BACKUP_DIR_HANDLE_KEY = 'backup_dir_handle';
+
+async function _loadBackupDirHandle() {
+    if (_automaticBackupDirHandle) return _automaticBackupDirHandle;
+    try {
+        const handle = await TruffleStorage.loadDirectoryHandle(_BACKUP_DIR_HANDLE_KEY);
+        if (handle) _automaticBackupDirHandle = handle;
+    } catch {
+        // IndexedDB unavailable or handle not yet saved
+    }
+    return _automaticBackupDirHandle;
+}
 
 async function downloadBackupFile(data) {
     const jsonStr = JSON.stringify(data, null, 2);
     const fileName = 'backup_truffle_automatico.json';
 
-    if (window.showSaveFilePicker) {
+    if (window.showDirectoryPicker) {
         try {
-            if (!_automaticBackupFileHandle) {
-                await appAlert("📁 **Dove salvare il backup?**\n\nTi verrà chiesto dove salvare il file di backup.\n\n💡 **Consiglio importante:** Crea (o scegli) una cartella chiamata **SmartTrufflePath** nella memoria del dispositivo e salva il file lì dentro. Così, anche dopo la cancellazione della cache del browser, potrai sempre trovare e sovrascrivere lo stesso file navigando in quella cartella.");
-                _automaticBackupFileHandle = await window.showSaveFilePicker({
-                    suggestedName: fileName,
-                    types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
-                });
+            let dirHandle = await _loadBackupDirHandle();
+            if (!dirHandle) {
+                await appAlert("📁 **Dove salvare il backup?**\n\nTi verrà chiesto di scegliere una cartella dove salvare il file di backup.\n\n💡 **Consiglio importante:** Crea (o scegli) una cartella chiamata **SmartTrufflePath** nella memoria del dispositivo. Il file **backup_truffle_automatico.json** verrà sempre salvato lì, sovrascrivendo il precedente ad ogni modifica.");
+                dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                _automaticBackupDirHandle = dirHandle;
+                await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, dirHandle);
+            } else {
+                const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
+                if (permission !== 'granted') {
+                    _automaticBackupDirHandle = null;
+                    await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
+                    return;
+                }
             }
-            const writable = await _automaticBackupFileHandle.createWritable();
+            const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+            const writable = await fileHandle.createWritable();
             await writable.write(jsonStr);
             await writable.close();
             lastAutomaticBackupSavedAt = new Date().toISOString();
@@ -3105,11 +3125,12 @@ async function downloadBackupFile(data) {
             return;
         } catch (err) {
             if (err && err.name === 'AbortError') {
-                _automaticBackupFileHandle = null;
+                _automaticBackupDirHandle = null;
                 return;
             }
-            // If overwrite fails (e.g. handle invalidated), clear handle and fall through to anchor download
-            _automaticBackupFileHandle = null;
+            // If directory handle is no longer valid, clear it and fall through to anchor download
+            _automaticBackupDirHandle = null;
+            TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
         }
     }
 
