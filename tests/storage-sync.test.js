@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  init,
   getAutomaticBackupStatus,
   getLatestAutomaticBackupSnapshot,
   getLatestAutomaticBackupSnapshotAsync,
@@ -219,5 +220,96 @@ describe('saveDirectoryHandle / loadDirectoryHandle', () => {
   it('loadDirectoryHandle restituisce null per una chiave inesistente', async () => {
     const loaded = await storage.loadDirectoryHandle('chiave_inesistente');
     expect(loaded).toBeNull();
+  });
+});
+
+describe('init con localStorage patchato', () => {
+  function createIndexedDbStub({ failWrites = false } = {}) {
+    const kvStore = new Map();
+    const handlesStore = new Map();
+
+    function makeRequest(executor) {
+      const request = { result: undefined, error: null, onsuccess: null, onerror: null };
+      Promise.resolve().then(() => {
+        try {
+          request.result = executor();
+          if (typeof request.onsuccess === 'function') request.onsuccess();
+        } catch (error) {
+          request.error = error;
+          if (typeof request.onerror === 'function') request.onerror();
+        }
+      });
+      return request;
+    }
+
+    return {
+      open: () => {
+        const req = { onsuccess: null, onerror: null, onupgradeneeded: null, result: null };
+        const fakeDb = {
+          transaction: (storeName) => {
+            const targetStore = storeName === 'handles' ? handlesStore : kvStore;
+            const tx = {
+              objectStore: () => ({
+                getAll: () => makeRequest(() => Array.from(targetStore.values())),
+                put: (record) => makeRequest(() => {
+                  if (failWrites && storeName === 'kv') throw new Error('indexedDB write failed');
+                  targetStore.set(record.key, record);
+                  return record.key;
+                }),
+                delete: (key) => makeRequest(() => targetStore.delete(key)),
+                clear: () => makeRequest(() => targetStore.clear()),
+              }),
+              oncomplete: null,
+              onerror: null,
+              onabort: null,
+            };
+
+            Promise.resolve().then(() => {
+              if (failWrites && storeName === 'kv') {
+                if (typeof tx.onerror === 'function') tx.onerror();
+                return;
+              }
+              if (typeof tx.oncomplete === 'function') tx.oncomplete();
+            });
+
+            return tx;
+          },
+        };
+
+        req.result = fakeDb;
+        Promise.resolve().then(() => {
+          if (typeof req.onupgradeneeded === 'function') {
+            req.onupgradeneeded({
+              target: {
+                result: {
+                  objectStoreNames: { contains: () => true },
+                  createObjectStore: () => {},
+                },
+              },
+            });
+          }
+          if (typeof req.onsuccess === 'function') req.onsuccess();
+        });
+        return req;
+      },
+    };
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('non genera errori quando un nuovo salvataggio fallisce su IndexedDB', async () => {
+    vi.resetModules();
+    vi.stubGlobal('indexedDB', createIndexedDbStub({ failWrites: true }));
+
+    const storage = await import('../js/storage-sync.js');
+    await storage.init();
+
+    expect(() => {
+      localStorage.setItem('storico_vendite', '[]');
+    }).not.toThrow();
+
+    expect(localStorage.getItem('storico_vendite')).toBe('[]');
   });
 });
