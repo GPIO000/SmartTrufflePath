@@ -1642,7 +1642,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="file" id="import-file" accept=".json,application/json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Backup automatico locale</h3>
-                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app salva automaticamente il file <strong>backup_truffle_automatico.json</strong> nella cartella Download ad ogni modifica dei dati (sovrascrive il precedente). Nessun cloud.</p>
+                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app salva automaticamente il file <strong>${_BACKUP_FILE_NAME}</strong> sempre nel percorso <strong>${_BACKUP_RELATIVE_PATH}</strong>. Alla prima configurazione, se la cartella non esiste, ti guiderà alla sua creazione/selezione. Nessun cloud.</p>
                     <p id="local-backup-status" style="font-size:0.82rem; color:#b8b0a0; margin:0 0 10px 0;">Stato ultimo backup automatico: non disponibile</p>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('forceLocalBackupNow')}>💾 Salva Backup Ora</button>
                     <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('restoreLatestAutomaticBackup')}>📂 Ripristina da File...</button>
@@ -3071,6 +3071,10 @@ function formatBackupTimestamp(isoDate) {
 }
 
 let lastAutomaticBackupSavedAt = null;
+const _BACKUP_DIR_HANDLE_KEY = 'backup_dir_handle';
+const _BACKUP_DIRECTORY_NAME = 'backup_SmartTrufflePath';
+const _BACKUP_FILE_NAME = 'backup_truffle_automatico.json';
+const _BACKUP_RELATIVE_PATH = `Download/${_BACKUP_DIRECTORY_NAME}/${_BACKUP_FILE_NAME}`;
 
 function syncAutomaticBackupStatusUI() {
     const statusEl = document.getElementById('local-backup-status');
@@ -3083,46 +3087,72 @@ function syncAutomaticBackupStatusUI() {
 }
 
 let _automaticBackupDirHandle = null;
-const _BACKUP_DIR_HANDLE_KEY = 'backup_dir_handle';
 
 async function _loadBackupDirHandle() {
     if (_automaticBackupDirHandle) return _automaticBackupDirHandle;
     try {
         const handle = await TruffleStorage.loadDirectoryHandle(_BACKUP_DIR_HANDLE_KEY);
-        if (handle) _automaticBackupDirHandle = handle;
+        if (handle?.name === _BACKUP_DIRECTORY_NAME) {
+            _automaticBackupDirHandle = handle;
+        } else if (handle) {
+            await _storeBackupDirHandle(null);
+        }
     } catch {
         // IndexedDB unavailable or handle not yet saved
     }
     return _automaticBackupDirHandle;
 }
 
+async function _storeBackupDirHandle(dirHandle) {
+    _automaticBackupDirHandle = dirHandle;
+    await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, dirHandle);
+}
+
+async function _requestBackupDirHandle() {
+    while (true) {
+        await appAlert(`📁 **Cartella backup predefinita**\n\nIl backup automatico viene salvato sempre nello stesso percorso:\n**${_BACKUP_RELATIVE_PATH}**\n\nAlla prima configurazione apri la cartella **Download** del dispositivo e seleziona la cartella **${_BACKUP_DIRECTORY_NAME}**.\n\nSe non esiste ancora, creala prima di confermare la selezione.`);
+        const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        if (dirHandle?.name === _BACKUP_DIRECTORY_NAME) {
+            await _storeBackupDirHandle(dirHandle);
+            return dirHandle;
+        }
+        await appAlert(`⚠️ **Cartella non valida**\n\nPer continuare devi selezionare la cartella **${_BACKUP_DIRECTORY_NAME}** dentro **Download**.\n\nPercorso richiesto:\n**${_BACKUP_RELATIVE_PATH}**`);
+    }
+}
+
+async function _ensureBackupDirPermission(dirHandle) {
+    if (!dirHandle) return false;
+    if (typeof dirHandle.queryPermission === 'function') {
+        const permission = await dirHandle.queryPermission({ mode: 'readwrite' });
+        if (permission === 'granted') return true;
+    }
+    return (await dirHandle.requestPermission({ mode: 'readwrite' })) === 'granted';
+}
+
+async function _writeBackupFileToDirectory(dirHandle, jsonStr) {
+    const fileHandle = await dirHandle.getFileHandle(_BACKUP_FILE_NAME, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(jsonStr);
+    await writable.close();
+}
+
 async function downloadBackupFile(data) {
     const jsonStr = JSON.stringify(data, null, 2);
-    const fileName = 'backup_truffle_automatico.json';
 
     if (window.showDirectoryPicker) {
         try {
             let dirHandle = await _loadBackupDirHandle();
             if (!dirHandle) {
-                await appAlert("📁 **Dove salvare il backup?**\n\nTi verrà chiesto di scegliere una cartella dove salvare il file di backup.\n\n💡 **Consiglio importante:** Crea (o scegli) una cartella chiamata **SmartTrufflePath** nella memoria del dispositivo. Il file **backup_truffle_automatico.json** verrà sempre salvato lì, sovrascrivendo il precedente ad ogni modifica.");
-                dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                _automaticBackupDirHandle = dirHandle;
-                await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, dirHandle);
+                dirHandle = await _requestBackupDirHandle();
             } else {
-                const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
-                if (permission !== 'granted') {
-                    _automaticBackupDirHandle = null;
-                    await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
-                    await appAlert("⚠️ **Permesso negato**\n\nIl permesso per accedere alla cartella di backup è stato negato.\n\nTi verrà chiesto di scegliere nuovamente la cartella.");
-                    dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                    _automaticBackupDirHandle = dirHandle;
-                    await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, dirHandle);
+                const permissionGranted = await _ensureBackupDirPermission(dirHandle);
+                if (!permissionGranted) {
+                    await _storeBackupDirHandle(null).catch(() => {});
+                    await appAlert(`⚠️ **Permesso negato**\n\nL'accesso alla cartella di backup predefinita è stato negato.\n\nSeleziona di nuovo **${_BACKUP_DIRECTORY_NAME}** nel percorso:\n**${_BACKUP_RELATIVE_PATH}**`);
+                    dirHandle = await _requestBackupDirHandle();
                 }
             }
-            const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(jsonStr);
-            await writable.close();
+            await _writeBackupFileToDirectory(dirHandle, jsonStr);
             lastAutomaticBackupSavedAt = new Date().toISOString();
             syncAutomaticBackupStatusUI();
             return;
@@ -3132,17 +3162,11 @@ async function downloadBackupFile(data) {
                 return;
             }
             // Directory handle is no longer valid (folder moved, deleted, or cache cleared): clear it and re-prompt
-            _automaticBackupDirHandle = null;
-            await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
-            await appAlert("⚠️ **Cartella di backup non più accessibile**\n\nLa cartella precedentemente selezionata non è più disponibile (potrebbe essere stata spostata, eliminata o la cache è stata cancellata).\n\nTi verrà chiesto di scegliere nuovamente la cartella.");
+            await _storeBackupDirHandle(null).catch(() => {});
+            await appAlert(`⚠️ **Cartella di backup non accessibile**\n\nLa cartella predefinita non è più disponibile.\n\nVerifica che esista ancora il percorso:\n**${_BACKUP_RELATIVE_PATH}**\n\ne seleziona di nuovo la cartella **${_BACKUP_DIRECTORY_NAME}**.`);
             try {
-                const newDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                _automaticBackupDirHandle = newDirHandle;
-                await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, newDirHandle);
-                const fileHandle = await newDirHandle.getFileHandle(fileName, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(jsonStr);
-                await writable.close();
+                const newDirHandle = await _requestBackupDirHandle();
+                await _writeBackupFileToDirectory(newDirHandle, jsonStr);
                 lastAutomaticBackupSavedAt = new Date().toISOString();
                 syncAutomaticBackupStatusUI();
                 return;
@@ -3161,7 +3185,7 @@ async function downloadBackupFile(data) {
     const dataStr = "data:application/json;charset=utf-8," + encodeURIComponent(jsonStr);
     const a = document.createElement('a');
     a.setAttribute('href', dataStr);
-    a.setAttribute('download', fileName);
+    a.setAttribute('download', _BACKUP_FILE_NAME);
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -3173,11 +3197,11 @@ async function forceLocalBackupNow() {
     const backupData = buildCompleteBackupData();
     await downloadBackupFile(backupData);
     lastAutomaticBackupFingerprint = JSON.stringify(backupData);
-    showToast("Backup salvato nella cartella Download.", 'success');
+    showToast(`Backup salvato in ${_BACKUP_RELATIVE_PATH}.`, 'success');
 }
 
 async function restoreLatestAutomaticBackup() {
-    if (!await appConfirm("Scegli il file di backup automatico (backup_truffle_automatico.json) dalla cartella Download del dispositivo.")) return;
+    if (!await appConfirm(`Scegli il file di backup automatico (**${_BACKUP_FILE_NAME}**) dal percorso **${_BACKUP_RELATIVE_PATH}**.`)) return;
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = '.json,application/json';
@@ -4101,7 +4125,7 @@ async function mostraInfoModulo(moduleName) {
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
-        'export': "ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV o crea un backup manuale JSON.\n\nIl backup automatico salva il file **backup_truffle_automatico.json** nella cartella Download del dispositivo ogni volta che modifichi un dato (sovrascrive sempre lo stesso file). Usa '💾 Salva Backup Ora' per forzarlo manualmente. Per ripristinare, premi '📂 Ripristina da File...' e scegli il file dalla cartella Download.\n\n💡 **Suggerimento:** Per trovare facilmente il file di recupero e mantenerlo al sicuro anche dopo la cancellazione della cache, crea una cartella chiamata **SmartTrufflePath** nella memoria del dispositivo e sposta lì il file di backup. In questo modo il file sarà sempre nello stesso posto e non verrà mai perso.",
+        'export': `ℹ️ **Guida - Report & Backup Dati**\n\nEsporta i dati contabili in formato CSV o crea un backup manuale JSON.\n\nIl backup automatico salva il file **${_BACKUP_FILE_NAME}** sempre nel percorso **${_BACKUP_RELATIVE_PATH}** e sovrascrive il precedente ad ogni modifica. Alla prima configurazione, se la cartella **${_BACKUP_DIRECTORY_NAME}** non esiste ancora dentro **Download**, l'app ti guiderà alla sua creazione/selezione. Usa '💾 Salva Backup Ora' per forzarlo manualmente. Per ripristinare, premi '📂 Ripristina da File...' e scegli il file dallo stesso percorso.`,
         'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
         'clienti': "ℹ️ **Guida - Rubrica Clienti & Acquirenti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico e gestisci le note dedicate.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
