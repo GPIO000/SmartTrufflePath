@@ -3113,6 +3113,7 @@ async function downloadBackupFile(data) {
                 if (permission !== 'granted') {
                     _automaticBackupDirHandle = null;
                     await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
+                    await appAlert("⚠️ **Permesso negato**\n\nIl permesso per accedere alla cartella di backup è stato negato.\n\nAl prossimo salvataggio ti verrà chiesto di scegliere nuovamente la cartella.");
                     return;
                 }
             }
@@ -3128,9 +3129,29 @@ async function downloadBackupFile(data) {
                 _automaticBackupDirHandle = null;
                 return;
             }
-            // If directory handle is no longer valid, clear it and fall through to anchor download
+            // Directory handle is no longer valid (folder moved, deleted, or cache cleared): clear it and re-prompt
             _automaticBackupDirHandle = null;
-            TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
+            await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
+            await appAlert("⚠️ **Cartella di backup non più accessibile**\n\nLa cartella precedentemente selezionata non è più disponibile (potrebbe essere stata spostata, eliminata o la cache è stata cancellata).\n\nTi verrà chiesto di scegliere nuovamente la cartella.");
+            try {
+                const newDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                _automaticBackupDirHandle = newDirHandle;
+                await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, newDirHandle);
+                const fileHandle = await newDirHandle.getFileHandle(fileName, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(jsonStr);
+                await writable.close();
+                lastAutomaticBackupSavedAt = new Date().toISOString();
+                syncAutomaticBackupStatusUI();
+                return;
+            } catch (retryErr) {
+                if (retryErr && retryErr.name === 'AbortError') {
+                    _automaticBackupDirHandle = null;
+                    return;
+                }
+                _automaticBackupDirHandle = null;
+                TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
+            }
         }
     }
 
