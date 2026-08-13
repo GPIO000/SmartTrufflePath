@@ -25,4 +25,17 @@ function normalizeBackupEntry(entryValue, fallbackValue) {
     return JSON.stringify(parsedValue);
 }
 
-export { normalizeBackupEntry };
+const AUTOMATIC_BACKUP_APP_FOLDER_NAME = 'SmartTrufflePath';
+const AUTOMATIC_BACKUP_FILES_FOLDER_NAME = 'file backup';
+
+function buildAutomaticBackupPathLabel(rootFolderName = 'Download') {
+    const safeRootFolderName = String(rootFolderName || 'Download').trim() || 'Download';
+    return `${safeRootFolderName}/${AUTOMATIC_BACKUP_APP_FOLDER_NAME}/${AUTOMATIC_BACKUP_FILES_FOLDER_NAME}`;
+}
+
+export {
+    normalizeBackupEntry,
+    AUTOMATIC_BACKUP_APP_FOLDER_NAME,
+    AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
+    buildAutomaticBackupPathLabel
+};
