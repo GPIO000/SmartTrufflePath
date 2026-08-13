@@ -7,8 +7,6 @@ import {
   saveAutomaticBackupSnapshot,
   setDataChangeListener,
   notifyDataChange,
-  saveDirectoryHandle,
-  loadDirectoryHandle,
 } from '../js/storage-sync.js';
 
 beforeEach(() => {
