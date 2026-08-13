@@ -3113,8 +3113,10 @@ async function downloadBackupFile(data) {
                 if (permission !== 'granted') {
                     _automaticBackupDirHandle = null;
                     await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
-                    await appAlert("⚠️ **Permesso negato**\n\nIl permesso per accedere alla cartella di backup è stato negato.\n\nAl prossimo salvataggio ti verrà chiesto di scegliere nuovamente la cartella.");
-                    return;
+                    await appAlert("⚠️ **Permesso negato**\n\nIl permesso per accedere alla cartella di backup è stato negato.\n\nTi verrà chiesto di scegliere nuovamente la cartella.");
+                    dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                    _automaticBackupDirHandle = dirHandle;
+                    await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, dirHandle);
                 }
             }
             const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
@@ -3150,7 +3152,7 @@ async function downloadBackupFile(data) {
                     return;
                 }
                 _automaticBackupDirHandle = null;
-                TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
+                await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
             }
         }
     }
