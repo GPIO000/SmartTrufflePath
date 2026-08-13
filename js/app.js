@@ -197,10 +197,13 @@ const ACTION_HANDLERS = {
     sharePoi: (_event, index) => sharePoi(index),
     deletePoi: (_event, index) => deletePoi(index),
     viewStoredDocument: (_event, storageKey, title, moduleName) => viewStoredDocument(storageKey, title, moduleName),
+    viewDocumentoExtra: (_event, index) => viewDocumentoExtra(index),
     clearData: (_event, storageKey, moduleName) => clearData(storageKey, moduleName),
     saveTesserino: () => saveTesserino(),
     savePagoPAWithFile: () => savePagoPAWithFile(),
     saveF24WithFile: () => saveF24WithFile(),
+    saveDocumentoExtra: () => saveDocumentoExtra(),
+    deleteDocumentoExtra: (_event, index) => deleteDocumentoExtra(index),
     saveNewCane: () => saveNewCane(),
     deleteDog: (_event, index) => deleteDog(index),
     savePolizza: () => savePolizza(),
@@ -309,6 +312,8 @@ function isImageFile(file) {
     return Boolean(file && typeof file.type === 'string' && file.type.startsWith('image/'));
 }
 
+const MAX_UPLOAD_IMAGE_SIZE_BYTES = 1.5 * 1024 * 1024;
+
 function getStoredDocumentData(storageKey) {
     const data = readStorageJSON(storageKey, {});
     return isSafeDataUrl(data.contenutoBase64) ? data.contenutoBase64 : '';
@@ -339,6 +344,7 @@ function restoreBackupEntries(data) {
         vetHistoryList: { storageKey: 'vet_history_list', fallbackValue: [] },
         heatDiaryList: { storageKey: 'heat_diary_list', fallbackValue: [] },
         vetClinicsList: { storageKey: 'vet_clinics_list', fallbackValue: [] },
+        documentiExtraList: { storageKey: 'documenti_extra_list', fallbackValue: [] },
         calendariTartufiCustom: { storageKey: 'calendari_tartufi_custom', fallbackValue: {} },
         noteRegionaliTartufi: { storageKey: 'note_regionali_tartufi', fallbackValue: {} },
         carCoords: { storageKey: 'car_coords', fallbackValue: {} }
@@ -904,6 +910,56 @@ function openModule(moduleName, editMode = false) {
     }
     contentHTML = storicoHtml;
     break;
+
+        case 'documenti_extra': {
+            const documentiExtraList = getRenderableStorageJSON('documenti_extra_list', []);
+            let documentiExtraHtml = `
+                <h2>Archivio Documenti Extra</h2>
+                <p>Archivia documenti personali utili (es. carta d'identità, permessi funghi) per averli sempre a portata di mano.</p>
+                <div class="module-card" style="margin-bottom: 16px;">
+                    <label>Nome documento:</label>
+                    <input type="text" id="de-nome" class="mod-input" placeholder="Es. Carta d'identità">
+                    <label>Tipologia:</label>
+                    <select id="de-tipo" class="mod-input">
+                        <option value="Carta d'identità">Carta d'identità</option>
+                        <option value="Permesso raccolta funghi">Permesso raccolta funghi</option>
+                        <option value="Altro">Altro</option>
+                    </select>
+                    <label>Data scadenza (facoltativa):</label>
+                    <input type="date" id="de-scadenza" class="mod-input">
+                    <label>Note (facoltative):</label>
+                    <input type="text" id="de-note" class="mod-input" placeholder="Es. Rinnovo entro fine anno">
+                    <label>Carica documento (solo immagine - Max 1.5MB):</label>
+                    <input type="file" id="de-file" accept="image/*" class="mod-input" style="padding:8px;">
+                    <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveDocumentoExtra')}>Archivia Documento</button>
+                </div>
+            `;
+
+            if (documentiExtraList.length === 0) {
+                documentiExtraHtml += `<div class="module-card"><p>Nessun documento extra archiviato.</p></div>`;
+            } else {
+                documentiExtraHtml += `<p style="font-size:0.85rem; color:#b8b0a0;">Documenti salvati:</p>`;
+                documentiExtraList.slice().reverse().forEach((doc, index) => {
+                    const originalIndex = documentiExtraList.length - 1 - index;
+                    const safeDoc = sanitizeRenderable(doc);
+                    documentiExtraHtml += `
+                        <div class="module-card" style="margin-bottom:12px; border-left: 4px solid #4d8a98;">
+                            <strong style="color:#f6f1e6; font-size:0.95rem;">🗂️ ${safeDoc.nome || 'Documento senza nome'}</strong>
+                            <p style="font-size:0.82rem; color:#ddd6c8; margin:4px 0;">Tipo: <b>${safeDoc.tipo || 'Altro'}</b></p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin:2px 0;">Scadenza: ${safeDoc.scadenza || 'Non indicata'}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin:2px 0;">File: ${safeDoc.nomeFile || 'Documento immagine'}</p>
+                            ${safeDoc.note ? `<p style="font-size:0.8rem; color:#ddd6c8; margin:2px 0;">Note: ${safeDoc.note}</p>` : ''}
+                            <div class="btn-row">
+                                <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('viewDocumentoExtra', [originalIndex])}>👁️ Visualizza</button>
+                                <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteDocumentoExtra', [originalIndex])}>🗑️ Elimina</button>
+                            </div>
+                        </div>`;
+                });
+            }
+
+            contentHTML = documentiExtraHtml;
+            break;
+        }
 
         case 'f24':
             const fData = getRenderableStorageJSON('f24_data', {});
@@ -1854,7 +1910,7 @@ function saveTesserino() {
             showToast("Formato non supportato: carica solo immagini.", 'error');
             return;
         }
-        if (file.size > 1.5 * 1024 * 1024) {
+        if (file.size > MAX_UPLOAD_IMAGE_SIZE_BYTES) {
             showToast("Immagine troppo grande. Max 1.5 MB.", 'error');
             return;
         }
@@ -1908,7 +1964,7 @@ function saveF24WithFile() {
             showToast("Formato non supportato: carica solo immagini.", 'error');
             return;
         }
-        if (file.size > 1.5 * 1024 * 1024) {
+        if (file.size > MAX_UPLOAD_IMAGE_SIZE_BYTES) {
             showToast("Immagine troppo grande. Max 1.5 MB.", 'error');
             return;
         }
@@ -1956,7 +2012,7 @@ function savePagoPAWithFile() {
             showToast("Formato non supportato: carica solo immagini.", 'error');
             return;
         }
-        if (file.size > 1.5 * 1024 * 1024) {
+        if (file.size > MAX_UPLOAD_IMAGE_SIZE_BYTES) {
             showToast("Immagine troppo grande. Max 1.5 MB.", 'error');
             return;
         }
@@ -1967,6 +2023,89 @@ function savePagoPAWithFile() {
         reader.readAsDataURL(file);
     } else {
         saveData(pDataExisting.contenutoBase64, pDataExisting.nomeFile, pDataExisting.tipoFile);
+    }
+}
+
+function saveDocumentoExtra() {
+    const nomeVal = (document.getElementById('de-nome') || {}).value?.trim() || '';
+    const tipoVal = (document.getElementById('de-tipo') || {}).value?.trim() || 'Altro';
+    const scadenzaVal = (document.getElementById('de-scadenza') || {}).value || '';
+    const noteVal = (document.getElementById('de-note') || {}).value?.trim() || '';
+    const fileInput = document.getElementById('de-file');
+    const file = fileInput ? fileInput.files[0] : null;
+
+    if (!nomeVal) {
+        showToast("Inserisci il nome del documento.", 'error');
+        return;
+    }
+
+    if (!file) {
+        showToast("Carica un'immagine del documento.", 'error');
+        return;
+    }
+
+    if (!isImageFile(file)) {
+        showToast("Formato non supportato: carica solo immagini.", 'error');
+        return;
+    }
+
+    if (file.size > MAX_UPLOAD_IMAGE_SIZE_BYTES) {
+        showToast("Immagine troppo grande. Max 1.5 MB.", 'error');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const contenutoBase64 = event.target.result;
+        const documentiExtra = readStorageJSON('documenti_extra_list', []);
+        documentiExtra.push({
+            nome: nomeVal,
+            tipo: tipoVal,
+            scadenza: scadenzaVal,
+            note: noteVal,
+            nomeFile: file.name,
+            tipoFile: file.type,
+            contenutoBase64,
+            dataInserimento: new Date().toISOString()
+        });
+
+        try {
+            localStorage.setItem('documenti_extra_list', JSON.stringify(documentiExtra));
+            showToast("Documento archiviato!", 'success');
+            openModule('documenti_extra');
+        } catch (error) {
+            showToast("Spazio esaurito. Carica un file più piccolo.", 'error');
+            console.error(error);
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function viewDocumentoExtra(index) {
+    const documentiExtra = readStorageJSON('documenti_extra_list', []);
+    const documento = documentiExtra[index];
+
+    if (!documento || !isSafeDataUrl(documento.contenutoBase64)) {
+        showToast("Documento non disponibile.", 'error');
+        return;
+    }
+
+    visualizzaImmagineSalvata(
+        documento.contenutoBase64,
+        `Documento: ${documento.nome || 'Documento extra'}`,
+        'documenti_extra'
+    );
+}
+
+async function deleteDocumentoExtra(index) {
+    const documentiExtra = readStorageJSON('documenti_extra_list', []);
+    if (!documentiExtra[index]) return;
+
+    if (await appConfirm("Vuoi davvero eliminare questo documento?")) {
+        documentiExtra.splice(index, 1);
+        localStorage.setItem('documenti_extra_list', JSON.stringify(documentiExtra));
+        showToast("Documento eliminato.", 'success');
+        openModule('documenti_extra');
     }
 }
 
@@ -2682,6 +2821,7 @@ function buildCompleteBackupData() {
         vetHistoryList: localStorage.getItem('vet_history_list'),
         heatDiaryList: localStorage.getItem('heat_diary_list'),
         vetClinicsList: localStorage.getItem('vet_clinics_list'),
+        documentiExtraList: localStorage.getItem('documenti_extra_list'),
         calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
         noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
         carCoords: localStorage.getItem('car_coords')
@@ -3706,6 +3846,7 @@ async function mostraInfoModulo(moduleName) {
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto (Imposta Sostitutiva o Ritenuta d'Acconto) in base alla presenza di un F24 valido.",
         'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\nConsulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
+        'documenti_extra': "ℹ️ **Guida - Archivio Documenti Extra**\n\nArchivia documenti personali utili non strettamente legati all'app (es. carta d'identità o permessi funghi) per consultarli rapidamente anche offline.",
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
         'canidiary': "ℹ️ **Guida - Anagrafica Cane**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo razza, sesso, data di nascita e numero di microchip.",
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
