@@ -660,6 +660,9 @@ function openModule(moduleName, editMode = false) {
                             <div style="margin-top:14px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.07);">
                                 <p><strong>Versamento Rinnovo Annuale:</strong> ${tRinnovoData.dataPagamento || 'Data non specificata'}</p>
                                 <p style="color:#b8b0a0;">Ricevuta non visualizzabile o assente.</p>
+                                <div style="margin-top:10px;">
+                                    <button class="overlay-btn btn-danger" ${actionAttrs('clearData', ['tesserino_rinnovo_data', 'tesserino'])}>🗑️ Elimina Versamento</button>
+                                </div>
                             </div>`;
                     }
                 }
@@ -1930,7 +1933,7 @@ function saveTesserino() {
         };
 
         const rinnovoData = {
-            dataPagamento: rinnovoDataVal || tRinnovoDataExisting.dataPagamento || '',
+            dataPagamento: rinnovoDataVal,
             nomeFile: rinnovoFileName !== undefined ? rinnovoFileName : (tRinnovoDataExisting.nomeFile || null),
             tipoFile: rinnovoFileType !== undefined ? rinnovoFileType : (tRinnovoDataExisting.tipoFile || null),
             contenutoBase64: rinnovoBase64Content !== undefined ? rinnovoBase64Content : (tRinnovoDataExisting.contenutoBase64 || null)
