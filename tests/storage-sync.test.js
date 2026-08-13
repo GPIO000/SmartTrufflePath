@@ -162,3 +162,62 @@ describe('setDataChangeListener', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+describe('saveDirectoryHandle / loadDirectoryHandle', () => {
+  let storage;
+
+  beforeEach(async () => {
+    vi.resetModules();
+
+    const store = new Map();
+    const fakeDb = {
+      transaction: (_storeName, _mode) => {
+        const tx = {
+          objectStore: () => ({
+            put: (record) => {
+              store.set(record.key, record);
+              return { result: undefined };
+            },
+            get: (key) => ({ result: store.get(key) }),
+          }),
+          oncomplete: null,
+          onerror: null,
+          onabort: null,
+        };
+        Promise.resolve().then(() => { if (typeof tx.oncomplete === 'function') tx.oncomplete(); });
+        return tx;
+      },
+    };
+
+    vi.stubGlobal('indexedDB', {
+      open: () => {
+        const req = { onsuccess: null, onerror: null, onupgradeneeded: null, result: fakeDb };
+        Promise.resolve().then(() => {
+          if (typeof req.onupgradeneeded === 'function') {
+            req.onupgradeneeded({ target: { result: { objectStoreNames: { contains: () => true }, createObjectStore: () => {} } } });
+          }
+          if (typeof req.onsuccess === 'function') req.onsuccess();
+        });
+        return req;
+      },
+    });
+
+    storage = await import('../js/storage-sync.js');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('saveDirectoryHandle e loadDirectoryHandle eseguono round-trip correttamente', async () => {
+    const fakeHandle = { kind: 'directory', name: 'SmartTrufflePath' };
+    await storage.saveDirectoryHandle('backup_dir_handle', fakeHandle);
+    const loaded = await storage.loadDirectoryHandle('backup_dir_handle');
+    expect(loaded).toEqual(fakeHandle);
+  });
+
+  it('loadDirectoryHandle restituisce null per una chiave inesistente', async () => {
+    const loaded = await storage.loadDirectoryHandle('chiave_inesistente');
+    expect(loaded).toBeNull();
+  });
+});

@@ -1,6 +1,7 @@
   const DB_NAME = 'truffle-storage-db';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const STORE_KV = 'kv';
+  const STORE_HANDLES = 'handles';
   const AUTO_BACKUP_SNAPSHOT_KEY = 'local_auto_backup_snapshot';
   const AUTO_BACKUP_STATUS_KEY = 'local_auto_backup_status';
 
@@ -22,6 +23,9 @@
         const db = event.target.result;
         if (!db.objectStoreNames.contains(STORE_KV)) {
           db.createObjectStore(STORE_KV, { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains(STORE_HANDLES)) {
+          db.createObjectStore(STORE_HANDLES, { keyPath: 'key' });
         }
       };
       request.onsuccess = () => resolve(request.result);
@@ -221,4 +225,28 @@
     initialized = true;
   }
 
-export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshotAsync, getAutomaticBackupStatus, setDataChangeListener, notifyDataChange };
+  async function saveDirectoryHandle(key, handle) {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_HANDLES, 'readwrite');
+      const store = tx.objectStore(STORE_HANDLES);
+      const req = store.put({ key, handle });
+      tx.oncomplete = () => resolve(req.result);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  }
+
+  async function loadDirectoryHandle(key) {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_HANDLES, 'readonly');
+      const store = tx.objectStore(STORE_HANDLES);
+      const req = store.get(key);
+      tx.oncomplete = () => resolve(req.result ? req.result.handle : null);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  }
+
+export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshotAsync, getAutomaticBackupStatus, setDataChangeListener, notifyDataChange, saveDirectoryHandle, loadDirectoryHandle };
