@@ -14,6 +14,7 @@ SmartTruffle Path è una web app **mobile-first e PWA** per supportare il tartuf
 
 - **Documenti tartufaio**
   - Dati personali e tesserino (con allegato immagine/PDF)
+  - Versamento rinnovo annuale autorizzazioni (con allegato ricevuta)
   - Ricevuta PagoPA (con allegato)
   - F24 ELIDE (con allegato)
   - Archivio documenti extra (es. carta d'identità, permessi funghi)

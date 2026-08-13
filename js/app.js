@@ -331,6 +331,7 @@ function viewStoredDocument(storageKey, title, moduleName) {
 function restoreBackupEntries(data) {
     const backupSchema = {
         tesserino: { storageKey: 'tesserino_data', fallbackValue: {} },
+        tesserinoRinnovo: { storageKey: 'tesserino_rinnovo_data', fallbackValue: {} },
         pagopa: { storageKey: 'pagopa_data', fallbackValue: {} },
         f24: { storageKey: 'f24_data', fallbackValue: {} },
         storicoVendite: { storageKey: 'storico_vendite', fallbackValue: [] },
@@ -626,9 +627,11 @@ function openModule(moduleName, editMode = false) {
             break;
         case 'tesserino':
             const tData = getRenderableStorageJSON('tesserino_data', {});
+            const tRinnovoData = getRenderableStorageJSON('tesserino_rinnovo_data', {});
             if (tData.nome && !editMode) {
                 let filePreviewHTML = '';
                 let visualizzaBtnHTML = '';
+                let rinnovoPreviewHTML = '';
                 if (getStoredDocumentData('tesserino_data')) {
                     if (tData.tipoFile && tData.tipoFile.startsWith('image/')) {
                         filePreviewHTML = `<div style="margin-top:10px;"><p><strong>Documento Allegato:</strong> ${tData.nomeFile || 'Immagine'}</p><img src="${getStoredDocumentData('tesserino_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Tesserino"></div>`;
@@ -638,6 +641,27 @@ function openModule(moduleName, editMode = false) {
                     }
                 } else {
                     filePreviewHTML = `<p style="margin-top:10px; color:#b8b0a0;">Nessun file allegato.</p>`;
+                }
+
+                if (tRinnovoData.dataPagamento || getStoredDocumentData('tesserino_rinnovo_data')) {
+                    if (getStoredDocumentData('tesserino_rinnovo_data') && tRinnovoData.tipoFile && tRinnovoData.tipoFile.startsWith('image/')) {
+                        rinnovoPreviewHTML = `
+                            <div style="margin-top:14px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.07);">
+                                <p><strong>Versamento Rinnovo Annuale:</strong> ${tRinnovoData.dataPagamento || 'Data non specificata'}</p>
+                                <p><strong>Ricevuta Allegata:</strong> ${tRinnovoData.nomeFile || 'Immagine'}</p>
+                                <img src="${getStoredDocumentData('tesserino_rinnovo_data')}" style="max-width:100%; border-radius:6px; margin-top:5px;" alt="Versamento rinnovo annuale">
+                                <div style="margin-top:10px;">
+                                    <button class="overlay-btn btn-info" ${actionAttrs('viewStoredDocument', ['tesserino_rinnovo_data', 'Versamento Rinnovo Annuale', 'tesserino'])}>👁️ Visualizza Ricevuta</button>
+                                    <button class="overlay-btn btn-danger" ${actionAttrs('clearData', ['tesserino_rinnovo_data', 'tesserino'])}>🗑️ Elimina Versamento</button>
+                                </div>
+                            </div>`;
+                    } else {
+                        rinnovoPreviewHTML = `
+                            <div style="margin-top:14px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.07);">
+                                <p><strong>Versamento Rinnovo Annuale:</strong> ${tRinnovoData.dataPagamento || 'Data non specificata'}</p>
+                                <p style="color:#b8b0a0;">Ricevuta non visualizzabile o assente.</p>
+                            </div>`;
+                    }
                 }
 
                 contentHTML = `
@@ -653,6 +677,7 @@ function openModule(moduleName, editMode = false) {
                         ${tData.iban ? `<p style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.07);"><strong>IBAN:</strong> ${tData.iban}</p>` : ''}
                         ${tData.banca ? `<p><strong>Banca:</strong> ${tData.banca}</p>` : ''}
                         ${filePreviewHTML}
+                        ${rinnovoPreviewHTML}
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
                             ${visualizzaBtnHTML}
                             <button class="overlay-btn btn-primary" ${actionAttrs('openModule', ['tesserino', true])}>✏️ Modifica</button>
@@ -682,6 +707,11 @@ function openModule(moduleName, editMode = false) {
                         <input type="text" id="t-iban" class="mod-input" value="${tData.iban || ''}" placeholder="Es. IT60 X054 2811 1010 0000 0123 456">
                         <label>Banca / Istituto di Credito (facoltativo):</label>
                         <input type="text" id="t-banca" class="mod-input" value="${tData.banca || ''}" placeholder="Es. Banca Intesa Sanpaolo">
+                        <p style="margin-top:14px; margin-bottom:6px; color:#b8b0a0; font-size:0.8rem; text-transform:uppercase; border-top:1px dashed rgba(255,255,255,0.07); padding-top:10px;">🧾 Versamento Rinnovo Annuale</p>
+                        <label>Data versamento rinnovo:</label>
+                        <input type="date" id="t-rinnovo-data" class="mod-input" value="${tRinnovoData.dataPagamento || ''}">
+                        <label style="margin-top:10px;">Carica ricevuta versamento rinnovo (solo immagine - Max 1.5MB):</label>
+                        <input type="file" id="t-rinnovo-file" accept="image/*" class="mod-input" style="padding:8px;">
                         <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('saveTesserino')}>Salva Dati Personali</button>
                     </div>`;
             }
@@ -1869,8 +1899,11 @@ function saveTesserino() {
     const numVal = document.getElementById('t-num').value.trim();
     const ibanVal = (document.getElementById('t-iban') || {}).value?.trim() || '';
     const bancaVal = (document.getElementById('t-banca') || {}).value?.trim() || '';
+    const rinnovoDataVal = (document.getElementById('t-rinnovo-data') || {}).value || '';
     const fileInput = document.getElementById('t-file');
     const file = fileInput ? fileInput.files[0] : null;
+    const rinnovoFileInput = document.getElementById('t-rinnovo-file');
+    const rinnovoFile = rinnovoFileInput ? rinnovoFileInput.files[0] : null;
 
     if (!nomeVal || !cfVal) {
         showToast("Inserisci almeno Nome e Codice Fiscale.", 'error');
@@ -1878,9 +1911,10 @@ function saveTesserino() {
     }
 
     const tDataExisting = readStorageJSON('tesserino_data', {});
+    const tRinnovoDataExisting = readStorageJSON('tesserino_rinnovo_data', {});
 
     // Funzione helper per il salvataggio sicuro
-    const saveData = (base64Content, fileName, fileType) => {
+    const saveData = (base64Content, fileName, fileType, rinnovoBase64Content, rinnovoFileName, rinnovoFileType) => {
         const data = { 
             nome: nomeVal, 
             cf: cfVal, 
@@ -1894,9 +1928,21 @@ function saveTesserino() {
             tipoFile: fileType !== undefined ? fileType : (tDataExisting.tipoFile || null),
             contenutoBase64: base64Content !== undefined ? base64Content : (tDataExisting.contenutoBase64 || null)
         };
+
+        const rinnovoData = {
+            dataPagamento: rinnovoDataVal || tRinnovoDataExisting.dataPagamento || '',
+            nomeFile: rinnovoFileName !== undefined ? rinnovoFileName : (tRinnovoDataExisting.nomeFile || null),
+            tipoFile: rinnovoFileType !== undefined ? rinnovoFileType : (tRinnovoDataExisting.tipoFile || null),
+            contenutoBase64: rinnovoBase64Content !== undefined ? rinnovoBase64Content : (tRinnovoDataExisting.contenutoBase64 || null)
+        };
         
         try {
             localStorage.setItem('tesserino_data', JSON.stringify(data));
+            if (rinnovoData.dataPagamento || rinnovoData.contenutoBase64) {
+                localStorage.setItem('tesserino_rinnovo_data', JSON.stringify(rinnovoData));
+            } else {
+                localStorage.removeItem('tesserino_rinnovo_data');
+            }
             showToast("Dati personali salvati!", 'success');
             openModule('tesserino');
         } catch (e) {
@@ -1917,12 +1963,44 @@ function saveTesserino() {
 
         const reader = new FileReader();
         reader.onload = function(e) {
-            saveData(e.target.result, file.name, file.type);
+            if (rinnovoFile) {
+                if (!isImageFile(rinnovoFile)) {
+                    showToast("Formato non supportato: carica solo immagini.", 'error');
+                    return;
+                }
+                if (rinnovoFile.size > MAX_UPLOAD_IMAGE_SIZE_BYTES) {
+                    showToast("Immagine versamento troppo grande. Max 1.5 MB.", 'error');
+                    return;
+                }
+                const rinnovoReader = new FileReader();
+                rinnovoReader.onload = function(rEvent) {
+                    saveData(e.target.result, file.name, file.type, rEvent.target.result, rinnovoFile.name, rinnovoFile.type);
+                };
+                rinnovoReader.readAsDataURL(rinnovoFile);
+            } else {
+                saveData(e.target.result, file.name, file.type);
+            }
         };
         reader.readAsDataURL(file);
     } else {
-        // Salva mantenendo il file pre-esistente
-        saveData();
+        if (rinnovoFile) {
+            if (!isImageFile(rinnovoFile)) {
+                showToast("Formato non supportato: carica solo immagini.", 'error');
+                return;
+            }
+            if (rinnovoFile.size > MAX_UPLOAD_IMAGE_SIZE_BYTES) {
+                showToast("Immagine versamento troppo grande. Max 1.5 MB.", 'error');
+                return;
+            }
+            const rinnovoReader = new FileReader();
+            rinnovoReader.onload = function(rEvent) {
+                saveData(undefined, undefined, undefined, rEvent.target.result, rinnovoFile.name, rinnovoFile.type);
+            };
+            rinnovoReader.readAsDataURL(rinnovoFile);
+        } else {
+            // Salva mantenendo il file pre-esistente
+            saveData();
+        }
     }
 }
 function saveF24WithFile() {
@@ -2808,6 +2886,7 @@ function mostraRicevuteClienteByIndex(index) {
 function buildCompleteBackupData() {
     return { 
         tesserino: localStorage.getItem('tesserino_data'), 
+        tesserinoRinnovo: localStorage.getItem('tesserino_rinnovo_data'),
         pagopa: localStorage.getItem('pagopa_data'),
         f24: localStorage.getItem('f24_data'),
         storicoVendite: localStorage.getItem('storico_vendite'), 
@@ -3842,7 +3921,7 @@ function importaCalendariJSON(event) {
 async function mostraInfoModulo(moduleName) {
     const guideTesti = {
         'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
-        'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
+        'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi, carica una foto del documento (max 1.5MB) e, se necessario, allega anche la ricevuta del versamento per il rinnovo annuale.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'ricevute': "ℹ️ **Guida - Ricevuta di Vendita Occasionale**\n\nEmetti ricevute di vendita conformi alla normativa vigente (Legge 145/2018). Il sistema sceglie automaticamente il regime fiscale corretto (Imposta Sostitutiva o Ritenuta d'Acconto) in base alla presenza di un F24 valido.",
         'storico_ricevute': "ℹ️ **Guida - Archivio Storico Ricevute**\n\nConsulta l'elenco cronologico di tutte le ricevute emesse, con la possibilità di visualizzarle, modificarle, stamparle o filtrarle per acquirente.",
