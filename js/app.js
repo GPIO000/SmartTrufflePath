@@ -236,6 +236,18 @@ function getRenderableStorageJSON(key, fallbackValue) {
     return sanitizeRenderable(readStorageJSON(key, fallbackValue));
 }
 
+function buildLuoghiSelectOptions(selectedValue = '') {
+    const luoghi = readStorageJSON('luoghi_raccolta', []);
+    const hasSelected = selectedValue && !luoghi.includes(selectedValue);
+    let opts = `<option value="">-- Seleziona Luogo --</option>`;
+    if (hasSelected) {
+        opts += `<option value="${escapeHtml(selectedValue)}" selected>${escapeHtml(selectedValue)}</option>`;
+    }
+    opts += luoghi.map(l => `<option value="${escapeHtml(l)}"${l === selectedValue ? ' selected' : ''}>${escapeHtml(l)}</option>`).join('');
+    opts += `<option value="__altro__">✏️ Altro (inserisci nuovo)...</option>`;
+    return opts;
+}
+
 function aggiungiLuogoRaccolta(luogo) {
     if (!luogo || typeof luogo !== 'string') return;
     const trimmed = luogo.trim();
@@ -347,6 +359,19 @@ const ACTION_HANDLERS = {
     setArchivioRegione: (event) => {
         window.currentArchivioRegione = event.target.value;
         openModule('archivio');
+    },
+    handleLuogoSelectChange: async (event, selectId) => {
+        const sel = document.getElementById(selectId);
+        if (!sel || sel.value !== '__altro__') return;
+        const nuovo = await appPrompt('Inserisci il nuovo luogo / area di raccolta:', '');
+        if (nuovo && nuovo.trim()) {
+            aggiungiLuogoRaccolta(nuovo.trim());
+            // Rebuild options and select the new value
+            sel.innerHTML = buildLuoghiSelectOptions(nuovo.trim());
+            sel.value = nuovo.trim();
+        } else {
+            sel.value = '';
+        }
     },
     refreshRegistroGiornaliero: () => openModule('registro_giornaliero'),
     registerRicevutaSafe: async () => {
@@ -928,8 +953,7 @@ function openModule(moduleName, editMode = false) {
                     </div>
 
                     <label>Luogo / Area di Raccolta e Provincia <span style="color:#ef4444;">*</span>:</label>
-                    <input type="text" id="r-comune" class="mod-input" list="luoghi-raccolta-list" placeholder="Es. Comune / Località (Provincia) - Obbligatorio" autocomplete="off">
-                    <datalist id="luoghi-raccolta-list">${readStorageJSON('luoghi_raccolta', []).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist>
+                    <select id="r-comune" class="mod-input" ${eventActionAttrs('change', 'handleLuogoSelectChange', ['r-comune'])}>${buildLuoghiSelectOptions()}</select>
                     
                     <label>Codice Lotto / Tracciabilità:</label>
                     <input type="text" id="r-lotto" class="mod-input" value="LOTTO-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-01" placeholder="Codice lotto">
@@ -1472,6 +1496,8 @@ function openModule(moduleName, editMode = false) {
                     <select id="reg-specie" class="mod-input">${selectSpecieFormHtml}</select>
                     <label>Peso Totale (grammi):</label>
                     <input type="number" id="reg-peso" class="mod-input" placeholder="Es. 250">
+                    <label>Luogo del Ritrovamento:</label>
+                    <select id="reg-luogo" class="mod-input" ${eventActionAttrs('change', 'handleLuogoSelectChange', ['reg-luogo'])}>${buildLuoghiSelectOptions()}</select>
                     <label>Note:</label>
                     <input type="text" id="reg-note" class="mod-input" placeholder="Es. Bosco di castagni">
                     <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveRaccoltaGiornaliera')}>Salva nel Registro</button>
@@ -1498,6 +1524,7 @@ function openModule(moduleName, editMode = false) {
                             <strong style="color:#f6f1e6; font-size:0.95rem;">📅 ${item.data}</strong>
                             <p style="font-size:0.9rem; color:#4d8a98; margin: 4px 0;"><b>${item.specie}</b></p>
                             <p style="font-size:0.85rem; color:#22c55e; margin: 2px 0;">⚖️ Peso: <b>${item.peso} g</b></p>
+                            ${item.luogo ? `<p style="font-size:0.8rem; color:#a3c4bc; margin: 2px 0;">📍 Luogo: ${escapeHtml(item.luogo)}</p>` : ''}
                             <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteRaccoltaGiornaliera', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
@@ -2439,10 +2466,12 @@ function saveRaccoltaGiornaliera() {
     const data = document.getElementById('reg-data').value;
     const specie = document.getElementById('reg-specie').value;
     const peso = parseFloat(document.getElementById('reg-peso').value) || 0;
+    const luogo = document.getElementById('reg-luogo').value.trim();
     const note = document.getElementById('reg-note').value.trim();
     if (!data || peso <= 0) { showToast("Data e peso obbligatori.", 'error'); return; }
+    if (luogo) aggiungiLuogoRaccolta(luogo);
     let storicoRaccolta = readStorageJSON('storico_raccolta_giornaliera', []);
-    storicoRaccolta.push({ data, specie, peso, note });
+    storicoRaccolta.push({ data, specie, peso, luogo, note });
     localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
     showToast("Raccolta registrata!", 'success');
     openModule('registro_giornaliero');
@@ -2879,7 +2908,12 @@ function modificaRicevuta(index) {
         if (elQualita) elQualita.value = v.qualita || 'Prima Scelta';
         if (elPeso) elPeso.value = v.peso || '';
         if (elImporto) { elImporto.value = v.importo || ''; calcolaRitenutaAcconto(); }
-        if (elComune) elComune.value = v.comune || '';
+        if (elComune) {
+            if (v.comune && !Array.from(elComune.options).some(o => o.value === v.comune)) {
+                elComune.innerHTML = buildLuoghiSelectOptions(v.comune);
+            }
+            elComune.value = v.comune || '';
+        }
         if (elLotto) elLotto.value = v.lotto || '';
         if (elF24) elF24.value = v.f24 || '';
 
