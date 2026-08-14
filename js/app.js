@@ -2277,6 +2277,12 @@ function openModule(moduleName, editMode = false) {
                     </div>
                     <button class="overlay-btn btn-primary" style="width:100%; margin-bottom:10px;" ${actionAttrs('scaricaRegioniOffline')}>📥 Scarica Regioni Selezionate</button>
                     <button class="overlay-btn btn-danger" style="width:100%;" ${actionAttrs('eliminaCacheMappaOffline')}>🗑️ Elimina Tutta la Cache Mappa</button>
+                </div>
+                <div class="module-card" style="margin-bottom:14px;">
+                    <p style="font-size:0.85rem; color:#f6f1e6; font-weight:bold; margin:0 0 8px 0;">📦 Stato cache per regione</p>
+                    <div id="offline-cache-status" style="font-size:0.82rem; color:#b8b0a0;">
+                        <p style="margin:0; color:#6b7280; font-size:0.8rem;">Verifica in corso…</p>
+                    </div>
                 </div>`;
             break;
         }
@@ -2297,6 +2303,9 @@ function openModule(moduleName, editMode = false) {
     if (moduleName === 'export') {
         setTimeout(syncAutomaticBackupDestinationUI, 0);
         setTimeout(syncAutomaticBackupStatusUI, 0);
+    }
+    if (moduleName === 'mappa_offline') {
+        setTimeout(aggiornaStatoCacheRegioni, 0);
     }
 }
 
@@ -4740,6 +4749,39 @@ async function scaricaRegioniOffline() {
     } else {
         showToast(`✅ Download completato! ${total} tile salvati per uso offline.`, 'success');
     }
+    aggiornaStatoCacheRegioni();
+}
+
+async function aggiornaStatoCacheRegioni() {
+    let cachedUrls = new Set();
+    try {
+        const cacheKeys = await caches.keys();
+        if (cacheKeys.includes('smarttruffle-map-offline')) {
+            const cache = await caches.open('smarttruffle-map-offline');
+            const requests = await cache.keys();
+            requests.forEach(req => cachedUrls.add(req.url));
+        }
+    } catch {
+        return;
+    }
+
+    const statusEl = document.getElementById('offline-cache-status');
+    if (!statusEl) return;
+
+    const pref = readStorageJSON('offline_regioni_preferite', { regioni: [], maxZoom: 14 });
+    const maxZoom = typeof pref.maxZoom === 'number' ? pref.maxZoom : 14;
+
+    let html = '';
+    for (const regione of REGIONI_ITALIA_OFFLINE) {
+        const sampleUrls = getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, Math.min(maxZoom, OFFLINE_MAP_MIN_ZOOM + 1));
+        const hasTiles = sampleUrls.some(url => cachedUrls.has(url));
+        const badge = hasTiles
+            ? `<span style="color:#22c55e; font-size:0.75rem; font-weight:bold; margin-left:4px;">✅ in cache</span>`
+            : `<span style="color:#6b7280; font-size:0.75rem; margin-left:4px;">⬜ non scaricata</span>`;
+        html += `<div style="display:flex; align-items:center; justify-content:space-between; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+            <span style="font-size:0.82rem; color:#ddd6c8;">${escapeHtml(regione.nome)}</span>${badge}</div>`;
+    }
+    statusEl.innerHTML = html;
 }
 
 async function eliminaCacheMappaOffline() {
@@ -4755,6 +4797,7 @@ async function eliminaCacheMappaOffline() {
     } catch {
         showToast('Errore durante l\'eliminazione della cache.', 'error');
     }
+    aggiornaStatoCacheRegioni();
 }
 
 // ── Re-download automatico regioni offline al ritorno della connessione ────────
