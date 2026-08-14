@@ -4730,7 +4730,13 @@ async function getOfflineMapCachedUrlsSet() {
         // If cache does not exist, open() creates an empty cache and we return an empty Set.
     }
     const cache = await cacheStorage.open('smarttruffle-map-offline');
-    const requests = await cache.keys();
+    if (!cache || typeof cache.keys !== 'function') return new Set();
+    let requests = [];
+    try {
+        requests = await cache.keys();
+    } catch {
+        return new Set();
+    }
     return new Set(requests.map(req => req.url));
 }
 
