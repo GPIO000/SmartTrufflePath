@@ -1,5 +1,5 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-14b';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-14c';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './js/app.js',
+  './js/backup-utils.js',
   './js/storage-sync.js',
   './js/fiscal-utils.js',
   './vendor/leaflet/dist/leaflet.css',
