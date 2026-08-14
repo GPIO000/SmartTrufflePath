@@ -4723,17 +4723,15 @@ function getCacheStorageSafe() {
 async function getOfflineMapCachedUrlsSet() {
     const cacheStorage = getCacheStorageSafe();
     if (!cacheStorage) throw new Error('CACHE_API_UNAVAILABLE');
-    if (typeof cacheStorage.keys !== 'function') return new Set();
+    // Apre direttamente la cache (se non esiste, open() la crea vuota e keys() restituirà []).
+    // Non si usa caches.keys() per il pre-check perché su alcuni browser può restituire
+    // un array vuoto o incompleto anche quando la cache esiste, causando false-negative.
+    let cache;
     try {
-        const cacheNames = await cacheStorage.keys();
-        if (!cacheNames.includes('smarttruffle-map-offline')) {
-            return new Set();
-        }
+        cache = await cacheStorage.open('smarttruffle-map-offline');
     } catch {
-        // Fallback: some browsers can fail on keys(); open() may still work.
-        // If cache does not exist, open() creates an empty cache and we return an empty Set.
+        return new Set();
     }
-    const cache = await cacheStorage.open('smarttruffle-map-offline');
     if (!cache || typeof cache.keys !== 'function') return new Set();
     let requests = [];
     try {
