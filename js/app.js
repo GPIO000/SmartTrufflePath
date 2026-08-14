@@ -4710,6 +4710,20 @@ function getTileUrls(bbox, minZoom, maxZoom) {
     return urls;
 }
 
+function getCacheStorageSafe() {
+    const cacheStorage = globalThis && globalThis.caches;
+    if (!cacheStorage || typeof cacheStorage.open !== 'function') return null;
+    return cacheStorage;
+}
+
+async function getOfflineMapCachedUrlsSet() {
+    const cacheStorage = getCacheStorageSafe();
+    if (!cacheStorage) throw new Error('CACHE_API_UNAVAILABLE');
+    const cache = await cacheStorage.open('smarttruffle-map-offline');
+    const requests = await cache.keys();
+    return new Set(requests.map(req => req.url));
+}
+
 async function scaricaRegioniOffline() {
     const selezionate = [...document.querySelectorAll('.offline-region-cb:checked')].map(cb => cb.value);
     if (selezionate.length === 0) {
@@ -4785,17 +4799,14 @@ async function scaricaRegioniOffline() {
 }
 
 async function aggiornaStatoCacheRegioni() {
-    let cachedUrls = new Set();
+    let cachedUrls;
     try {
-        const cacheKeys = await caches.keys();
-        if (cacheKeys.includes('smarttruffle-map-offline')) {
-            const cache = await caches.open('smarttruffle-map-offline');
-            const requests = await cache.keys();
-            requests.forEach(req => cachedUrls.add(req.url));
-        }
+        cachedUrls = await getOfflineMapCachedUrlsSet();
     } catch {
         const statusEl = document.getElementById('offline-cache-status');
-        if (statusEl) statusEl.innerHTML = '<p style="margin:0; color:#ef4444; font-size:0.8rem;">⚠️ Impossibile verificare la cache.</p>';
+        if (statusEl) {
+            statusEl.innerHTML = '<p style="margin:0; color:#ef4444; font-size:0.8rem;">⚠️ Impossibile verificare la cache locale del browser.</p>';
+        }
         return;
     }
 
@@ -4842,12 +4853,8 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
     // Controlla se la cache è assente o vuota
     let cacheEsistente = false;
     try {
-        const cacheKeys = await caches.keys();
-        if (cacheKeys.includes('smarttruffle-map-offline')) {
-            const cache = await caches.open('smarttruffle-map-offline');
-            const cachedRequests = await cache.keys();
-            cacheEsistente = cachedRequests.length > 0;
-        }
+        const cachedUrls = await getOfflineMapCachedUrlsSet();
+        cacheEsistente = cachedUrls.size > 0;
     } catch {
         return; // Cache API non disponibile, nessuna azione
     }
