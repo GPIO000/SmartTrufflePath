@@ -63,7 +63,7 @@ self.addEventListener('fetch', (e) => {
     requestUrl.pathname.endsWith('.html') ||
     requestUrl.pathname.endsWith('.js') ||
     requestUrl.pathname.endsWith('.css') ||
-    requestUrl.pathname.endsWith('.json')
+    requestUrl.pathname.endsWith('/manifest.json')
   );
 
   // Gestione speciale per le tile delle mappe (OpenStreetMap) o risorse esterne dinamiche
@@ -94,18 +94,26 @@ self.addEventListener('fetch', (e) => {
   if (isCoreAppAsset) {
     e.respondWith(
       fetch(e.request).then((networkResponse) => {
-        if (networkResponse.ok) {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, networkResponse.clone());
-          }).catch(() => {});
+        if (!networkResponse.ok) {
+          return caches.match(e.request).then((cachedResponse) => {
+            return cachedResponse || networkResponse;
+          });
         }
-        return networkResponse;
+        return caches.open(CACHE_NAME)
+          .then((cache) => cache.put(e.request, networkResponse.clone()))
+          .then(() => networkResponse)
+          .catch(() => networkResponse);
       }).catch(() => {
         return caches.match(e.request).then((cachedResponse) => {
           if (cachedResponse) return cachedResponse;
-          return caches.match('./index.html').then((offlinePage) => {
-            return offlinePage || serviceUnavailableResponse();
-          });
+          const acceptsHtml = e.request.mode === 'navigate' ||
+            (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html'));
+          if (acceptsHtml) {
+            return caches.match('./index.html').then((offlinePage) => {
+              return offlinePage || serviceUnavailableResponse();
+            });
+          }
+          return serviceUnavailableResponse();
         });
       })
     );
@@ -118,12 +126,11 @@ self.addEventListener('fetch', (e) => {
         return cachedResponse;
       }
       return fetch(e.request).then((networkResponse) => {
-        if (networkResponse.ok) {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, networkResponse.clone());
-          }).catch(() => {});
-        }
-        return networkResponse;
+        if (!networkResponse.ok) return networkResponse;
+        return caches.open(CACHE_NAME)
+          .then((cache) => cache.put(e.request, networkResponse.clone()))
+          .catch(() => {})
+          .then(() => networkResponse);
       }).catch(() => {
         // Fallback di sicurezza offline per pagine HTML
         if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
