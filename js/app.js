@@ -1472,6 +1472,9 @@ function openModule(moduleName, editMode = false) {
                     <select id="reg-specie" class="mod-input">${selectSpecieFormHtml}</select>
                     <label>Peso Totale (grammi):</label>
                     <input type="number" id="reg-peso" class="mod-input" placeholder="Es. 250">
+                    <label>Luogo del Ritrovamento:</label>
+                    <input type="text" id="reg-luogo" class="mod-input" list="luoghi-raccolta-list-reg" placeholder="Es. Norcia (PG)" autocomplete="off">
+                    <datalist id="luoghi-raccolta-list-reg">${readStorageJSON('luoghi_raccolta', []).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist>
                     <label>Note:</label>
                     <input type="text" id="reg-note" class="mod-input" placeholder="Es. Bosco di castagni">
                     <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveRaccoltaGiornaliera')}>Salva nel Registro</button>
@@ -1498,6 +1501,7 @@ function openModule(moduleName, editMode = false) {
                             <strong style="color:#f6f1e6; font-size:0.95rem;">📅 ${item.data}</strong>
                             <p style="font-size:0.9rem; color:#4d8a98; margin: 4px 0;"><b>${item.specie}</b></p>
                             <p style="font-size:0.85rem; color:#22c55e; margin: 2px 0;">⚖️ Peso: <b>${item.peso} g</b></p>
+                            ${item.luogo ? `<p style="font-size:0.8rem; color:#a3c4bc; margin: 2px 0;">📍 Luogo: ${escapeHtml(item.luogo)}</p>` : ''}
                             <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteRaccoltaGiornaliera', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
@@ -2439,10 +2443,12 @@ function saveRaccoltaGiornaliera() {
     const data = document.getElementById('reg-data').value;
     const specie = document.getElementById('reg-specie').value;
     const peso = parseFloat(document.getElementById('reg-peso').value) || 0;
+    const luogo = document.getElementById('reg-luogo').value.trim();
     const note = document.getElementById('reg-note').value.trim();
     if (!data || peso <= 0) { showToast("Data e peso obbligatori.", 'error'); return; }
+    if (luogo) aggiungiLuogoRaccolta(luogo);
     let storicoRaccolta = readStorageJSON('storico_raccolta_giornaliera', []);
-    storicoRaccolta.push({ data, specie, peso, note });
+    storicoRaccolta.push({ data, specie, peso, luogo, note });
     localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
     showToast("Raccolta registrata!", 'success');
     openModule('registro_giornaliero');
