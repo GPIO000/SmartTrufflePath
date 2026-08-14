@@ -56,6 +56,15 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
 
   const requestUrl = new URL(e.request.url);
+  const isSameOrigin = requestUrl.origin === self.location.origin;
+  const isCoreAppAsset = isSameOrigin && (
+    e.request.mode === 'navigate' ||
+    requestUrl.pathname.endsWith('/') ||
+    requestUrl.pathname.endsWith('.html') ||
+    requestUrl.pathname.endsWith('.js') ||
+    requestUrl.pathname.endsWith('.css') ||
+    requestUrl.pathname.endsWith('.json')
+  );
 
   // Gestione speciale per le tile delle mappe (OpenStreetMap) o risorse esterne dinamiche
   if (requestUrl.hostname === 'tile.openstreetmap.org') {
@@ -74,6 +83,28 @@ self.addEventListener('fetch', (e) => {
             });
           }).catch(() => {
             return serviceUnavailableResponse();
+          });
+        });
+      })
+    );
+    return;
+  }
+
+  // Per gli asset principali dell'app usa Network-First per vedere subito gli aggiornamenti
+  if (isCoreAppAsset) {
+    e.respondWith(
+      fetch(e.request).then((networkResponse) => {
+        if (networkResponse.ok) {
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, networkResponse.clone());
+          }).catch(() => {});
+        }
+        return networkResponse;
+      }).catch(() => {
+        return caches.match(e.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          return caches.match('./index.html').then((offlinePage) => {
+            return offlinePage || serviceUnavailableResponse();
           });
         });
       })
