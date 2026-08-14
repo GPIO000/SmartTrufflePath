@@ -30,6 +30,30 @@ const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
 
+function getOfflinePreferredMaxZoom() {
+    const pref = readStorageJSON('offline_regioni_preferite', null);
+    if (!pref || typeof pref.maxZoom !== 'number') return null;
+    return pref.maxZoom;
+}
+
+function getAdaptiveFocusZoom(defaultZoom) {
+    const offlineMaxZoom = getOfflinePreferredMaxZoom();
+    if (!navigator.onLine && offlineMaxZoom !== null) {
+        return Math.min(defaultZoom, offlineMaxZoom);
+    }
+    return defaultZoom;
+}
+
+function clampMapZoomForOffline() {
+    if (navigator.onLine) return;
+    const offlineMaxZoom = getOfflinePreferredMaxZoom();
+    if (offlineMaxZoom === null) return;
+    if (map.getZoom() > offlineMaxZoom) {
+        map.setZoom(offlineMaxZoom);
+        showToast(`📉 Zoom ridotto a ${offlineMaxZoom} per usare le tile offline disponibili.`, 'info');
+    }
+}
+
 // ── Regioni italiane per download mappa offline ───────────────────────────────
 const OFFLINE_MAP_MIN_ZOOM = 8;
 const REGIONI_ITALIA_OFFLINE = [
@@ -708,7 +732,7 @@ if (navigator.geolocation) {
         reverseGeocodePosition(lat, lng);
         if (!userMarker) {
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>Sei qui</b>").openPopup();
-            map.setView([lat, lng], 16);
+            map.setView([lat, lng], getAdaptiveFocusZoom(16));
             renderAllPoiMarkers();
         } else { userMarker.setLatLng([lat, lng]); }
         updateCompass(lat, lng);
@@ -828,7 +852,7 @@ async function savePoiPosition() {
         const newIndex = addPoi(pos.lat, pos.lng, note);
         renderAllPoiMarkers();
         targetNavigation = `poi_${newIndex}`;
-        map.setView([pos.lat, pos.lng], 18);
+        map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
         showToast("📍 Punto salvato!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
@@ -836,7 +860,7 @@ async function savePoiPosition() {
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
-        map.setView([poiList[index].lat, poiList[index].lng], 18);
+        map.setView([poiList[index].lat, poiList[index].lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
         closeActiveModule();
         showToast(`🧭 Destinazione: ${poiList[index].note}`, 'success');
@@ -3835,7 +3859,7 @@ function toggleDrawer() {
 }
 
 function centerOnUser() {
-    if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], 16); userMarker.openPopup(); }
+    if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(16)); userMarker.openPopup(); }
     else { showToast("Posizione GPS non disponibile.", 'error'); }
 }
 
@@ -4873,4 +4897,8 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 
 window.addEventListener('online', () => {
     autoRiscaricaRegioniOfflineSeNecessario();
+});
+
+window.addEventListener('offline', () => {
+    clampMapZoomForOffline();
 });
