@@ -4711,7 +4711,7 @@ function getTileUrls(bbox, minZoom, maxZoom) {
 }
 
 function getCacheStorageSafe() {
-    const cacheStorage = globalThis && globalThis.caches;
+    const cacheStorage = globalThis.caches;
     if (!cacheStorage || typeof cacheStorage.open !== 'function') return null;
     return cacheStorage;
 }
@@ -4719,6 +4719,16 @@ function getCacheStorageSafe() {
 async function getOfflineMapCachedUrlsSet() {
     const cacheStorage = getCacheStorageSafe();
     if (!cacheStorage) throw new Error('CACHE_API_UNAVAILABLE');
+    if (typeof cacheStorage.keys !== 'function') return new Set();
+    try {
+        const cacheNames = await cacheStorage.keys();
+        if (!cacheNames.includes('smarttruffle-map-offline')) {
+            return new Set();
+        }
+    } catch {
+        // Fallback: some browsers can fail on keys(); open() may still work.
+        // If cache does not exist, open() creates an empty cache and we return an empty Set.
+    }
     const cache = await cacheStorage.open('smarttruffle-map-offline');
     const requests = await cache.keys();
     return new Set(requests.map(req => req.url));
