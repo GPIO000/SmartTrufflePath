@@ -384,6 +384,7 @@ const ACTION_HANDLERS = {
     archiviaAnnoPrecedente: () => archiviaAnnoPrecedente(),
     setArchivioRegione: (event) => {
         window.currentArchivioRegione = event.target.value;
+        localStorage.setItem('archivio_regione_selezionata', event.target.value);
         openModule('archivio');
     },
     handleLuogoSelectChange: async (event, selectId) => {
@@ -535,6 +536,11 @@ function restoreBackupEntries(data) {
 
     if (Object.prototype.hasOwnProperty.call(data, 'backupDirLabel') && typeof data.backupDirLabel === 'string' && data.backupDirLabel) {
         setAutomaticBackupDestinationLabel(data.backupDirLabel);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, 'archivioRegioneSelezionata') && typeof data.archivioRegioneSelezionata === 'string' && data.archivioRegioneSelezionata) {
+        localStorage.setItem('archivio_regione_selezionata', data.archivioRegioneSelezionata);
+        window.currentArchivioRegione = data.archivioRegioneSelezionata;
     }
 }
 
@@ -2048,7 +2054,7 @@ function openModule(moduleName, editMode = false) {
             ];
 
             // Recupera la regione selezionata nell'archivio o usa una di default
-            const regioneSelezionataArchivio = window.currentArchivioRegione || "Campania";
+            const regioneSelezionataArchivio = window.currentArchivioRegione || localStorage.getItem('archivio_regione_selezionata') || "Campania";
 
             let calendariPersonalizzatiArchivio = getRenderableStorageJSON('calendari_tartufi_custom', {});
             let datiRegioneArchivio = calendariPersonalizzatiArchivio[regioneSelezionataArchivio] || {};
@@ -3518,6 +3524,7 @@ function buildCompleteBackupData() {
         calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
         noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
         offlineRegioniPreferite: localStorage.getItem('offline_regioni_preferite'),
+        archivioRegioneSelezionata: localStorage.getItem('archivio_regione_selezionata'),
         backupDirLabel: localStorage.getItem(_BACKUP_DIR_LABEL_KEY)
     };
 }
