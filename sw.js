@@ -58,7 +58,7 @@ self.addEventListener('fetch', (e) => {
   const requestUrl = new URL(e.request.url);
 
   // Gestione speciale per le tile delle mappe (OpenStreetMap) o risorse esterne dinamiche
-  if (requestUrl.hostname === 'tile.openstreetmap.org' || requestUrl.hostname.endsWith('.tile.openstreetmap.org')) {
+  if (requestUrl.hostname === 'tile.openstreetmap.org' || /^[abc]\.tile\.openstreetmap\.org$/.test(requestUrl.hostname)) {
     e.respondWith(
       caches.match(e.request).then((cachedResponse) => {
         // Cerca prima nella cache offline dedicata alla mappa, poi nel cache generale
