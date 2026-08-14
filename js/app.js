@@ -775,6 +775,17 @@ function updateCompass(currentLat, currentLng) {
     }
 }
 
+function getSavedSenderName() {
+    const tData = readStorageJSON('tesserino_data', {});
+    return typeof tData.nome === 'string' ? tData.nome.trim() : '';
+}
+
+function buildSharedPoiMessage(poi) {
+    const senderName = getSavedSenderName();
+    const senderLine = senderName ? `\nDa: ${senderName}` : '';
+    return `📍 TARTUFAIA CONDIVISA${senderLine}\nNota: ${poi.note}\nData: ${poi.date}\nGoogle Maps: https://maps.google.com/?q=${poi.lat},${poi.lng}`;
+}
+
 function addPoi(lat, lng, note, type, from) {
     const savedAt = new Date().toISOString();
     const id = `poi-${savedAt}-${Math.random().toString(36).slice(2, 8)}`;
@@ -827,7 +838,7 @@ function navigateToPoi(index) {
 function sharePoi(index) {
     if (poiList[index]) {
         const p = poiList[index];
-        const msg = `📍 TARTUFAIA CONDIVISA\nNota: ${p.note}\nData: ${p.date}\nGoogle Maps: https://maps.google.com/?q=${p.lat},${p.lng}`;
+        const msg = buildSharedPoiMessage(p);
         if (navigator.share) { navigator.share({ title: 'Tartufaia', text: msg }).catch(() => {}); }
         else { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
     }
@@ -856,6 +867,11 @@ function extractCoordsFromMessage(text) {
     return null;
 }
 
+function extractSenderNameFromMessage(text) {
+    const match = text.match(/(?:^|[\n\r]|[.!?]\s)(?:da|mittente)[:\s]+([^\n\r.]+)/i);
+    return match ? match[1].trim().slice(0, 80) : '';
+}
+
 function importSharedPoint() {
     const msgEl = document.getElementById('condiviso-msg-input');
     const fromEl = document.getElementById('condiviso-from-input');
@@ -867,7 +883,7 @@ function importSharedPoint() {
         showToast("Nessuna coordinata GPS trovata nel messaggio.", 'error');
         return;
     }
-    const from = fromEl ? fromEl.value.trim() : '';
+    const from = (fromEl ? fromEl.value.trim() : '') || extractSenderNameFromMessage(text);
     // Determine type: SOS if message contains emergency keywords
     const isSOS = /sos|emergenz|soccors|urgenz|aiuto/i.test(text);
     const type = isSOS ? 'sos' : 'shared';
@@ -887,7 +903,9 @@ function importSharedPoint() {
 function triggerSOS() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
-        const msg = `EMERGENZA TARTUFAIA! Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
+        const senderName = getSavedSenderName();
+        const senderLine = senderName ? ` Da: ${senderName}.` : '';
+        const msg = `EMERGENZA TARTUFAIA!${senderLine} Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
         window.location.href = `sms:?body=${encodeURIComponent(msg)}`;
     } else { showToast("Impossibile rilevare le coordinate GPS.", 'error'); }
 }
@@ -935,11 +953,11 @@ function openModule(moduleName, editMode = false) {
         case 'punti_condivisi':
             contentHTML = `
                 <h2>📩 Importa Punti Condivisi / SOS</h2>
-                <p>Incolla qui il messaggio ricevuto da un altro utente (punto condiviso o SOS). Il sistema estrarrà automaticamente le coordinate e salverà il punto nell'elenco.</p>
+                <p>Incolla qui il messaggio ricevuto da un altro utente (punto condiviso o SOS). Il sistema estrarrà automaticamente le coordinate e, se presente, anche il nome del mittente.</p>
                 <div class="module-card">
                     <label for="condiviso-msg-input" style="display:block; margin-bottom:8px; font-weight:bold;">Messaggio ricevuto:</label>
-                    <textarea id="condiviso-msg-input" class="mod-input" rows="6" placeholder="Incolla qui il messaggio ricevuto...&#10;&#10;Esempio:&#10;📍 TARTUFAIA CONDIVISA&#10;Nota: Quercia grande&#10;Google Maps: https://maps.google.com/?q=43.1234,11.5678&#10;&#10;oppure:&#10;EMERGENZA TARTUFAIA! Coordinate GPS: Lat: 43.1234, Lng: 11.5678." style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
-                    <label for="condiviso-from-input" style="display:block; margin:12px 0 6px; font-weight:bold;">Da (mittente, opzionale):</label>
+                    <textarea id="condiviso-msg-input" class="mod-input" rows="6" placeholder="Incolla qui il messaggio ricevuto...&#10;&#10;Esempio:&#10;📍 TARTUFAIA CONDIVISA&#10;Da: Mario Rossi&#10;Nota: Quercia grande&#10;Google Maps: https://maps.google.com/?q=43.1234,11.5678&#10;&#10;oppure:&#10;EMERGENZA TARTUFAIA! Da: Mario Rossi. Coordinate GPS: Lat: 43.1234, Lng: 11.5678." style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
+                    <label for="condiviso-from-input" style="display:block; margin:12px 0 6px; font-weight:bold;">Da (mittente, opzionale solo per messaggi vecchi):</label>
                     <input type="text" id="condiviso-from-input" class="mod-input" placeholder="Es. Mario Rossi" style="width:100%; box-sizing:border-box;">
                     <button class="overlay-btn btn-primary" style="margin-top:14px; width:100%;" ${actionAttrs('importSharedPoint', [])}>📥 Importa Punto</button>
                 </div>`;
@@ -4588,7 +4606,7 @@ function importaCalendariJSON(event) {
 async function mostraInfoModulo(moduleName) {
     const guideTesti = {
         'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
-        'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS e salva il punto nell'elenco con l'icona appropriata (📩 condiviso, 🚨 SOS).",
+        'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS, rileva il nome del mittente quando presente nel testo e salva il punto nell'elenco con l'icona appropriata (📩 condiviso, 🚨 SOS).",
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'archivio_documenti': "ℹ️ **Guida - Archivio Altri Documenti**\n\nSalva altri documenti (es. carta d'identità o autorizzazione funghi) indicando numero documento, scadenza e immagine del documento. Puoi anche allegare l'immagine della ricevuta di rinnovo.",
