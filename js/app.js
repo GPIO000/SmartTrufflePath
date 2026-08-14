@@ -323,7 +323,6 @@ const ACTION_HANDLERS = {
     navigateToPoi: (_event, index) => navigateToPoi(index),
     sharePoi: (_event, index) => sharePoi(index),
     deletePoi: (_event, index) => deletePoi(index),
-    importSharedPoint: () => importSharedPoint(),
     viewStoredDocument: (_event, storageKey, title, moduleName) => viewStoredDocument(storageKey, title, moduleName),
     clearData: (_event, storageKey, moduleName) => clearData(storageKey, moduleName),
     saveTesserino: () => saveTesserino(),
@@ -592,12 +591,14 @@ function normalizePoiList(rawPoiList) {
 
             const note = typeof poi.note === 'string' && poi.note.trim() ? poi.note.trim() : 'Punto di interesse';
             const id = typeof poi.id === 'string' && poi.id.trim() ? poi.id.trim() : `poi-${savedAt}-${index}`;
-            const type = typeof poi.type === 'string' && poi.type.trim() ? poi.type.trim() : undefined;
-            const from = typeof poi.from === 'string' && poi.from.trim() ? poi.from.trim() : undefined;
-            const entry = { id, lat, lng, note, savedAt, date: formatPoiDisplayDate(savedAt) };
-            if (type) entry.type = type;
-            if (from) entry.from = from;
-            return entry;
+            return {
+                id,
+                lat,
+                lng,
+                note,
+                savedAt,
+                date: formatPoiDisplayDate(savedAt)
+            };
         })
         .filter(Boolean);
 
@@ -716,26 +717,8 @@ function renderAllPoiMarkers() {
     poiMapMarkers = {};
     poiList.forEach((poi, index) => {
         const safePoi = sanitizeRenderable(poi);
-        const isAuto = poi.type === 'auto';
-        const isSos = poi.type === 'sos';
-        const isShared = poi.type === 'shared';
-        let icon, popupTitle;
-        if (isAuto) {
-            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">🚗</div>', iconAnchor: [14, 14] });
-            popupTitle = '🚗 Auto';
-        } else if (isSos) {
-            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">🚨</div>', iconAnchor: [14, 14] });
-            popupTitle = '🚨 SOS';
-        } else if (isShared) {
-            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">📩</div>', iconAnchor: [14, 14] });
-            popupTitle = '📩 Punto Condiviso';
-        } else {
-            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">📍</div>', iconAnchor: [14, 14] });
-            popupTitle = '📍 Tartufo / Punto';
-        }
-        const fromInfo = poi.from ? `<br><small>Da: ${safePoi.from || ''}</small>` : '';
-        const marker = L.marker([poi.lat, poi.lng], { icon }).addTo(map)
-            .bindPopup(`<b>${popupTitle}</b><br>Nota: ${safePoi.note || 'Nessuna nota'}<br><small>${safePoi.date || ''}</small>${fromInfo}`);
+        const marker = L.marker([poi.lat, poi.lng]).addTo(map)
+            .bindPopup(`<b>📍 Tartufo / Punto</b><br>Nota: ${safePoi.note || 'Nessuna nota'}<br><small>${safePoi.date || ''}</small>`);
         poiMapMarkers[index] = marker;
     });
 }
@@ -769,37 +752,23 @@ function updateCompass(currentLat, currentLng) {
     }
     if (target) {
         const res = calculateDistanceAndBearing(currentLat, currentLng, target.lat, target.lng);
-        compassText.innerHTML = `🧭 <b>${escapeHtml(label)}:</b> ${res.arrow} ${res.distance} (${res.direction})`;
+        compassText.innerHTML = `🧭 <b>${label}:</b> ${res.arrow} ${res.distance} (${res.direction})`;
     } else {
         compassText.innerHTML = `🧭 Seleziona una destinazione dall'elenco punti`;
     }
 }
 
-function getSavedSenderName() {
-    const tData = readStorageJSON('tesserino_data', {});
-    return typeof tData.nome === 'string' ? tData.nome.trim() : '';
-}
-
-function buildSharedPoiMessage(poi) {
-    const senderName = getSavedSenderName();
-    const senderLine = senderName ? `\nDa: ${senderName}` : '';
-    return `📍 TARTUFAIA CONDIVISA${senderLine}\nNota: ${poi.note}\nData: ${poi.date}\nGoogle Maps: https://maps.google.com/?q=${poi.lat},${poi.lng}`;
-}
-
-function addPoi(lat, lng, note, type, from) {
+function addPoi(lat, lng, note) {
     const savedAt = new Date().toISOString();
     const id = `poi-${savedAt}-${Math.random().toString(36).slice(2, 8)}`;
-    const entry = {
+    poiList.push({
         id,
         lat,
         lng,
         note: note.trim() || 'Punto di interesse',
         savedAt,
         date: formatPoiDisplayDate(savedAt)
-    };
-    if (type) entry.type = type;
-    if (from) entry.from = from;
-    poiList.push(entry);
+    });
     poiList = normalizePoiList(poiList);
     localStorage.setItem('poi_list', JSON.stringify(poiList));
     return poiList.findIndex((poi) => poi.id === id);
@@ -808,7 +777,7 @@ function addPoi(lat, lng, note, type, from) {
 function saveCarPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
-        addPoi(pos.lat, pos.lng, 'Auto', 'auto');
+        addPoi(pos.lat, pos.lng, 'Auto');
         renderAllPoiMarkers();
         showToast("🚗 Posizione auto aggiunta nell'elenco punti!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
@@ -838,7 +807,7 @@ function navigateToPoi(index) {
 function sharePoi(index) {
     if (poiList[index]) {
         const p = poiList[index];
-        const msg = buildSharedPoiMessage(p);
+        const msg = `📍 TARTUFAIA CONDIVISA\nNota: ${p.note}\nData: ${p.date}\nGoogle Maps: https://maps.google.com/?q=${p.lat},${p.lng}`;
         if (navigator.share) { navigator.share({ title: 'Tartufaia', text: msg }).catch(() => {}); }
         else { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
     }
@@ -853,60 +822,10 @@ async function deletePoi(index) {
         openModule('poilist');
     }
 }
-
-function extractCoordsFromMessage(text) {
-    // Try Google Maps URL: ?q=lat,lng
-    let m = text.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-    // Try "Lat: X, Lng: Y" or "Lat: X Lng: Y"
-    m = text.match(/lat[:\s]+(-?\d+\.?\d*)[,\s]+ln?g[:\s]+(-?\d+\.?\d*)/i);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-    // Try GPS coordinate pairs like "43.1234, 11.5678" or "43.1234,11.5678"
-    m = text.match(/(-?\d{1,3}\.\d{4,})[,\s]+(-?\d{1,3}\.\d{4,})/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-    return null;
-}
-
-function extractSenderNameFromMessage(text) {
-    const match = text.match(/(?:^|[\n\r]|[.!?]\s)(?:da|mittente)[:\s]+([^\n\r.]+)/i);
-    return match ? match[1].trim().slice(0, 80) : '';
-}
-
-function importSharedPoint() {
-    const msgEl = document.getElementById('condiviso-msg-input');
-    const fromEl = document.getElementById('condiviso-from-input');
-    if (!msgEl) return;
-    const text = msgEl.value.trim();
-    if (!text) { showToast("Incolla prima il messaggio ricevuto.", 'error'); return; }
-    const coords = extractCoordsFromMessage(text);
-    if (!coords) {
-        showToast("Nessuna coordinata GPS trovata nel messaggio.", 'error');
-        return;
-    }
-    const from = (fromEl ? fromEl.value.trim() : '') || extractSenderNameFromMessage(text);
-    // Determine type: SOS if message contains emergency keywords
-    const isSOS = /sos|emergenz|soccors|urgenz|aiuto/i.test(text);
-    const type = isSOS ? 'sos' : 'shared';
-    const defaultNote = isSOS ? 'SOS ricevuto' : 'Punto condiviso';
-    // Try to extract a note hint from the message
-    let note = defaultNote;
-    const noteMatch = text.match(/nota[:\s]+([^\n\r]+)/i);
-    if (noteMatch) note = noteMatch[1].trim().slice(0, 80) || defaultNote;
-    const newIndex = addPoi(coords.lat, coords.lng, note, type, from || undefined);
-    renderAllPoiMarkers();
-    const icon = isSOS ? '🚨' : '📩';
-    showToast(`${icon} Punto importato con successo!`, 'success');
-    msgEl.value = '';
-    if (fromEl) fromEl.value = '';
-    openModule('poilist');
-}
-
 function triggerSOS() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
-        const senderName = getSavedSenderName();
-        const senderLine = senderName ? ` Da: ${senderName}.` : '';
-        const msg = `EMERGENZA TARTUFAIA!${senderLine} Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
+        const msg = `EMERGENZA TARTUFAIA! Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
         window.location.href = `sms:?body=${encodeURIComponent(msg)}`;
     } else { showToast("Impossibile rilevare le coordinate GPS.", 'error'); }
 }
@@ -926,21 +845,15 @@ function openModule(moduleName, editMode = false) {
         case 'poilist':
             let poiHtml = '<h2>Elenco Punti & Tartufaie</h2><p>I tuoi punti di ricerca salvati con note:</p>';
             if (poiList.length === 0) {
-                poiHtml += '<div class="module-card"><p>Nessun punto salvato. Usa i tasti "Segna Auto" o "Segna Punto" sulla mappa.</p></div>';
+                poiHtml += '<div class="module-card"><p>Nessun punto salvato. Usa i tasti "Segna Auto" o "Punto" sulla mappa.</p></div>';
             } else {
                 poiList.forEach((poi, idx) => {
                     const safePoi = sanitizeRenderable(poi);
-                    const isAuto = poi.type === 'auto';
-                    const isSos = poi.type === 'sos';
-                    const isShared = poi.type === 'shared';
-                    const poiIcon = isAuto ? '🚗' : isSos ? '🚨' : isShared ? '📩' : '📍';
-                    const fromLine = safePoi.from ? `<p class="text-muted small-text" style="margin:2px 0;">Da: ${safePoi.from}</p>` : '';
                     poiHtml += `
                         <div class="module-card card-gap">
-                            <strong class="text-accent">${poiIcon} ${safePoi.note}</strong>
+                            <strong class="text-accent">📍 ${safePoi.note}</strong>
                             <p class="text-muted small-text" style="margin:4px 0;">Data: ${safePoi.date}</p>
                             <p class="text-subtle small-text">Lat: ${poi.lat.toFixed(4)}, Lng: ${poi.lng.toFixed(4)}</p>
-                            ${fromLine}
                             <div class="btn-row">
                                 <button class="overlay-btn btn-success" ${actionAttrs('navigateToPoi', [idx])}>🧭 Vai</button>
                                 <button class="overlay-btn btn-info" ${actionAttrs('sharePoi', [idx])}>📤 Condividi</button>
@@ -950,18 +863,6 @@ function openModule(moduleName, editMode = false) {
                 });
             }
             contentHTML = poiHtml;
-            break;
-        case 'punti_condivisi':
-            contentHTML = `
-                <h2>📩 Importa Punti Condivisi / SOS</h2>
-                <p>Incolla qui il messaggio ricevuto da un altro utente (punto condiviso o SOS). Il sistema estrarrà automaticamente le coordinate e, se presente, anche il nome del mittente.</p>
-                <div class="module-card">
-                    <label for="condiviso-msg-input" style="display:block; margin-bottom:8px; font-weight:bold;">Messaggio ricevuto:</label>
-                    <textarea id="condiviso-msg-input" class="mod-input" rows="6" placeholder="Incolla qui il messaggio ricevuto...&#10;&#10;Esempio:&#10;📍 TARTUFAIA CONDIVISA&#10;Da: Mario Rossi&#10;Nota: Quercia grande&#10;Google Maps: https://maps.google.com/?q=43.1234,11.5678&#10;&#10;oppure:&#10;EMERGENZA TARTUFAIA! Da: Mario Rossi. Coordinate GPS: Lat: 43.1234, Lng: 11.5678." style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
-                    <label for="condiviso-from-input" style="display:block; margin:12px 0 6px; font-weight:bold;">Da (mittente, opzionale solo per messaggi vecchi):</label>
-                    <input type="text" id="condiviso-from-input" class="mod-input" placeholder="Es. Mario Rossi" style="width:100%; box-sizing:border-box;">
-                    <button class="overlay-btn btn-primary" style="margin-top:14px; width:100%;" ${actionAttrs('importSharedPoint', [])}>📥 Importa Punto</button>
-                </div>`;
             break;
         case 'tesserino':
             const tData = getRenderableStorageJSON('tesserino_data', {});
@@ -4607,7 +4508,6 @@ function importaCalendariJSON(event) {
 async function mostraInfoModulo(moduleName) {
     const guideTesti = {
         'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
-        'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS, rileva il nome del mittente quando presente nel testo e salva il punto nell'elenco con l'icona appropriata (📩 condiviso, 🚨 SOS).",
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'archivio_documenti': "ℹ️ **Guida - Archivio Altri Documenti**\n\nSalva altri documenti (es. carta d'identità o autorizzazione funghi) indicando numero documento, scadenza e immagine del documento. Puoi anche allegare l'immagine della ricevuta di rinnovo.",

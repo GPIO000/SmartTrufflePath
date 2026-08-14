@@ -1,5 +1,5 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-2026-08-14d';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-14';
 const ASSETS = [
   './',
   './index.html',
@@ -8,17 +8,11 @@ const ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './js/app.js',
-  './js/backup-utils.js',
   './js/storage-sync.js',
   './js/fiscal-utils.js',
-  './vendor/leaflet/dist/leaflet.css',
-  './vendor/leaflet/dist/leaflet.js',
-  './vendor/leaflet/dist/images/layers.png',
-  './vendor/leaflet/dist/images/layers-2x.png',
-  './vendor/leaflet/dist/images/marker-icon.png',
-  './vendor/leaflet/dist/images/marker-icon-2x.png',
-  './vendor/leaflet/dist/images/marker-shadow.png',
-  './vendor/html2pdf/html2pdf.bundle.min.js'
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
 
 function serviceUnavailableResponse() {
