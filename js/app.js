@@ -530,6 +530,10 @@ function restoreBackupEntries(data) {
     normalizedEntries.forEach(([storageKey, normalizedValue]) => {
         localStorage.setItem(storageKey, normalizedValue);
     });
+
+    if (Object.prototype.hasOwnProperty.call(data, 'backupDirLabel') && typeof data.backupDirLabel === 'string' && data.backupDirLabel) {
+        setAutomaticBackupDestinationLabel(data.backupDirLabel);
+    }
 }
 
 setTimeout(() => {
@@ -3401,7 +3405,8 @@ function buildCompleteBackupData() {
         heatDiaryList: localStorage.getItem('heat_diary_list'),
         vetClinicsList: localStorage.getItem('vet_clinics_list'),
         calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
-        noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi')
+        noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
+        backupDirLabel: localStorage.getItem(_BACKUP_DIR_LABEL_KEY)
     };
 }
 
