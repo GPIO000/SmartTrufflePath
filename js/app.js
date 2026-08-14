@@ -334,6 +334,8 @@ const ACTION_HANDLERS = {
     shareLocationToVetByIndex: (_event, index) => shareLocationToVetByIndex(index),
     deleteVetClinic: (_event, index) => deleteVetClinic(index),
     salvaNotaClienteDaInput: (_event, index) => salvaNotaClienteDaInput(index),
+    addClienteInRubrica: (_event) => addClienteInRubrica(),
+    editCliente: (_event, index) => editCliente(index),
     creaRicevutaPerCliente: (_event, index) => creaRicevutaPerCliente(index),
     mostraRicevuteClienteByIndex: (_event, index) => mostraRicevuteClienteByIndex(index),
     deleteCliente: (_event, index) => deleteCliente(index),
@@ -1774,52 +1776,55 @@ function openModule(moduleName, editMode = false) {
             break;
 
        case 'clienti':
-    const rubricaClienti = getRenderableStorageJSON('rubrica_clienti', []);
-    
-    // Ordina dal cliente che ha speso di più a quello che ha speso di meno
-    rubricaClienti.sort((a, b) => (b.totaleAcquisti || 0) - (a.totaleAcquisti || 0));
+    const rubricaClienti = readStorageJSON('rubrica_clienti', []);
+    const clientiOrdinati = rubricaClienti
+        .map((cliente, originalIndex) => ({ ...cliente, originalIndex }))
+        .sort((a, b) => (b.totaleAcquisti || 0) - (a.totaleAcquisti || 0));
 
     let clientiHtml = `
-        <h2>Rubrica Clienti & Acquirenti</h2>
+        <h2>Rubrica Clienti</h2>
         <p>Elenco dei clienti salvati con storico acquisti:</p>
+        <button class="overlay-btn btn-primary" style="width:100%; margin-bottom: 12px;" ${actionAttrs('addClienteInRubrica')}>➕ Nuovo Cliente</button>
     `;
-    if (rubricaClienti.length === 0) {
+    if (clientiOrdinati.length === 0) {
         clientiHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun cliente salvato in rubrica.</p></div>`;
     } else {
-        rubricaClienti.forEach((cliente, idx) => {
-            // Formattazione del totale acquisti in valuta
-            const totaleFormattato = (cliente.totaleAcquisti || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
-            
+        clientiOrdinati.forEach((clienteData) => {
+            const originalIndex = Number(clienteData.originalIndex);
+            if (!Number.isInteger(originalIndex) || originalIndex < 0) return;
+
+            const safeCliente = sanitizeRenderable(clienteData);
+            const totaleFormattato = (clienteData.totaleAcquisti || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+            const numeroAcquisti = Number(clienteData.numeroAcquisti) || 0;
+
             clientiHtml += `
                 <div class="module-card" style="border-left: 4px solid #0284c7; margin-bottom: 12px;">
-                    <strong style="color:#f6f1e6; font-size:1rem;">👤 ${cliente.nome}</strong>
-                    <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">P.IVA / CF: ${cliente.cf || 'Non inserito'}</p>
-                    <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📍 Indirizzo: ${cliente.indirizzo || 'Non inserito'}</p>
-                    <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📧 Email: ${cliente.email || 'Non specificata'}</p>
+                    <strong style="color:#f6f1e6; font-size:1rem;">👤 ${safeCliente.nome}</strong>
+                    <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">P.IVA / CF: ${safeCliente.cf || 'Non inserito'}</p>
+                    <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📍 Indirizzo: ${safeCliente.indirizzo || 'Non inserito'}</p>
+                    <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📧 Email: ${safeCliente.email || 'Non specificata'}</p>
                     
-                    <!-- Sezione Statistiche Spesa -->
                     <div style="background: rgba(15, 23, 42, 0.6); padding: 8px; border-radius: 6px; margin: 8px 0;">
                         <p style="font-size:0.85rem; color:#4ade80; margin: 0; font-weight: bold;">💰 Totale Acquisti: ${totaleFormattato}</p>
-                        <p style="font-size:0.75rem; color:#b8b0a0; margin: 2px 0 0 0;">📦 Ricevute emesse: ${cliente.numeroAcquisti || 1} | Ultimo: ${cliente.dataUltimoAcquisto || 'N.D.'}</p>
+                        <p style="font-size:0.75rem; color:#b8b0a0; margin: 2px 0 0 0;">📦 Ricevute emesse: ${numeroAcquisti} | Ultimo: ${safeCliente.dataUltimoAcquisto || 'N.D.'}</p>
                     </div>
 
-                    <!-- Sezione Note Cliente con Tasto Salva a pieno larghezza -->
                     <div style="margin: 8px 0;">
                         <label style="font-size:0.75rem; color:#b8b0a0; display:block; margin-bottom:2px;">📝 Note Cliente:</label>
                         <textarea 
-                            id="nota-cliente-${idx}"
+                            id="nota-cliente-${originalIndex}"
                             style="width: 100%; background: #121610; color: #f6f1e6; border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 6px; font-size: 0.8rem; resize: vertical;" 
                             rows="2" 
                             placeholder="Scrivi una nota per questo cliente..."
-                        >${cliente.nota || ''}</textarea>
-                        <button class="overlay-btn" style="width: 100%; background:#eab308; color:#0f172a; font-weight:bold; padding:8px; font-size:0.85rem; margin-top:6px; border-radius:4px; border:none; cursor:pointer;" ${actionAttrs('salvaNotaClienteDaInput', [idx])}>💾 Salva Nota</button>
+                        >${safeCliente.nota || ''}</textarea>
+                        <button class="overlay-btn" style="width: 100%; background:#eab308; color:#0f172a; font-weight:bold; padding:8px; font-size:0.85rem; margin-top:6px; border-radius:4px; border:none; cursor:pointer;" ${actionAttrs('salvaNotaClienteDaInput', [originalIndex])}>💾 Salva Nota</button>
                     </div>
 
-                    <!-- Blocco tasti principali distanziato -->
                     <div style="display:flex; gap:6px; margin-top:16px; flex-wrap:wrap;">
-                        <button class="overlay-btn btn-success" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('creaRicevutaPerCliente', [idx])}>📄 Nuova Ricevuta</button>
-                        <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('mostraRicevuteClienteByIndex', [idx])}>📜 Vedi Ricevute</button>
-                        <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteCliente', [idx])}>🗑️ Elimina</button>
+                        <button class="overlay-btn btn-success" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('creaRicevutaPerCliente', [originalIndex])}>📄 Nuova Ricevuta</button>
+                        <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('mostraRicevuteClienteByIndex', [originalIndex])}>📜 Vedi Ricevute</button>
+                        <button class="overlay-btn btn-neutral" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('editCliente', [originalIndex])}>✏️ Modifica</button>
+                        <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteCliente', [originalIndex])}>🗑️ Elimina</button>
                     </div>
                 </div>`;
         });
@@ -2431,9 +2436,112 @@ function creaRicevutaPerCliente(index) {
     }, 50);
 }
 
+async function addClienteInRubrica() {
+    const nomeInput = await appPrompt("Inserisci nome cliente:", "");
+    if (nomeInput === null) return;
+
+    const nome = nomeInput.trim();
+    if (!nome) {
+        showToast("Il nome cliente è obbligatorio.", 'error');
+        return;
+    }
+
+    let rubricaClienti = readStorageJSON('rubrica_clienti', []);
+    const clienteEsistente = rubricaClienti.some((cliente) => (cliente.nome || '').trim().toLowerCase() === nome.toLowerCase());
+    if (clienteEsistente) {
+        showToast("Cliente già presente in rubrica.", 'error');
+        return;
+    }
+
+    const cfInput = await appPrompt("Inserisci P.IVA / CF (facoltativo):", "");
+    if (cfInput === null) return;
+    const indirizzoInput = await appPrompt("Inserisci indirizzo (facoltativo):", "");
+    if (indirizzoInput === null) return;
+    const emailInput = await appPrompt("Inserisci email (facoltativo):", "");
+    if (emailInput === null) return;
+    const notaInput = await appPrompt("Inserisci nota cliente (facoltativa):", "");
+    if (notaInput === null) return;
+
+    rubricaClienti = readStorageJSON('rubrica_clienti', []);
+    const duplicatoAlSalvataggio = rubricaClienti.some((cliente) => (cliente.nome || '').trim().toLowerCase() === nome.toLowerCase());
+    if (duplicatoAlSalvataggio) {
+        showToast("Cliente già presente in rubrica.", 'error');
+        return;
+    }
+
+    rubricaClienti.push({
+        nome,
+        cf: cfInput.trim(),
+        indirizzo: indirizzoInput.trim(),
+        email: emailInput.trim(),
+        nota: notaInput.trim(),
+        totaleAcquisti: 0,
+        numeroAcquisti: 0,
+        dataUltimoAcquisto: ''
+    });
+
+    localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
+    showToast("Cliente aggiunto in rubrica!", 'success');
+    openModule('clienti');
+}
+
+async function editCliente(index) {
+    let rubricaClienti = readStorageJSON('rubrica_clienti', []);
+    const cliente = rubricaClienti[index];
+    if (!cliente) return;
+
+    const nomeInput = await appPrompt("Modifica nome cliente:", cliente.nome || '');
+    if (nomeInput === null) return;
+
+    const nome = nomeInput.trim();
+    if (!nome) {
+        showToast("Il nome cliente è obbligatorio.", 'error');
+        return;
+    }
+
+    const nomeDuplicato = rubricaClienti.some((item, idx) => idx !== index && (item.nome || '').trim().toLowerCase() === nome.toLowerCase());
+    if (nomeDuplicato) {
+        showToast("Esiste già un cliente con questo nome.", 'error');
+        return;
+    }
+
+    const cfInput = await appPrompt("Modifica P.IVA / CF:", cliente.cf || '');
+    if (cfInput === null) return;
+    const indirizzoInput = await appPrompt("Modifica indirizzo:", cliente.indirizzo || '');
+    if (indirizzoInput === null) return;
+    const emailInput = await appPrompt("Modifica email:", cliente.email || '');
+    if (emailInput === null) return;
+
+    rubricaClienti = readStorageJSON('rubrica_clienti', []);
+    if (index < 0 || index >= rubricaClienti.length || rubricaClienti[index] === undefined) {
+        showToast("Cliente non trovato.", 'error');
+        return;
+    }
+
+    const nomeDuplicatoAlSalvataggio = rubricaClienti.some((item, idx) => idx !== index && (item.nome || '').trim().toLowerCase() === nome.toLowerCase());
+    if (nomeDuplicatoAlSalvataggio) {
+        showToast("Esiste già un cliente con questo nome.", 'error');
+        return;
+    }
+
+    rubricaClienti[index] = {
+        ...rubricaClienti[index],
+        nome,
+        cf: cfInput.trim(),
+        indirizzo: indirizzoInput.trim(),
+        email: emailInput.trim()
+    };
+
+    localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
+    showToast("Cliente aggiornato!", 'success');
+    openModule('clienti');
+}
+
 async function deleteCliente(index) {
+    let rubricaClienti = readStorageJSON('rubrica_clienti', []);
+    if (index < 0 || index >= rubricaClienti.length || rubricaClienti[index] === undefined) return;
+
     if (await appConfirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
-        let rubricaClienti = readStorageJSON('rubrica_clienti', []);
         rubricaClienti.splice(index, 1);
         localStorage.setItem('rubrica_clienti', JSON.stringify(rubricaClienti));
         openModule('clienti');
@@ -4267,7 +4375,7 @@ async function mostraInfoModulo(moduleName) {
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
         'export': `ℹ️ Guida - Report & Backup Dati\n\nEsporta i dati contabili in formato CSV o crea un backup manuale JSON.\n\nIl backup automatico ti guida a scegliere la cartella Download del dispositivo e poi crea/usa sempre il percorso ${buildAutomaticBackupPathLabel('Download')} per salvare backup_truffle_automatico.json. Usa '📁 Imposta Cartella Backup' per registrare o cambiare il percorso, poi '💾 Salva Backup Ora' per forzarlo manualmente. Per ripristinare, premi '📂 Ripristina da File...' e scegli il file dalla cartella registrata.\n\nSe il browser non supporta la scelta guidata della cartella, l'app usa il normale download del file JSON.`,
         'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
-        'clienti': "ℹ️ **Guida - Rubrica Clienti & Acquirenti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico e gestisci le note dedicate.",
+        'clienti': "ℹ️ **Guida - Rubrica Clienti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico, aggiungi nuovi nominativi e gestisci modifiche, note ed eliminazioni.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
         'calendario': "ℹ️ **Guida - Calendario Raccolta (GPS)**\n\nVerifica in base alla tua posizione GPS attuale quali specie di tartufo hanno il periodo di raccolta attualmente aperto o chiuso."
     };
