@@ -4717,7 +4717,7 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
     }
 }
 
-// Compatibilità: espone le funzioni mappa offline anche su window.
+// Compatibility: expose offline map functions on window for legacy entry points.
 window.scaricaRegioniOffline = scaricaRegioniOffline;
 window.eliminaCacheMappaOffline = eliminaCacheMappaOffline;
 window.autoRiscaricaRegioniOfflineSeNecessario = autoRiscaricaRegioniOfflineSeNecessario;
