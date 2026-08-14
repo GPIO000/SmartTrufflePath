@@ -1,4 +1,6 @@
 import * as TruffleStorage from './storage-sync.js';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import {
     normalizeBackupEntry,
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
