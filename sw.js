@@ -38,7 +38,7 @@ self.addEventListener('activate', (e) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (key !== CACHE_NAME && key !== 'smarttruffle-map-offline') {
             console.log('[Service Worker] Eliminazione vecchia cache:', key);
             return caches.delete(key);
           }
