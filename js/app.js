@@ -4717,6 +4717,11 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
     }
 }
 
+// Compatibilità: espone le funzioni mappa offline anche su window.
+window.scaricaRegioniOffline = scaricaRegioniOffline;
+window.eliminaCacheMappaOffline = eliminaCacheMappaOffline;
+window.autoRiscaricaRegioniOfflineSeNecessario = autoRiscaricaRegioniOfflineSeNecessario;
+
 window.addEventListener('online', () => {
     autoRiscaricaRegioniOfflineSeNecessario();
 });
