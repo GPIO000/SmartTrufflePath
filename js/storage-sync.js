@@ -18,6 +18,18 @@
   function openDb() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
+      let settled = false;
+      const settle = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        fn(value);
+      };
+
+      const timeoutId = setTimeout(() => {
+        dbPromise = null;
+        settle(reject, new Error('IndexedDB open timed out'));
+      }, 5000);
+
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
@@ -28,8 +40,14 @@
           db.createObjectStore(STORE_HANDLES, { keyPath: 'key' });
         }
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      const rejectAndReset = (err) => { clearTimeout(timeoutId); dbPromise = null; settle(reject, err); };
+      request.onsuccess = () => {
+        clearTimeout(timeoutId);
+        if (settled) { request.result.close(); return; }
+        settle(resolve, request.result);
+      };
+      request.onerror = () => rejectAndReset(request.error);
+      request.onblocked = () => rejectAndReset(new Error('IndexedDB open blocked'));
     });
     return dbPromise;
   }
