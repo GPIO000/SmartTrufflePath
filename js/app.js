@@ -733,7 +733,7 @@ function renderAllPoiMarkers() {
             icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">📍</div>', iconAnchor: [14, 14] });
             popupTitle = '📍 Tartufo / Punto';
         }
-        const fromInfo = poi.from ? `<br><small>Da: ${safePoi.from || ''}</small>` : '';
+        const fromInfo = poi.from ? `<br><small>Da: ${escapeHtml(safePoi.from || '')}</small>` : '';
         const marker = L.marker([poi.lat, poi.lng], { icon }).addTo(map)
             .bindPopup(`<b>${popupTitle}</b><br>Nota: ${safePoi.note || 'Nessuna nota'}<br><small>${safePoi.date || ''}</small>${fromInfo}`);
         poiMapMarkers[index] = marker;
@@ -891,7 +891,7 @@ function importSharedPoint() {
     let note = defaultNote;
     const noteMatch = text.match(/nota[:\s]+([^\n\r]+)/i);
     if (noteMatch) note = noteMatch[1].trim().slice(0, 80) || defaultNote;
-    const newIndex = addPoi(coords.lat, coords.lng, note, type, from || undefined);
+    addPoi(coords.lat, coords.lng, note, type, from || undefined);
     renderAllPoiMarkers();
     const icon = isSOS ? '🚨' : '📩';
     showToast(`${icon} Punto importato con successo!`, 'success');
