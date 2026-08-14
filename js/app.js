@@ -334,7 +334,7 @@ const ACTION_HANDLERS = {
     shareLocationToVetByIndex: (_event, index) => shareLocationToVetByIndex(index),
     deleteVetClinic: (_event, index) => deleteVetClinic(index),
     salvaNotaClienteDaInput: (_event, index) => salvaNotaClienteDaInput(index),
-    addClienteInRubrica: () => addClienteInRubrica(),
+    addClienteInRubrica: (_event) => addClienteInRubrica(),
     editCliente: (_event, index) => editCliente(index),
     creaRicevutaPerCliente: (_event, index) => creaRicevutaPerCliente(index),
     mostraRicevuteClienteByIndex: (_event, index) => mostraRicevuteClienteByIndex(index),
@@ -1790,6 +1790,9 @@ function openModule(moduleName, editMode = false) {
         clientiHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun cliente salvato in rubrica.</p></div>`;
     } else {
         clientiOrdinati.forEach((clienteData) => {
+            const originalIndex = Number(clienteData.originalIndex);
+            if (!Number.isInteger(originalIndex) || originalIndex < 0) return;
+
             const safeCliente = sanitizeRenderable(clienteData);
             const totaleFormattato = (clienteData.totaleAcquisti || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
             const numeroAcquisti = Number(clienteData.numeroAcquisti) || 0;
@@ -1809,19 +1812,19 @@ function openModule(moduleName, editMode = false) {
                     <div style="margin: 8px 0;">
                         <label style="font-size:0.75rem; color:#b8b0a0; display:block; margin-bottom:2px;">📝 Note Cliente:</label>
                         <textarea 
-                            id="nota-cliente-${clienteData.originalIndex}"
+                            id="nota-cliente-${originalIndex}"
                             style="width: 100%; background: #121610; color: #f6f1e6; border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 6px; font-size: 0.8rem; resize: vertical;" 
                             rows="2" 
                             placeholder="Scrivi una nota per questo cliente..."
                         >${safeCliente.nota || ''}</textarea>
-                        <button class="overlay-btn" style="width: 100%; background:#eab308; color:#0f172a; font-weight:bold; padding:8px; font-size:0.85rem; margin-top:6px; border-radius:4px; border:none; cursor:pointer;" ${actionAttrs('salvaNotaClienteDaInput', [clienteData.originalIndex])}>💾 Salva Nota</button>
+                        <button class="overlay-btn" style="width: 100%; background:#eab308; color:#0f172a; font-weight:bold; padding:8px; font-size:0.85rem; margin-top:6px; border-radius:4px; border:none; cursor:pointer;" ${actionAttrs('salvaNotaClienteDaInput', [originalIndex])}>💾 Salva Nota</button>
                     </div>
 
                     <div style="display:flex; gap:6px; margin-top:16px; flex-wrap:wrap;">
-                        <button class="overlay-btn btn-success" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('creaRicevutaPerCliente', [clienteData.originalIndex])}>📄 Nuova Ricevuta</button>
-                        <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('mostraRicevuteClienteByIndex', [clienteData.originalIndex])}>📜 Vedi Ricevute</button>
-                        <button class="overlay-btn btn-neutral" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('editCliente', [clienteData.originalIndex])}>✏️ Modifica</button>
-                        <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteCliente', [clienteData.originalIndex])}>🗑️ Elimina</button>
+                        <button class="overlay-btn btn-success" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('creaRicevutaPerCliente', [originalIndex])}>📄 Nuova Ricevuta</button>
+                        <button class="overlay-btn btn-info" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('mostraRicevuteClienteByIndex', [originalIndex])}>📜 Vedi Ricevute</button>
+                        <button class="overlay-btn btn-neutral" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('editCliente', [originalIndex])}>✏️ Modifica</button>
+                        <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteCliente', [originalIndex])}>🗑️ Elimina</button>
                     </div>
                 </div>`;
         });
@@ -2459,6 +2462,13 @@ async function addClienteInRubrica() {
     const notaInput = await appPrompt("Inserisci nota cliente (facoltativa):", "");
     if (notaInput === null) return;
 
+    rubricaClienti = readStorageJSON('rubrica_clienti', []);
+    const duplicatoAlSalvataggio = rubricaClienti.some((cliente) => (cliente.nome || '').trim().toLowerCase() === nome.toLowerCase());
+    if (duplicatoAlSalvataggio) {
+        showToast("Cliente già presente in rubrica.", 'error');
+        return;
+    }
+
     rubricaClienti.push({
         nome,
         cf: cfInput.trim(),
@@ -2502,8 +2512,20 @@ async function editCliente(index) {
     const emailInput = await appPrompt("Modifica email:", cliente.email || '');
     if (emailInput === null) return;
 
+    rubricaClienti = readStorageJSON('rubrica_clienti', []);
+    if (index < 0 || index >= rubricaClienti.length || rubricaClienti[index] === undefined) {
+        showToast("Cliente non trovato.", 'error');
+        return;
+    }
+
+    const nomeDuplicatoAlSalvataggio = rubricaClienti.some((item, idx) => idx !== index && (item.nome || '').trim().toLowerCase() === nome.toLowerCase());
+    if (nomeDuplicatoAlSalvataggio) {
+        showToast("Esiste già un cliente con questo nome.", 'error');
+        return;
+    }
+
     rubricaClienti[index] = {
-        ...cliente,
+        ...rubricaClienti[index],
         nome,
         cf: cfInput.trim(),
         indirizzo: indirizzoInput.trim(),
@@ -2517,7 +2539,7 @@ async function editCliente(index) {
 
 async function deleteCliente(index) {
     let rubricaClienti = readStorageJSON('rubrica_clienti', []);
-    if (!rubricaClienti[index]) return;
+    if (index < 0 || index >= rubricaClienti.length || rubricaClienti[index] === undefined) return;
 
     if (await appConfirm("Vuoi davvero rimuovere questo cliente dalla rubrica?")) {
         rubricaClienti.splice(index, 1);
