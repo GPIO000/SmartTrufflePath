@@ -739,11 +739,8 @@ function addPoi(lat, lng, note) {
 function saveCarPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
-        const newIndex = addPoi(pos.lat, pos.lng, 'Auto');
+        addPoi(pos.lat, pos.lng, 'Auto');
         renderAllPoiMarkers();
-        targetNavigation = `poi_${newIndex}`;
-        map.setView([pos.lat, pos.lng], 18);
-        if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
         showToast("🚗 Posizione auto aggiunta nell'elenco punti!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
@@ -3324,8 +3321,7 @@ function buildCompleteBackupData() {
         heatDiaryList: localStorage.getItem('heat_diary_list'),
         vetClinicsList: localStorage.getItem('vet_clinics_list'),
         calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
-        noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
-        carCoords: localStorage.getItem('car_coords')
+        noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi')
     };
 }
 
