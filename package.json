@@ -18,5 +18,9 @@
     "jsdom": "30.0.1",
     "vite": "8.2.1",
     "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "html2pdf.js": "^0.10.1",
+    "leaflet": "^1.9.4"
   }
 }
