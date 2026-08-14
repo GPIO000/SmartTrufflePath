@@ -288,8 +288,6 @@ const ACTION_HANDLERS = {
     toggleDrawer: () => toggleDrawer(),
     centerOnUser: () => centerOnUser(),
     saveCarPosition: () => saveCarPosition(),
-    returnToCar: () => returnToCar(),
-    deleteCarPosition: () => deleteCarPosition(),
     savePoiPosition: () => savePoiPosition(),
     triggerSOS: () => triggerSOS(),
     shareAppUrl: () => shareAppUrl(),
@@ -507,11 +505,89 @@ setTimeout(() => {
 }, 400);
 
 let userMarker = null;
-let carMarker = null;
-let carCoordinates = readStorageJSON('car_coords', null);
-let poiList = readStorageJSON('poi_list', []);
 let poiMapMarkers = {}; 
 let targetNavigation = null;
+const legacyCarCoordinates = readStorageJSON('car_coords', null);
+
+function parseLegacyDateToTimestamp(dateText) {
+    if (typeof dateText !== 'string') return null;
+    const normalized = dateText.trim();
+    if (!normalized) return null;
+    const direct = Date.parse(normalized);
+    if (!Number.isNaN(direct)) return new Date(direct).toISOString();
+
+    const match = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (!match) return null;
+
+    const day = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    const yearRaw = Number(match[3]);
+    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+    const hour = Number(match[4] || 0);
+    const minute = Number(match[5] || 0);
+    const second = Number(match[6] || 0);
+    const parsed = new Date(year, month, day, hour, minute, second);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+}
+
+function formatPoiDisplayDate(savedAtIso) {
+    const parsed = new Date(savedAtIso);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString() + ' ' + parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function normalizePoiList(rawPoiList) {
+    const baseTimestamp = Date.now();
+    const normalized = Array.isArray(rawPoiList) ? rawPoiList : [];
+    const result = normalized
+        .map((poi, index) => {
+            if (!poi || typeof poi !== 'object') return null;
+            const lat = Number(poi.lat);
+            const lng = Number(poi.lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+            const savedAt = parseLegacyDateToTimestamp(poi.savedAt)
+                || parseLegacyDateToTimestamp(poi.date)
+                || new Date(baseTimestamp + index).toISOString();
+
+            const note = typeof poi.note === 'string' && poi.note.trim() ? poi.note.trim() : 'Punto di interesse';
+            const id = typeof poi.id === 'string' && poi.id.trim() ? poi.id.trim() : `poi-${savedAt}-${index}`;
+            return {
+                id,
+                lat,
+                lng,
+                note,
+                savedAt,
+                date: formatPoiDisplayDate(savedAt)
+            };
+        })
+        .filter(Boolean);
+
+    result.sort((a, b) => new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime());
+    return result;
+}
+
+const rawPoiList = readStorageJSON('poi_list', []);
+let poiList = normalizePoiList(rawPoiList);
+let poiListChanged = JSON.stringify(rawPoiList) !== JSON.stringify(poiList);
+if (legacyCarCoordinates && Number.isFinite(Number(legacyCarCoordinates.lat)) && Number.isFinite(Number(legacyCarCoordinates.lng))) {
+    const migratedAt = new Date().toISOString();
+    poiList.push({
+        id: `poi-${migratedAt}-auto`,
+        lat: Number(legacyCarCoordinates.lat),
+        lng: Number(legacyCarCoordinates.lng),
+        note: 'Auto',
+        savedAt: migratedAt,
+        date: formatPoiDisplayDate(migratedAt)
+    });
+    poiList = normalizePoiList(poiList);
+    localStorage.removeItem('car_coords');
+    poiListChanged = true;
+}
+if (poiListChanged) {
+    localStorage.setItem('poi_list', JSON.stringify(poiList));
+}
 const REVERSE_GEOCODE_MIN_INTERVAL_MS = 30000;
 const REVERSE_GEOCODE_GRID_DECIMALS = 3;
 const REVERSE_GEOCODE_MAX_CACHE_ENTRIES = 200;
@@ -589,7 +665,6 @@ if (navigator.geolocation) {
         if (!userMarker) {
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>Sei qui</b>").openPopup();
             map.setView([lat, lng], 16);
-            if (carCoordinates) { carMarker = L.marker([carCoordinates.lat, carCoordinates.lng]).addTo(map).bindPopup("<b>🚗 La tua Auto</b>"); }
             renderAllPoiMarkers();
         } else { userMarker.setLatLng([lat, lng]); }
         updateCompass(lat, lng);
@@ -633,9 +708,7 @@ function updateCompass(currentLat, currentLng) {
     const compassText = document.getElementById('compass-box');
     if (!compassText) return;
     let target = null, label = '';
-    if (targetNavigation === 'car' && carCoordinates) {
-        target = carCoordinates; label = '🚗 Auto';
-    } else if (typeof targetNavigation === 'string' && targetNavigation.startsWith('poi_')) {
+    if (typeof targetNavigation === 'string' && targetNavigation.startsWith('poi_')) {
         const index = parseInt(targetNavigation.split('_')[1]);
         if (poiList[index]) { target = poiList[index]; label = `📍 ${poiList[index].note || 'Punto'}`; }
     }
@@ -643,51 +716,40 @@ function updateCompass(currentLat, currentLng) {
         const res = calculateDistanceAndBearing(currentLat, currentLng, target.lat, target.lng);
         compassText.innerHTML = `🧭 <b>${label}:</b> ${res.arrow} ${res.distance} (${res.direction})`;
     } else {
-        compassText.innerHTML = `🧭 Seleziona una destinazione (Auto o Punto)`;
+        compassText.innerHTML = `🧭 Seleziona una destinazione dall'elenco punti`;
     }
 }
+
+function addPoi(lat, lng, note) {
+    const savedAt = new Date().toISOString();
+    const id = `poi-${savedAt}-${Math.random().toString(36).slice(2, 8)}`;
+    poiList.push({
+        id,
+        lat,
+        lng,
+        note: note.trim() || 'Punto di interesse',
+        savedAt,
+        date: formatPoiDisplayDate(savedAt)
+    });
+    poiList = normalizePoiList(poiList);
+    localStorage.setItem('poi_list', JSON.stringify(poiList));
+    return poiList.findIndex((poi) => poi.id === id);
+}
+
 function saveCarPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
-        carCoordinates = { lat: pos.lat, lng: pos.lng };
-        localStorage.setItem('car_coords', JSON.stringify(carCoordinates));
-        if (carMarker) { carMarker.setLatLng([pos.lat, pos.lng]); }
-        else { carMarker = L.marker([pos.lat, pos.lng]).addTo(map).bindPopup("<b>🚗 La tua Auto</b>"); }
-        showToast("🚗 Posizione auto salvata!", 'success');
+        addPoi(pos.lat, pos.lng, 'Auto');
+        renderAllPoiMarkers();
+        showToast("🚗 Posizione auto aggiunta nell'elenco punti!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
-}
-
-async function deleteCarPosition() {
-    if (carCoordinates) {
-        if (await appConfirm("Vuoi davvero eliminare la posizione dell'auto salvata?")) {
-            if (carMarker) { map.removeLayer(carMarker); carMarker = null; }
-            carCoordinates = null;
-            localStorage.removeItem('car_coords');
-            if (targetNavigation === 'car') targetNavigation = null;
-            showToast("🚗 Posizione auto rimossa.", 'info');
-        }
-    } else { showToast("Nessuna posizione auto salvata.", 'info'); }
-}
-function returnToCar() {
-    if (carCoordinates) {
-        targetNavigation = 'car';
-        map.setView([carCoordinates.lat, carCoordinates.lng], 18);
-        if (carMarker) carMarker.openPopup();
-    } else { showToast("Nessun parcheggio salvato.", 'info'); }
 }
 async function savePoiPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "Tartufaia");
         if (note === null) return;
-        const newPoi = {
-            lat: pos.lat, lng: pos.lng,
-            note: note.trim() || "Punto di interesse",
-            date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-        };
-        poiList.push(newPoi);
-        localStorage.setItem('poi_list', JSON.stringify(poiList));
-        const newIndex = poiList.length - 1;
+        const newIndex = addPoi(pos.lat, pos.lng, note);
         renderAllPoiMarkers();
         targetNavigation = `poi_${newIndex}`;
         map.setView([pos.lat, pos.lng], 18);
@@ -745,7 +807,7 @@ function openModule(moduleName, editMode = false) {
         case 'poilist':
             let poiHtml = '<h2>Elenco Punti & Tartufaie</h2><p>I tuoi punti di ricerca salvati con note:</p>';
             if (poiList.length === 0) {
-                poiHtml += '<div class="module-card"><p>Nessun punto salvato. Usa il tasto "Punto" sulla mappa.</p></div>';
+                poiHtml += '<div class="module-card"><p>Nessun punto salvato. Usa i tasti "Segna Auto" o "Punto" sulla mappa.</p></div>';
             } else {
                 poiList.forEach((poi, idx) => {
                     const safePoi = sanitizeRenderable(poi);
@@ -3259,8 +3321,7 @@ function buildCompleteBackupData() {
         heatDiaryList: localStorage.getItem('heat_diary_list'),
         vetClinicsList: localStorage.getItem('vet_clinics_list'),
         calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
-        noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
-        carCoords: localStorage.getItem('car_coords')
+        noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi')
     };
 }
 
