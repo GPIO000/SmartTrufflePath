@@ -4799,7 +4799,7 @@ async function scaricaRegioniOffline() {
 }
 
 async function aggiornaStatoCacheRegioni() {
-    let cachedUrls;
+    let cachedUrls = new Set();
     try {
         cachedUrls = await getOfflineMapCachedUrlsSet();
     } catch {
