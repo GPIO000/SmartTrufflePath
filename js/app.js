@@ -29,6 +29,31 @@ if ('serviceWorker' in navigator) {
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
+
+function getOfflinePreferredMaxZoom() {
+    const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, null);
+    if (!pref || typeof pref.maxZoom !== 'number') return null;
+    return pref.maxZoom;
+}
+
+function getAdaptiveFocusZoom(defaultZoom) {
+    const offlineMaxZoom = getOfflinePreferredMaxZoom();
+    if (!navigator.onLine && offlineMaxZoom !== null) {
+        return Math.min(defaultZoom, offlineMaxZoom);
+    }
+    return defaultZoom;
+}
+
+function clampMapZoomForOffline() {
+    if (navigator.onLine) return;
+    const offlineMaxZoom = getOfflinePreferredMaxZoom();
+    if (offlineMaxZoom === null) return;
+    if (map.getZoom() > offlineMaxZoom) {
+        map.setZoom(offlineMaxZoom);
+        showToast(`📉 Zoom ridotto a ${offlineMaxZoom} per usare le mappe offline disponibili.`, 'info');
+    }
+}
 
 // ── Regioni italiane per download mappa offline ───────────────────────────────
 const OFFLINE_MAP_MIN_ZOOM = 8;
@@ -517,7 +542,7 @@ function restoreBackupEntries(data) {
         vetClinicsList: { storageKey: 'vet_clinics_list', fallbackValue: [] },
         calendariTartufiCustom: { storageKey: 'calendari_tartufi_custom', fallbackValue: {} },
         noteRegionaliTartufi: { storageKey: 'note_regionali_tartufi', fallbackValue: {} },
-        offlineRegioniPreferite: { storageKey: 'offline_regioni_preferite', fallbackValue: { regioni: [], maxZoom: 14 } },
+        offlineRegioniPreferite: { storageKey: OFFLINE_REGIONI_PREFERITE_KEY, fallbackValue: { regioni: [], maxZoom: 14 } },
         carCoords: { storageKey: 'car_coords', fallbackValue: {} }
     };
 
@@ -708,7 +733,7 @@ if (navigator.geolocation) {
         reverseGeocodePosition(lat, lng);
         if (!userMarker) {
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>Sei qui</b>").openPopup();
-            map.setView([lat, lng], 16);
+            map.setView([lat, lng], getAdaptiveFocusZoom(16));
             renderAllPoiMarkers();
         } else { userMarker.setLatLng([lat, lng]); }
         updateCompass(lat, lng);
@@ -828,7 +853,7 @@ async function savePoiPosition() {
         const newIndex = addPoi(pos.lat, pos.lng, note);
         renderAllPoiMarkers();
         targetNavigation = `poi_${newIndex}`;
-        map.setView([pos.lat, pos.lng], 18);
+        map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
         showToast("📍 Punto salvato!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
@@ -836,7 +861,7 @@ async function savePoiPosition() {
 function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
-        map.setView([poiList[index].lat, poiList[index].lng], 18);
+        map.setView([poiList[index].lat, poiList[index].lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
         closeActiveModule();
         showToast(`🧭 Destinazione: ${poiList[index].note}`, 'success');
@@ -2242,7 +2267,7 @@ function openModule(moduleName, editMode = false) {
 }
 
         case 'mappa_offline': {
-            const prefOffline = readStorageJSON('offline_regioni_preferite', { regioni: [], maxZoom: 14 });
+            const prefOffline = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: 14 });
             const regioniCheckboxes = REGIONI_ITALIA_OFFLINE.map(r => {
                 const checked = prefOffline.regioni.includes(r.id) ? ' checked' : '';
                 return `
@@ -3524,7 +3549,7 @@ function buildCompleteBackupData() {
         vetClinicsList: localStorage.getItem('vet_clinics_list'),
         calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
         noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
-        offlineRegioniPreferite: localStorage.getItem('offline_regioni_preferite'),
+        offlineRegioniPreferite: localStorage.getItem(OFFLINE_REGIONI_PREFERITE_KEY),
         backupDirLabel: localStorage.getItem(_BACKUP_DIR_LABEL_KEY)
     };
 }
@@ -3835,7 +3860,7 @@ function toggleDrawer() {
 }
 
 function centerOnUser() {
-    if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], 16); userMarker.openPopup(); }
+    if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(16)); userMarker.openPopup(); }
     else { showToast("Posizione GPS non disponibile.", 'error'); }
 }
 
@@ -4695,7 +4720,7 @@ async function scaricaRegioniOffline() {
     const maxZoom = parseInt(zoomSelect ? zoomSelect.value : '14', 10);
 
     // Salva le preferenze dell'utente per il re-download automatico
-    localStorage.setItem('offline_regioni_preferite', JSON.stringify({ regioni: selezionate, maxZoom }));
+    localStorage.setItem(OFFLINE_REGIONI_PREFERITE_KEY, JSON.stringify({ regioni: selezionate, maxZoom }));
 
     const progressArea = document.getElementById('offline-progress-area');
     const progressBar = document.getElementById('offline-progress-bar');
@@ -4777,7 +4802,7 @@ async function aggiornaStatoCacheRegioni() {
     const statusEl = document.getElementById('offline-cache-status');
     if (!statusEl) return;
 
-    const pref = readStorageJSON('offline_regioni_preferite', { regioni: [], maxZoom: 14 });
+    const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: 14 });
     const maxZoom = typeof pref.maxZoom === 'number' ? pref.maxZoom : 14;
 
     let html = '';
@@ -4811,7 +4836,7 @@ async function eliminaCacheMappaOffline() {
 
 // ── Re-download automatico regioni offline al ritorno della connessione ────────
 async function autoRiscaricaRegioniOfflineSeNecessario() {
-    const pref = readStorageJSON('offline_regioni_preferite', null);
+    const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, null);
     if (!pref || !Array.isArray(pref.regioni) || pref.regioni.length === 0) return;
 
     // Controlla se la cache è assente o vuota
@@ -4873,4 +4898,8 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 
 window.addEventListener('online', () => {
     autoRiscaricaRegioniOfflineSeNecessario();
+});
+
+window.addEventListener('offline', () => {
+    clampMapZoomForOffline();
 });
