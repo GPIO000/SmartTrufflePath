@@ -900,6 +900,7 @@ function importSharedPoint() {
     if (fromEl) fromEl.value = '';
     openModule('poilist');
 }
+
 function triggerSOS() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
@@ -933,7 +934,7 @@ function openModule(moduleName, editMode = false) {
                     const isSos = poi.type === 'sos';
                     const isShared = poi.type === 'shared';
                     const poiIcon = isAuto ? '🚗' : isSos ? '🚨' : isShared ? '📩' : '📍';
-                    const fromLine = poi.from ? `<p class="text-muted small-text" style="margin:2px 0;">Da: ${safePoi.from || ''}</p>` : '';
+                    const fromLine = safePoi.from ? `<p class="text-muted small-text" style="margin:2px 0;">Da: ${safePoi.from}</p>` : '';
                     poiHtml += `
                         <div class="module-card card-gap">
                             <strong class="text-accent">${poiIcon} ${safePoi.note}</strong>
