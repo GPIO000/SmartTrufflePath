@@ -4762,6 +4762,8 @@ async function aggiornaStatoCacheRegioni() {
             requests.forEach(req => cachedUrls.add(req.url));
         }
     } catch {
+        const statusEl = document.getElementById('offline-cache-status');
+        if (statusEl) statusEl.innerHTML = '<p style="margin:0; color:#ef4444; font-size:0.8rem;">⚠️ Impossibile verificare la cache.</p>';
         return;
     }
 
@@ -4773,7 +4775,7 @@ async function aggiornaStatoCacheRegioni() {
 
     let html = '';
     for (const regione of REGIONI_ITALIA_OFFLINE) {
-        const sampleUrls = getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, Math.min(maxZoom, OFFLINE_MAP_MIN_ZOOM + 1));
+        const sampleUrls = getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, maxZoom);
         const hasTiles = sampleUrls.some(url => cachedUrls.has(url));
         const badge = hasTiles
             ? `<span style="color:#22c55e; font-size:0.75rem; font-weight:bold; margin-left:4px;">✅ in cache</span>`
