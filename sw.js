@@ -1,5 +1,5 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-12';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-14';
 const ASSETS = [
   './',
   './index.html',
@@ -61,13 +61,20 @@ self.addEventListener('fetch', (e) => {
   if (requestUrl.hostname === 'tile.openstreetmap.org') {
     e.respondWith(
       caches.match(e.request).then((cachedResponse) => {
-        return cachedResponse || fetch(e.request).then((networkResponse) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, networkResponse.clone());
-            return networkResponse;
+        // Cerca prima nella cache offline dedicata alla mappa, poi nel cache generale
+        if (cachedResponse) return cachedResponse;
+        return caches.open('smarttruffle-map-offline').then(offlineCache =>
+          offlineCache.match(e.request)
+        ).then((offlineResponse) => {
+          if (offlineResponse) return offlineResponse;
+          return fetch(e.request).then((networkResponse) => {
+            return caches.open(CACHE_NAME).then((cache) => {
+              cache.put(e.request, networkResponse.clone());
+              return networkResponse;
+            });
+          }).catch(() => {
+            return serviceUnavailableResponse();
           });
-        }).catch(() => {
-          return serviceUnavailableResponse();
         });
       })
     );

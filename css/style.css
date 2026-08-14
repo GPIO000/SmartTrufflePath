@@ -661,3 +661,26 @@ textarea:focus-visible {
         border-radius: 0 !important;
     }
 }
+
+/* ── Mappa Offline – Checkbox Regioni ─────────────────────────────────────── */
+.offline-region-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #ddd6c8;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.offline-region-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #22c55e;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.offline-region-label:hover span {
+    color: #f6f1e6;
+}

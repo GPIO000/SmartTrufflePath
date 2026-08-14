@@ -30,6 +30,31 @@ const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
 
+// ── Regioni italiane per download mappa offline ───────────────────────────────
+const OFFLINE_MAP_MIN_ZOOM = 8;
+const REGIONI_ITALIA_OFFLINE = [
+    { id: 'piemonte',            nome: "Piemonte",             bbox: [43.516, 6.627, 46.464, 9.217] },
+    { id: 'valle_daosta',         nome: "Valle d'Aosta",        bbox: [45.461, 6.804, 45.988, 7.952] },
+    { id: 'lombardia',           nome: "Lombardia",            bbox: [44.676, 8.498, 46.634, 11.360] },
+    { id: 'trentino',            nome: "Trentino-Alto Adige",  bbox: [45.671, 10.381, 47.098, 12.479] },
+    { id: 'veneto',              nome: "Veneto",               bbox: [44.793, 10.629, 46.830, 13.102] },
+    { id: 'friuli',              nome: "Friuli-Venezia Giulia",bbox: [45.581, 12.326, 46.654, 14.103] },
+    { id: 'liguria',             nome: "Liguria",              bbox: [43.780, 7.491, 44.676, 10.076] },
+    { id: 'emilia_romagna',      nome: "Emilia-Romagna",       bbox: [43.726, 9.196, 45.143, 12.767] },
+    { id: 'toscana',             nome: "Toscana",              bbox: [42.236, 9.686, 44.473, 12.368] },
+    { id: 'umbria',              nome: "Umbria",               bbox: [42.362, 11.892, 43.619, 13.267] },
+    { id: 'marche',              nome: "Marche",               bbox: [42.689, 12.357, 43.975, 13.922] },
+    { id: 'lazio',               nome: "Lazio",                bbox: [41.141, 11.449, 42.844, 13.942] },
+    { id: 'abruzzo',             nome: "Abruzzo",              bbox: [41.684, 13.019, 42.895, 14.790] },
+    { id: 'molise',              nome: "Molise",               bbox: [41.330, 13.919, 42.069, 15.171] },
+    { id: 'campania',            nome: "Campania",             bbox: [39.993, 14.029, 41.499, 16.013] },
+    { id: 'puglia',              nome: "Puglia",               bbox: [39.789, 15.043, 41.880, 18.519] },
+    { id: 'basilicata',          nome: "Basilicata",           bbox: [39.906, 15.337, 41.139, 16.664] },
+    { id: 'calabria',            nome: "Calabria",             bbox: [37.915, 15.621, 40.149, 16.996] },
+    { id: 'sicilia',             nome: "Sicilia",              bbox: [36.646, 12.428, 38.323, 15.645] },
+    { id: 'sardegna',            nome: "Sardegna",             bbox: [38.862, 8.137, 41.315, 9.831] },
+];
+
 // ── Dialog / Toast personalizzati ────────────────────────────────────────────
 
 function showToast(message, type = 'info') {
@@ -391,6 +416,14 @@ const ACTION_HANDLERS = {
     closeDrawerAndModule: () => {
         toggleDrawer();
         closeActiveModule();
+    },
+    scaricaRegioniOffline: () => scaricaRegioniOffline(),
+    eliminaCacheMappaOffline: () => eliminaCacheMappaOffline(),
+    selezionaTutteRegioni: () => {
+        document.querySelectorAll('.offline-region-cb').forEach(cb => { cb.checked = true; });
+    },
+    deselezionaTutteRegioni: () => {
+        document.querySelectorAll('.offline-region-cb').forEach(cb => { cb.checked = false; });
     }
 };
 
@@ -483,6 +516,7 @@ function restoreBackupEntries(data) {
         vetClinicsList: { storageKey: 'vet_clinics_list', fallbackValue: [] },
         calendariTartufiCustom: { storageKey: 'calendari_tartufi_custom', fallbackValue: {} },
         noteRegionaliTartufi: { storageKey: 'note_regionali_tartufi', fallbackValue: {} },
+        offlineRegioniPreferite: { storageKey: 'offline_regioni_preferite', fallbackValue: { regioni: [], maxZoom: 14 } },
         carCoords: { storageKey: 'car_coords', fallbackValue: {} }
     };
 
@@ -497,6 +531,10 @@ function restoreBackupEntries(data) {
     normalizedEntries.forEach(([storageKey, normalizedValue]) => {
         localStorage.setItem(storageKey, normalizedValue);
     });
+
+    if (Object.prototype.hasOwnProperty.call(data, 'backupDirLabel') && typeof data.backupDirLabel === 'string' && data.backupDirLabel) {
+        setAutomaticBackupDestinationLabel(data.backupDirLabel);
+    }
 }
 
 setTimeout(() => {
@@ -2095,6 +2133,53 @@ function openModule(moduleName, editMode = false) {
     break;
 }
 
+        case 'mappa_offline': {
+            const prefOffline = readStorageJSON('offline_regioni_preferite', { regioni: [], maxZoom: 14 });
+            const regioniCheckboxes = REGIONI_ITALIA_OFFLINE.map(r => {
+                const checked = prefOffline.regioni.includes(r.id) ? ' checked' : '';
+                return `
+                <label class="offline-region-label">
+                    <input type="checkbox" class="offline-region-cb" data-region-id="${r.id}" value="${r.id}"${checked}>
+                    <span>${r.nome}</span>
+                </label>`;
+            }).join('');
+
+            const zoomOptions = [13, 14, 15].map(z => {
+                const labels = { 13: '13 – Panoramico (più leggero, ~15–30 MB/regione)', 14: '14 – Sentieri boschivi (consigliato, ~30–50 MB/regione)', 15: '15 – Dettaglio elevato (pesante, ~120–200 MB/regione)' };
+                const sel = prefOffline.maxZoom === z ? ' selected' : '';
+                return `<option value="${z}"${sel}>${labels[z]}</option>`;
+            }).join('');
+
+            contentHTML = `
+                <h2>📥 Download Mappa Offline</h2>
+                <div class="module-card" style="margin-bottom:14px;">
+                    <p style="font-size:0.85rem; color:#ddd6c8; margin:0 0 10px 0;">Seleziona una o più regioni da scaricare per usare la mappa <strong>senza connessione internet</strong>. Il download avviene via Wi-Fi (consigliato).</p>
+                    <p style="font-size:0.82rem; color:#b8b0a0; margin:0 0 14px 0;">⚠️ Ogni regione pesa indicativamente 30–50 MB. Assicurati di avere spazio sufficiente sul dispositivo.</p>
+                    <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                        <button class="overlay-btn btn-neutral" style="font-size:0.8rem; padding:6px 10px;" ${actionAttrs('selezionaTutteRegioni')}>✅ Seleziona tutte</button>
+                        <button class="overlay-btn btn-neutral" style="font-size:0.8rem; padding:6px 10px;" ${actionAttrs('deselezionaTutteRegioni')}>☐ Deseleziona tutte</button>
+                    </div>
+                    <div id="offline-regions-list" style="display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-bottom:16px;">
+                        ${regioniCheckboxes}
+                    </div>
+                    <div id="offline-zoom-row" style="margin-bottom:14px;">
+                        <label style="font-size:0.85rem; color:#f6f1e6; font-weight:bold;">Livello di zoom massimo:</label>
+                        <select id="offline-zoom-select" class="mod-input" style="margin-top:6px;">
+                            ${zoomOptions}
+                        </select>
+                    </div>
+                    <div id="offline-progress-area" style="display:none; margin-bottom:14px;">
+                        <p id="offline-progress-text" style="font-size:0.85rem; color:#4d8a98; margin:0 0 6px 0;">Download in corso…</p>
+                        <div style="background:rgba(255,255,255,0.08); border-radius:6px; height:10px; overflow:hidden;">
+                            <div id="offline-progress-bar" style="height:100%; width:0%; background:#22c55e; border-radius:6px; transition:width 0.3s;"></div>
+                        </div>
+                    </div>
+                    <button class="overlay-btn btn-primary" style="width:100%; margin-bottom:10px;" ${actionAttrs('scaricaRegioniOffline')}>📥 Scarica Regioni Selezionate</button>
+                    <button class="overlay-btn btn-danger" style="width:100%;" ${actionAttrs('eliminaCacheMappaOffline')}>🗑️ Elimina Tutta la Cache Mappa</button>
+                </div>`;
+            break;
+        }
+
     default:
             contentHTML = `<h2>Modulo</h2><p>In fase di sviluppo.</p>`;
     }
@@ -3321,7 +3406,9 @@ function buildCompleteBackupData() {
         heatDiaryList: localStorage.getItem('heat_diary_list'),
         vetClinicsList: localStorage.getItem('vet_clinics_list'),
         calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
-        noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi')
+        noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
+        offlineRegioniPreferite: localStorage.getItem('offline_regioni_preferite'),
+        backupDirLabel: localStorage.getItem(_BACKUP_DIR_LABEL_KEY)
     };
 }
 
@@ -4438,9 +4525,198 @@ async function mostraInfoModulo(moduleName) {
         'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
         'clienti': "ℹ️ **Guida - Rubrica Clienti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico, aggiungi nuovi nominativi e gestisci modifiche, note ed eliminazioni.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
-        'calendario': "ℹ️ **Guida - Calendario Raccolta (GPS)**\n\nVerifica in base alla tua posizione GPS attuale quali specie di tartufo hanno il periodo di raccolta attualmente aperto o chiuso."
+        'calendario': "ℹ️ **Guida - Calendario Raccolta (GPS)**\n\nVerifica in base alla tua posizione GPS attuale quali specie di tartufo hanno il periodo di raccolta attualmente aperto o chiuso.",
+        'mappa_offline': "ℹ️ **Guida - Download Mappa Offline**\n\nSeleziona le regioni italiane che ti interessano e premi 'Scarica'. I quadratini della mappa (tile) vengono salvati nella memoria del browser. La mappa funzionerà anche senza connessione internet, finché la cache non viene svuotata dal sistema.\n\n🔄 **Re-download automatico**: l'app ricorda le regioni e il livello di zoom scelti. Se il browser svuota la cache, non appena torni online la mappa viene riscaricata in automatico, senza che tu debba fare nulla.\n\nConsigli:\n• Usa la connessione Wi-Fi per scaricare\n• Zoom 14 è il miglior compromesso tra dettaglio e spazio\n• Puoi eliminare la cache in qualsiasi momento con il tasto apposito"
     };
 
     const messaggio = guideTesti[moduleName] || "ℹ️ Guida non disponibile per questo modulo.";
     await appAlert(messaggio);
 }
+
+// ── Mappa Offline ──────────────────────────────────────────────────────────────
+
+/**
+ * Calcola le coordinate (x, y) di un tile OSM dato lat/lng e zoom.
+ */
+function latlngToTile(lat, lng, zoom) {
+    const n = Math.pow(2, zoom);
+    const x = Math.floor((lng + 180) / 360 * n);
+    const latRad = lat * Math.PI / 180;
+    const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+    return { x, y };
+}
+
+/**
+ * Genera l'elenco di tutti gli URL tile compresi nel bounding box [minLat, minLng, maxLat, maxLng]
+ * per tutti i livelli di zoom da minZoom a maxZoom.
+ */
+function getTileUrls(bbox, minZoom, maxZoom) {
+    const [minLat, minLng, maxLat, maxLng] = bbox;
+    const subdomains = ['a', 'b', 'c'];
+    const urls = [];
+    for (let z = minZoom; z <= maxZoom; z++) {
+        const tileMin = latlngToTile(maxLat, minLng, z);
+        const tileMax = latlngToTile(minLat, maxLng, z);
+        for (let x = tileMin.x; x <= tileMax.x; x++) {
+            for (let y = tileMin.y; y <= tileMax.y; y++) {
+                const s = subdomains[(x + y) % subdomains.length];
+                urls.push(`https://${s}.tile.openstreetmap.org/${z}/${x}/${y}.png`);
+            }
+        }
+    }
+    return urls;
+}
+
+async function scaricaRegioniOffline() {
+    const selezionate = [...document.querySelectorAll('.offline-region-cb:checked')].map(cb => cb.value);
+    if (selezionate.length === 0) {
+        showToast('Seleziona almeno una regione prima di scaricare.', 'error');
+        return;
+    }
+    const zoomSelect = document.getElementById('offline-zoom-select');
+    const maxZoom = parseInt(zoomSelect ? zoomSelect.value : '14', 10);
+
+    // Salva le preferenze dell'utente per il re-download automatico
+    localStorage.setItem('offline_regioni_preferite', JSON.stringify({ regioni: selezionate, maxZoom }));
+
+    const progressArea = document.getElementById('offline-progress-area');
+    const progressBar = document.getElementById('offline-progress-bar');
+    const progressText = document.getElementById('offline-progress-text');
+    if (progressArea) progressArea.style.display = 'block';
+
+    const cacheName = 'smarttruffle-map-offline';
+
+    let allUrls = [];
+    for (const id of selezionate) {
+        const regione = REGIONI_ITALIA_OFFLINE.find(r => r.id === id);
+        if (!regione) continue;
+        allUrls = allUrls.concat(getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, maxZoom));
+    }
+
+    // Deduplicazione
+    allUrls = [...new Set(allUrls)];
+
+    const total = allUrls.length;
+    let done = 0;
+    let errors = 0;
+    const BATCH_SIZE = 10;
+
+    if (progressText) progressText.textContent = `Download in corso: 0 / ${total} tile…`;
+
+    let cache;
+    try {
+        cache = await caches.open(cacheName);
+    } catch {
+        showToast('Il browser non supporta la cache offline. Usa Chrome o Firefox.', 'error');
+        if (progressArea) progressArea.style.display = 'none';
+        return;
+    }
+
+    for (let i = 0; i < allUrls.length; i += BATCH_SIZE) {
+        const batch = allUrls.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(async (url) => {
+            try {
+                const cached = await cache.match(url);
+                if (!cached) {
+                    const res = await fetch(url, { mode: 'cors' });
+                    if (res.ok) await cache.put(url, res.clone());
+                    else errors++;
+                }
+            } catch {
+                errors++;
+            }
+        }));
+        done += batch.length;
+        const pct = Math.round((done / total) * 100);
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (progressText) progressText.textContent = `Download in corso: ${done} / ${total} tile (${pct}%)…`;
+    }
+
+    if (progressArea) progressArea.style.display = 'none';
+    if (errors > 0) {
+        showToast(`Download completato con ${errors} errori su ${total} tile. Riprova in caso di mappa incompleta.`, 'error');
+    } else {
+        showToast(`✅ Download completato! ${total} tile salvati per uso offline.`, 'success');
+    }
+}
+
+async function eliminaCacheMappaOffline() {
+    const conferma = await appConfirm('Eliminare tutta la cache della mappa offline? Dovrai riscaricarne le regioni per usarla offline.');
+    if (!conferma) return;
+    try {
+        const deleted = await caches.delete('smarttruffle-map-offline');
+        if (deleted) {
+            showToast('✅ Cache mappa offline eliminata.', 'success');
+        } else {
+            showToast('Nessuna cache offline trovata.', 'info');
+        }
+    } catch {
+        showToast('Errore durante l\'eliminazione della cache.', 'error');
+    }
+}
+
+// ── Re-download automatico regioni offline al ritorno della connessione ────────
+async function autoRiscaricaRegioniOfflineSeNecessario() {
+    const pref = readStorageJSON('offline_regioni_preferite', null);
+    if (!pref || !Array.isArray(pref.regioni) || pref.regioni.length === 0) return;
+
+    // Controlla se la cache è assente o vuota
+    let cacheEsistente = false;
+    try {
+        const cacheKeys = await caches.keys();
+        if (cacheKeys.includes('smarttruffle-map-offline')) {
+            const cache = await caches.open('smarttruffle-map-offline');
+            const cachedRequests = await cache.keys();
+            cacheEsistente = cachedRequests.length > 0;
+        }
+    } catch {
+        return; // Cache API non disponibile, nessuna azione
+    }
+
+    if (cacheEsistente) return;
+
+    showToast('🔄 Cache mappa offline assente. Re-download automatico in corso…', 'info');
+
+    const maxZoom = typeof pref.maxZoom === 'number' ? pref.maxZoom : 14;
+    let allUrls = [];
+    for (const id of pref.regioni) {
+        const regione = REGIONI_ITALIA_OFFLINE.find(r => r.id === id);
+        if (!regione) continue;
+        allUrls = allUrls.concat(getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, maxZoom));
+    }
+    allUrls = [...new Set(allUrls)];
+
+    let cache;
+    try {
+        cache = await caches.open('smarttruffle-map-offline');
+    } catch {
+        return;
+    }
+
+    const BATCH_SIZE = 10;
+    let errors = 0;
+    for (let i = 0; i < allUrls.length; i += BATCH_SIZE) {
+        const batch = allUrls.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(async (url) => {
+            try {
+                const cached = await cache.match(url);
+                if (!cached) {
+                    const res = await fetch(url, { mode: 'cors' });
+                    if (res.ok) await cache.put(url, res.clone());
+                }
+            } catch {
+                errors++;
+            }
+        }));
+    }
+
+    if (errors > 0) {
+        showToast(`⚠️ Re-download completato con ${errors} errori. Riprova manualmente se la mappa è incompleta.`, 'error');
+    } else {
+        showToast('✅ Mappa offline ripristinata automaticamente.', 'success');
+    }
+}
+
+window.addEventListener('online', () => {
+    autoRiscaricaRegioniOfflineSeNecessario();
+});
