@@ -195,11 +195,18 @@
     localStorage.removeItem = (key) => {
       localStorageOriginals.removeItem(key);
       deleteEntry(key).catch(() => {});
+      notifyDataChange(key);
     };
 
     localStorage.clear = () => {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const k = localStorage.key(i);
+        if (k) keys.push(k);
+      }
       localStorageOriginals.clear();
       clearEntries().catch(() => {});
+      keys.forEach((k) => notifyDataChange(k));
     };
   }
 

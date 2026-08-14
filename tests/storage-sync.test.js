@@ -161,6 +161,13 @@ describe('setDataChangeListener', () => {
     notifyDataChange('dogs_list');
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it('chiama il listener quando viene rimossa una chiave dato normale', () => {
+    const listener = vi.fn();
+    setDataChangeListener(listener);
+    notifyDataChange('spese_list');
+    expect(listener).toHaveBeenCalledWith('spese_list');
+  });
 });
 
 describe('saveDirectoryHandle / loadDirectoryHandle', () => {
