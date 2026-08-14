@@ -860,6 +860,9 @@ function extractCoordsFromMessage(text) {
     // Try "Lat: X, Lng: Y" or "Lat: X Lng: Y"
     m = text.match(/lat[:\s]+(-?\d+\.?\d*)[,\s]+ln?g[:\s]+(-?\d+\.?\d*)/i);
     if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+    // Try decimal comma format like "41,0290515, 14,6805400"
+    m = text.match(/(-?\d{1,3},\d{4,})\s*[,;]\s*(-?\d{1,3},\d{4,})/);
+    if (m) return { lat: parseFloat(m[1].replace(',', '.')), lng: parseFloat(m[2].replace(',', '.')) };
     // Try GPS coordinate pairs like "43.1234, 11.5678" or "43.1234,11.5678"
     m = text.match(/(-?\d{1,3}\.\d{4,})[,\s]+(-?\d{1,3}\.\d{4,})/);
     if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
