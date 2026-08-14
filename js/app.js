@@ -516,6 +516,7 @@ function restoreBackupEntries(data) {
         vetClinicsList: { storageKey: 'vet_clinics_list', fallbackValue: [] },
         calendariTartufiCustom: { storageKey: 'calendari_tartufi_custom', fallbackValue: {} },
         noteRegionaliTartufi: { storageKey: 'note_regionali_tartufi', fallbackValue: {} },
+        offlineRegioniPreferite: { storageKey: 'offline_regioni_preferite', fallbackValue: { regioni: [], maxZoom: 14 } },
         carCoords: { storageKey: 'car_coords', fallbackValue: {} }
     };
 
@@ -3406,6 +3407,7 @@ function buildCompleteBackupData() {
         vetClinicsList: localStorage.getItem('vet_clinics_list'),
         calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
         noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
+        offlineRegioniPreferite: localStorage.getItem('offline_regioni_preferite'),
         backupDirLabel: localStorage.getItem(_BACKUP_DIR_LABEL_KEY)
     };
 }
