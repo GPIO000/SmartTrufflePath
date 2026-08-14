@@ -536,11 +536,18 @@ function restoreBackupEntries(data) {
     if (Object.prototype.hasOwnProperty.call(data, 'backupDirLabel') && typeof data.backupDirLabel === 'string' && data.backupDirLabel) {
         setAutomaticBackupDestinationLabel(data.backupDirLabel);
     }
+
+    // Avvia il re-download automatico delle mappe offline se le preferenze sono state
+    // ripristinate dal backup ma la cache è assente (es. dopo reinstallazione dell'app).
+    autoRiscaricaRegioniOfflineSeNecessario();
 }
 
 setTimeout(() => {
     map.invalidateSize();
     mostraDisclaimerIniziale(); // <-- Mostra il disclaimer subito dopo l'avvio/GPS
+    // Avvia il re-download automatico delle mappe offline se le preferenze esistono
+    // ma la cache è assente (es. se l'app parte già connessa dopo una reinstallazione).
+    autoRiscaricaRegioniOfflineSeNecessario();
 }, 400);
 
 let userMarker = null;
