@@ -3646,15 +3646,11 @@ async function downloadBackupFile(data, { automatic = false } = {}) {
                 }
             }
         } else {
-            let configuredFolder = null;
-            try {
-                configuredFolder = await configureAutomaticBackupFolder();
-            } catch {
-                // configureAutomaticBackupFolder already handles and reports errors internally
+            const configuredFolder = await configureAutomaticBackupFolder();
+            if (!configuredFolder) {
+                return false;
             }
-            if (configuredFolder) {
-                backupDirHandle = configuredFolder.backupDirHandle;
-            }
+            backupDirHandle = configuredFolder.backupDirHandle;
         }
 
         if (backupDirHandle) {
@@ -3665,15 +3661,18 @@ async function downloadBackupFile(data, { automatic = false } = {}) {
                 await writable.close();
                 lastAutomaticBackupSavedAt = new Date().toISOString();
                 syncAutomaticBackupStatusUI();
-                return;
+                return true;
             } catch {
                 // Write failed — in automatic mode exit silently, otherwise fall through to anchor download
+                if (!automatic) {
+                    showToast("Cartella backup non scrivibile: verrà usato il download del file.", 'info');
+                }
             }
         }
     }
 
     // In automatic mode, skip anchor download to avoid unexpected browser dialogs.
-    if (automatic) return;
+    if (automatic) return false;
 
     // Fallback: anchor download
     const dataStr = "data:application/json;charset=utf-8," + encodeURIComponent(jsonStr);
@@ -3685,12 +3684,17 @@ async function downloadBackupFile(data, { automatic = false } = {}) {
     a.remove();
     lastAutomaticBackupSavedAt = new Date().toISOString();
     syncAutomaticBackupStatusUI();
+    return true;
 }
 
 async function forceLocalBackupNow() {
     try {
         const backupData = buildCompleteBackupData();
-        await downloadBackupFile(backupData);
+        const backupSaved = await downloadBackupFile(backupData, { automatic: false });
+        if (!backupSaved) {
+            showToast("Backup non completato.", 'info');
+            return;
+        }
         lastAutomaticBackupFingerprint = JSON.stringify(backupData);
         const destinationLabel = getAutomaticBackupDestinationLabel();
         showToast(destinationLabel ? `Backup salvato in ${destinationLabel}.` : "Backup salvato.", 'success');
@@ -3760,7 +3764,8 @@ async function runAutomaticLocalBackup() {
     const backupData = buildCompleteBackupData();
     const fingerprint = JSON.stringify(backupData);
     if (fingerprint === lastAutomaticBackupFingerprint) return;
-    await downloadBackupFile(backupData, { automatic: true });
+    const backupSaved = await downloadBackupFile(backupData, { automatic: true });
+    if (!backupSaved) return;
     lastAutomaticBackupFingerprint = fingerprint;
 }
 
