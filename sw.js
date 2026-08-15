@@ -16,11 +16,11 @@ const LOCAL_ASSETS = [
   './js/backup-utils.js',
   './js/offline-cache-utils.js',
   './js/offline-map-download-utils.js',
-  './vendor/html2pdf/html2pdf.bundle.min.js',
 ];
 const REMOTE_ASSETS = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
 ];
 
 async function warmRemoteAssets(cache) {
