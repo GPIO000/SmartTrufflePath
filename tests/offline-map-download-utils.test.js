@@ -149,13 +149,14 @@ describe('summarizeTileDownloadResults', () => {
       { ok: true },
       { ok: false, reason: 'quota_exceeded' },
       { ok: false, reason: 'network_or_server' },
-      { ok: false, reason: 'unexpected_reason' }
+      { ok: false, reason: 'unexpected_reason' },
+      { ok: false }
     ]);
 
     expect(summary).toEqual({
-      errors: 3,
+      errors: 4,
       quotaErrors: 1,
-      networkErrors: 2
+      networkErrors: 3
     });
   });
 });
