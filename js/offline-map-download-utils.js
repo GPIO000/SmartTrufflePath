@@ -1,5 +1,5 @@
 const TILE_MIN_VALID_SIZE = 512;
-const TILE_MAX_RETRIES = 2;
+const TILE_MAX_ATTEMPTS = 3;
 
 function isOpenStreetMapTileUrl(url) {
   try {
@@ -23,7 +23,7 @@ function isOpaqueTileResponse(response) {
   return response?.type === 'opaque';
 }
 
-function isValidCachedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
+function isValidTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
   if (!response) return false;
   if (isOpaqueTileResponse(response)) return true;
   if (!response.ok) return false;
@@ -31,18 +31,18 @@ function isValidCachedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE)
   return contentLength >= minValidSize;
 }
 
+function isValidCachedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
+  return isValidTileResponse(response, minValidSize);
+}
+
 function isValidDownloadedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
-  if (!response) return false;
-  if (isOpaqueTileResponse(response)) return true;
-  if (!response.ok) return false;
-  const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
-  return contentLength >= minValidSize;
+  return isValidTileResponse(response, minValidSize);
 }
 
 async function downloadTileWithRetry(cache, url, {
   fetchImpl = globalThis.fetch,
   fetchMode,
-  maxRetries = TILE_MAX_RETRIES,
+  maxAttempts = TILE_MAX_ATTEMPTS,
   minValidSize = TILE_MIN_VALID_SIZE
 } = {}) {
   try {
@@ -57,7 +57,7 @@ async function downloadTileWithRetry(cache, url, {
     // match() o delete() non disponibili: procedi comunque con il download
   }
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const resolvedFetchMode = fetchMode ?? (isOpenStreetMapTileUrl(url) ? 'no-cors' : 'cors');
       const response = await fetchImpl(url, { mode: resolvedFetchMode, cache: 'no-store' });
@@ -77,12 +77,13 @@ async function downloadTileWithRetry(cache, url, {
 }
 
 export {
-  TILE_MAX_RETRIES,
+  TILE_MAX_ATTEMPTS,
   TILE_MIN_VALID_SIZE,
   downloadTileWithRetry,
   isOpaqueTileResponse,
   isOpenStreetMapTileUrl,
   isQuotaExceededError,
   isValidCachedTileResponse,
+  isValidTileResponse,
   isValidDownloadedTileResponse
 };

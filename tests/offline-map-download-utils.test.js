@@ -9,7 +9,7 @@ import {
 } from '../js/offline-map-download-utils.js';
 
 describe('isQuotaExceededError', () => {
-  it('riconosce gli errori quota più comuni', () => {
+  it('detects the most common quota errors', () => {
     expect(isQuotaExceededError({ name: 'QuotaExceededError' })).toBe(true);
     expect(isQuotaExceededError({ name: 'NS_ERROR_DOM_QUOTA_REACHED' })).toBe(true);
     expect(isQuotaExceededError({ code: 22 })).toBe(true);
@@ -19,20 +19,20 @@ describe('isQuotaExceededError', () => {
 });
 
 describe('tile response validation', () => {
-  it('riconosce gli URL tile di OpenStreetMap', () => {
+  it('recognizes OpenStreetMap tile URLs', () => {
     expect(isOpenStreetMapTileUrl('https://a.tile.openstreetmap.org/8/1/1.png')).toBe(true);
     expect(isOpenStreetMapTileUrl('https://tile.openstreetmap.org/8/1/1.png')).toBe(true);
     expect(isOpenStreetMapTileUrl('https://example.com/8/1/1.png')).toBe(false);
   });
 
-  it('considera valide le risposte opaque per cache e download', () => {
+  it('treats opaque responses as valid for cache and download flows', () => {
     const response = { type: 'opaque', status: 0 };
     expect(isOpaqueTileResponse(response)).toBe(true);
     expect(isValidCachedTileResponse(response)).toBe(true);
     expect(isValidDownloadedTileResponse(response)).toBe(true);
   });
 
-  it('scarta le tile cached troppo piccole', () => {
+  it('rejects cached tiles that are too small', () => {
     const response = {
       type: 'basic',
       status: 200,
@@ -41,7 +41,7 @@ describe('tile response validation', () => {
     expect(isValidCachedTileResponse(response)).toBe(false);
   });
 
-  it('scarta le tile cached non ok anche se grandi', () => {
+  it('rejects cached tiles that are not ok even when large', () => {
     const response = {
       type: 'basic',
       status: 503,
@@ -51,7 +51,7 @@ describe('tile response validation', () => {
     expect(isValidCachedTileResponse(response)).toBe(false);
   });
 
-  it('scarta i download con risposta troppo piccola o non ok', () => {
+  it('rejects downloads that are too small or not ok', () => {
     const tooSmall = {
       type: 'cors',
       status: 200,
@@ -70,7 +70,7 @@ describe('tile response validation', () => {
 });
 
 describe('downloadTileWithRetry', () => {
-  it('riusa una tile opaque già presente in cache', async () => {
+  it('reuses an opaque tile already stored in cache', async () => {
     const cache = {
       match: vi.fn().mockResolvedValue({ type: 'opaque', status: 0 }),
       delete: vi.fn(),
@@ -85,7 +85,7 @@ describe('downloadTileWithRetry', () => {
     expect(cache.put).not.toHaveBeenCalled();
   });
 
-  it('scarica e salva una tile opaque quando il browser non espone CORS', async () => {
+  it('downloads and stores an opaque tile when the browser cannot use CORS', async () => {
     const cachedClone = { type: 'opaque', status: 0 };
     const response = {
       type: 'opaque',
@@ -107,7 +107,7 @@ describe('downloadTileWithRetry', () => {
     expect(cache.put).toHaveBeenCalledWith('https://b.tile.openstreetmap.org/8/1/1.png', cachedClone);
   });
 
-  it('classifica correttamente gli errori di quota', async () => {
+  it('classifies quota errors correctly', async () => {
     const cache = {
       match: vi.fn().mockResolvedValue(null),
       delete: vi.fn(),
@@ -120,7 +120,7 @@ describe('downloadTileWithRetry', () => {
     expect(result).toEqual({ ok: false, reason: 'quota_exceeded' });
   });
 
-  it('usa cors per provider non OSM se non viene forzata una modalità', async () => {
+  it('uses cors for non-OSM providers when no fetch mode is forced', async () => {
     const response = {
       type: 'cors',
       status: 200,
