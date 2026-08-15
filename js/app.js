@@ -4946,6 +4946,7 @@ async function eliminaCacheMappaOffline() {
     try {
         const deleted = await caches.delete(OFFLINE_MAP_CACHE_NAME);
         if (deleted) {
+            localStorage.removeItem(OFFLINE_REGIONI_PREFERITE_KEY);
             showToast('✅ Cache mappa offline eliminata.', 'success');
         } else {
             showToast('Nessuna cache offline trovata.', 'info');
