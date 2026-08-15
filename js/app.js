@@ -30,6 +30,8 @@ const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
 const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
+const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
+const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
 
 function getOfflinePreferredMaxZoom() {
     const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, null);
@@ -4757,7 +4759,16 @@ function getCacheStorageSafe() {
     return cacheStorage;
 }
 
-async function getOfflineMapCachedUrlsSet() {
+function isOsmTileUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return parsed.hostname === 'tile.openstreetmap.org' || /^[abc]\.tile\.openstreetmap\.org$/.test(parsed.hostname);
+    } catch {
+        return false;
+    }
+}
+
+async function getOfflineMapCachedUrlsSet({ includeLegacy = false } = {}) {
     const cacheStorage = getCacheStorageSafe();
     if (!cacheStorage) throw new Error('CACHE_API_UNAVAILABLE');
     // Apre direttamente la cache (se non esiste, open() la crea vuota e keys() restituirà []).
@@ -4765,7 +4776,7 @@ async function getOfflineMapCachedUrlsSet() {
     // un array vuoto o incompleto anche quando la cache esiste, causando false-negative.
     let cache;
     try {
-        cache = await cacheStorage.open('smarttruffle-map-offline');
+        cache = await cacheStorage.open(OFFLINE_MAP_CACHE_NAME);
     } catch {
         return new Set();
     }
@@ -4776,7 +4787,40 @@ async function getOfflineMapCachedUrlsSet() {
     } catch {
         return new Set();
     }
-    return new Set(requests.map(req => req.url));
+    const cachedUrls = new Set(requests.map(req => req.url).filter(isOsmTileUrl));
+
+    if (!includeLegacy || typeof cacheStorage.keys !== 'function') {
+        return cachedUrls;
+    }
+
+    let cacheNames = [];
+    try {
+        cacheNames = await cacheStorage.keys();
+    } catch {
+        return cachedUrls;
+    }
+
+    const legacyCacheNames = cacheNames.filter((name) => name.startsWith(APP_CACHE_NAME_PREFIX));
+    for (const legacyCacheName of legacyCacheNames) {
+        let legacyCache;
+        try {
+            legacyCache = await cacheStorage.open(legacyCacheName);
+        } catch {
+            continue;
+        }
+        if (!legacyCache || typeof legacyCache.keys !== 'function') continue;
+        let legacyRequests = [];
+        try {
+            legacyRequests = await legacyCache.keys();
+        } catch {
+            continue;
+        }
+        legacyRequests.forEach((req) => {
+            if (isOsmTileUrl(req.url)) cachedUrls.add(req.url);
+        });
+    }
+
+    return cachedUrls;
 }
 
 async function scaricaRegioniOffline() {
@@ -4796,7 +4840,7 @@ async function scaricaRegioniOffline() {
     const progressText = document.getElementById('offline-progress-text');
     if (progressArea) progressArea.style.display = 'block';
 
-    const cacheName = 'smarttruffle-map-offline';
+    const cacheName = OFFLINE_MAP_CACHE_NAME;
 
     let allUrls = [];
     for (const id of selezionate) {
@@ -4856,7 +4900,7 @@ async function scaricaRegioniOffline() {
 async function aggiornaStatoCacheRegioni() {
     let cachedUrls = new Set();
     try {
-        cachedUrls = await getOfflineMapCachedUrlsSet();
+        cachedUrls = await getOfflineMapCachedUrlsSet({ includeLegacy: true });
     } catch {
         const statusEl = document.getElementById('offline-cache-status');
         if (statusEl) {
@@ -4888,7 +4932,7 @@ async function eliminaCacheMappaOffline() {
     const conferma = await appConfirm('Eliminare tutta la cache della mappa offline? Dovrai riscaricarne le regioni per usarla offline.');
     if (!conferma) return;
     try {
-        const deleted = await caches.delete('smarttruffle-map-offline');
+        const deleted = await caches.delete(OFFLINE_MAP_CACHE_NAME);
         if (deleted) {
             showToast('✅ Cache mappa offline eliminata.', 'success');
         } else {
@@ -4908,7 +4952,7 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
     // Controlla se la cache è assente o vuota
     let cacheEsistente = false;
     try {
-        const cachedUrls = await getOfflineMapCachedUrlsSet();
+        const cachedUrls = await getOfflineMapCachedUrlsSet({ includeLegacy: true });
         cacheEsistente = cachedUrls.size > 0;
     } catch {
         return; // Cache API non disponibile, nessuna azione
@@ -4929,7 +4973,7 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 
     let cache;
     try {
-        cache = await caches.open('smarttruffle-map-offline');
+        cache = await caches.open(OFFLINE_MAP_CACHE_NAME);
     } catch {
         return;
     }
