@@ -54,6 +54,17 @@ async function migrateLegacyOsmTilesToOfflineCache() {
   }));
 }
 
+async function getLegacyOsmTileResponse(request) {
+  const keys = await caches.keys();
+  const legacyAppCaches = keys.filter((key) => key.startsWith('smarttruffle-path-'));
+  for (const cacheName of legacyAppCaches) {
+    const legacyCache = await caches.open(cacheName);
+    const cachedResponse = await legacyCache.match(request);
+    if (cachedResponse) return cachedResponse;
+  }
+  return null;
+}
+
 // Installazione Service Worker e salvataggio in cache
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -99,8 +110,7 @@ self.addEventListener('fetch', (e) => {
           const offlineResponse = await offlineCache.match(e.request);
           if (offlineResponse) return offlineResponse;
 
-          const appCache = await caches.open(CACHE_NAME);
-          const legacyResponse = await appCache.match(e.request);
+          const legacyResponse = await getLegacyOsmTileResponse(e.request);
           if (legacyResponse) {
             offlineCache.put(e.request, legacyResponse.clone()).catch(() => {});
             return legacyResponse;

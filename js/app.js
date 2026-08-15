@@ -4787,6 +4787,7 @@ async function getOfflineMapCachedUrlsSet({ includeLegacy = false } = {}) {
     } catch {
         return new Set();
     }
+    // Cache dedicata alle tile: per coerenza consideriamo solo URL OSM.
     const cachedUrls = new Set(requests.map(req => req.url).filter(isOsmTileUrl));
 
     if (!includeLegacy || typeof cacheStorage.keys !== 'function') {
