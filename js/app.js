@@ -3668,17 +3668,17 @@ async function downloadBackupFile(data, { automatic = false } = {}) {
         if (backupDirHandle) {
             try {
                 const fileHandle = await backupDirHandle.getFileHandle(fileName, { create: true });
-                const writable = await fileHandle.createWritable();
+                const writable = await fileHandle.createWritable({ keepExistingData: false });
                 await writable.write(jsonStr);
                 await writable.close();
                 lastAutomaticBackupSavedAt = new Date().toISOString();
                 syncAutomaticBackupStatusUI();
                 await TruffleStorage.saveAutomaticBackupSnapshot(data, automatic ? 'automatic' : 'manual').catch(() => {});
                 return true;
-            } catch {
-                // Write failed — in automatic mode exit silently, otherwise fall through to anchor download
+            } catch (err) {
+                // In automatic mode exit silently; in manual mode propagate so the caller can show a clear error.
                 if (!automatic) {
-                    showToast("Cartella backup non scrivibile: verrà usato il download del file.", 'info');
+                    throw err;
                 }
             }
         }
@@ -3712,8 +3712,9 @@ async function forceLocalBackupNow() {
         lastAutomaticBackupFingerprint = JSON.stringify(backupData);
         const destinationLabel = getAutomaticBackupDestinationLabel();
         showToast(destinationLabel ? `Backup salvato in ${destinationLabel}.` : "Backup salvato.", 'success');
-    } catch {
-        showToast("Errore durante il salvataggio del backup.", 'error');
+    } catch (err) {
+        const reason = (err && err.message) ? `: ${err.message}` : '';
+        showToast(`Errore durante il salvataggio del backup${reason}`, 'error');
     }
 }
 
