@@ -31,8 +31,13 @@ function isValidTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
   return contentLength >= minValidSize;
 }
 
-const isValidCachedTileResponse = isValidTileResponse;
-const isValidDownloadedTileResponse = isValidTileResponse;
+function isValidCachedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
+  return isValidTileResponse(response, minValidSize);
+}
+
+function isValidDownloadedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
+  return isValidTileResponse(response, minValidSize);
+}
 
 async function downloadTileWithRetry(cache, url, {
   fetchImpl = globalThis.fetch,
@@ -53,6 +58,7 @@ async function downloadTileWithRetry(cache, url, {
     // If match() or delete() are unavailable, continue with a network attempt.
   }
 
+  // `maxRetries` is the legacy option name and takes precedence when provided.
   const resolvedMaxAttempts = Number.isInteger(maxRetries) && maxRetries >= 0
     ? maxRetries + 1
     : maxAttempts;
