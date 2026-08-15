@@ -3,7 +3,7 @@ import {
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
     buildAutomaticBackupPathLabel,
-    extractValidBackupEntries
+    buildBackupRestorePlan
 } from './backup-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
 
@@ -3561,7 +3561,6 @@ function syncAutomaticBackupStatusUI() {
 }
 
 let _automaticBackupDirHandle = null;
-let _automaticBackupSubDirHandle = null;
 
 async function _loadBackupDirHandle() {
     if (_automaticBackupDirHandle) return _automaticBackupDirHandle;
@@ -3574,11 +3573,40 @@ async function _loadBackupDirHandle() {
     return _automaticBackupDirHandle;
 }
 
-async function _ensureAutomaticBackupSubdirectory(rootDirHandle) {
-    if (_automaticBackupSubDirHandle) return _automaticBackupSubDirHandle;
-    const appDirHandle = await rootDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_APP_FOLDER_NAME, { create: true });
-    _automaticBackupSubDirHandle = await appDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_FILES_FOLDER_NAME, { create: true });
-    return _automaticBackupSubDirHandle;
+function _matchesDirectoryName(handle, expectedName) {
+    return Boolean(handle && typeof handle.name === 'string' && handle.name.toLowerCase() === expectedName.toLowerCase());
+}
+
+function _normalizeAutomaticBackupDestinationLabel(destinationLabel) {
+    const currentLabel = getAutomaticBackupDestinationLabel();
+    if (destinationLabel === AUTOMATIC_BACKUP_FILES_FOLDER_NAME && currentLabel) {
+        return currentLabel;
+    }
+    return destinationLabel;
+}
+
+async function _resolveAutomaticBackupDirectory(selectedDirHandle) {
+    if (_matchesDirectoryName(selectedDirHandle, AUTOMATIC_BACKUP_FILES_FOLDER_NAME)) {
+        return {
+            backupDirHandle: selectedDirHandle,
+            destinationLabel: AUTOMATIC_BACKUP_FILES_FOLDER_NAME
+        };
+    }
+
+    if (_matchesDirectoryName(selectedDirHandle, AUTOMATIC_BACKUP_APP_FOLDER_NAME)) {
+        const backupDirHandle = await selectedDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_FILES_FOLDER_NAME, { create: true });
+        return {
+            backupDirHandle,
+            destinationLabel: `${AUTOMATIC_BACKUP_APP_FOLDER_NAME}/${AUTOMATIC_BACKUP_FILES_FOLDER_NAME}`
+        };
+    }
+
+    const appDirHandle = await selectedDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_APP_FOLDER_NAME, { create: true });
+    const backupDirHandle = await appDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_FILES_FOLDER_NAME, { create: true });
+    return {
+        backupDirHandle,
+        destinationLabel: buildAutomaticBackupPathLabel(selectedDirHandle.name)
+    };
 }
 
 async function configureAutomaticBackupFolder(forceReselect = false) {
@@ -3588,40 +3616,37 @@ async function configureAutomaticBackupFolder(forceReselect = false) {
     }
 
     try {
-        let rootDirHandle = forceReselect ? null : await _loadBackupDirHandle();
-        if (!rootDirHandle) {
+        let selectedDirHandle = forceReselect ? null : await _loadBackupDirHandle();
+        if (!selectedDirHandle) {
             await appAlert(
                 `📁 Configurazione backup automatico\n\n` +
                 `1. Seleziona la cartella Download del dispositivo.\n` +
                 `2. L'app creerà (o riutilizzerà) automaticamente il percorso ${buildAutomaticBackupPathLabel('Download')}.\n` +
                 `3. Il file backup_truffle_automatico.json verrà salvato sempre lì e il percorso sarà registrato.`
             );
-            rootDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            selectedDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
         } else {
-            const permission = await rootDirHandle.requestPermission({ mode: 'readwrite' });
+            const permission = await selectedDirHandle.requestPermission({ mode: 'readwrite' });
             if (permission !== 'granted') {
                 _automaticBackupDirHandle = null;
-                _automaticBackupSubDirHandle = null;
                 await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
                 setAutomaticBackupDestinationLabel(null);
                 await appAlert("⚠️ Permesso negato\n\nNon posso più usare la cartella backup registrata. Seleziona di nuovo la cartella Download per ricreare il percorso guidato.");
-                rootDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                selectedDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
             }
         }
 
-        _automaticBackupSubDirHandle = null;
-        _automaticBackupDirHandle = rootDirHandle;
-        const backupDirHandle = await _ensureAutomaticBackupSubdirectory(rootDirHandle);
-        await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, rootDirHandle);
-        const destinationLabel = buildAutomaticBackupPathLabel(rootDirHandle.name);
-        setAutomaticBackupDestinationLabel(destinationLabel);
-        return { rootDirHandle, backupDirHandle, destinationLabel };
+        const { backupDirHandle, destinationLabel } = await _resolveAutomaticBackupDirectory(selectedDirHandle);
+        const normalizedDestinationLabel = _normalizeAutomaticBackupDestinationLabel(destinationLabel);
+        _automaticBackupDirHandle = backupDirHandle;
+        await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, backupDirHandle);
+        setAutomaticBackupDestinationLabel(normalizedDestinationLabel);
+        return { backupDirHandle, destinationLabel: normalizedDestinationLabel };
     } catch (error) {
         if (error && error.name === 'AbortError') {
             return null;
         }
         _automaticBackupDirHandle = null;
-        _automaticBackupSubDirHandle = null;
         await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
         setAutomaticBackupDestinationLabel(null);
         await appAlert("⚠️ Cartella backup non disponibile\n\nLa cartella selezionata non è accessibile. Reimposta la cartella Download per registrare di nuovo il percorso guidato.");
@@ -3644,14 +3669,18 @@ async function downloadBackupFile(data, { automatic = false } = {}) {
         let backupDirHandle = null;
         if (automatic) {
             // In automatic mode never open pickers: use only the already-granted handle.
-            const rootDirHandle = await _loadBackupDirHandle();
-            if (rootDirHandle) {
+            const storedDirHandle = await _loadBackupDirHandle();
+            if (storedDirHandle) {
                 try {
                     // Use queryPermission to avoid triggering a browser prompt (requestPermission
                     // may require a user gesture on some browsers).
-                    const permission = await rootDirHandle.queryPermission({ mode: 'readwrite' });
+                    const permission = await storedDirHandle.queryPermission({ mode: 'readwrite' });
                     if (permission === 'granted') {
-                        backupDirHandle = await _ensureAutomaticBackupSubdirectory(rootDirHandle);
+                        const resolvedDirectory = await _resolveAutomaticBackupDirectory(storedDirHandle);
+                        backupDirHandle = resolvedDirectory.backupDirHandle;
+                        _automaticBackupDirHandle = backupDirHandle;
+                        await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, backupDirHandle).catch(() => {});
+                        setAutomaticBackupDestinationLabel(_normalizeAutomaticBackupDestinationLabel(resolvedDirectory.destinationLabel));
                     }
                 } catch {
                     // Permission check unavailable — exit silently without any fallback
@@ -3806,7 +3835,7 @@ async function ripristinaBackupDaFile(event) {
     reader.onload = async function(e) {
         try {
             const content = JSON.parse(e.target.result);
-            const entries = extractValidBackupEntries(content, backupMap);
+            const { entries, keysToRemove } = buildBackupRestorePlan(content, backupMap);
 
             const confirmed = await appConfirm(
                 '⚠️ Ripristina Backup\n\n' +
@@ -3818,6 +3847,9 @@ async function ripristinaBackupDaFile(event) {
                 return;
             }
 
+            for (const storageKey of keysToRemove) {
+                localStorage.removeItem(storageKey);
+            }
             for (const [storageKey, value] of entries) {
                 localStorage.setItem(storageKey, value);
             }

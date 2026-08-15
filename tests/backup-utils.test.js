@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeBackupEntry,
   extractValidBackupEntries,
+  buildBackupRestorePlan,
   AUTOMATIC_BACKUP_APP_FOLDER_NAME,
   AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
   buildAutomaticBackupPathLabel,
@@ -67,5 +68,41 @@ describe('extractValidBackupEntries', () => {
     expect(() => extractValidBackupEntries(null, backupMap)).toThrow();
     expect(() => extractValidBackupEntries([], backupMap)).toThrow();
     expect(() => extractValidBackupEntries('stringa', backupMap)).toThrow();
+  });
+});
+
+describe('buildBackupRestorePlan', () => {
+  const backupMap = {
+    storicoVendite: 'storico_vendite',
+    poiList: 'poi_list',
+    backupDirLabel: 'backup_dir_label',
+  };
+
+  it('restituisce le entry valide e le chiavi da rimuovere se mancanti nel backup', () => {
+    const content = {
+      storicoVendite: '[1,2,3]',
+      poiList: null,
+    };
+
+    expect(buildBackupRestorePlan(content, backupMap)).toEqual({
+      entries: [['storico_vendite', '[1,2,3]']],
+      keysToRemove: ['poi_list', 'backup_dir_label'],
+    });
+  });
+
+  it('tratta le voci JSON non valide come chiavi da rimuovere', () => {
+    const content = {
+      storicoVendite: 'not-json',
+      poiList: '[]',
+      backupDirLabel: '"Download/SmartTrufflePath/file backup"',
+    };
+
+    expect(buildBackupRestorePlan(content, backupMap)).toEqual({
+      entries: [
+        ['poi_list', '[]'],
+        ['backup_dir_label', '"Download/SmartTrufflePath/file backup"'],
+      ],
+      keysToRemove: ['storico_vendite'],
+    });
   });
 });

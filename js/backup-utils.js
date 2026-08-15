@@ -62,9 +62,31 @@ function extractValidBackupEntries(content, backupMap) {
     return entries;
 }
 
+/**
+ * Builds a restore plan from a backup object.
+ * - `entries` contains valid [storageKey, jsonString] pairs to write.
+ * - `keysToRemove` contains managed storage keys that are missing or invalid in the backup
+ *   and therefore must be cleared before restore to avoid stale data remaining visible.
+ *
+ * @param {unknown} content - Parsed backup JSON object.
+ * @param {Record<string, string>} backupMap - Mapping from backup field names to localStorage keys.
+ * @returns {{ entries: Array<[string, string]>, keysToRemove: string[] }}
+ */
+function buildBackupRestorePlan(content, backupMap) {
+    const entries = extractValidBackupEntries(content, backupMap);
+    const restoredStorageKeys = new Set(entries.map(([storageKey]) => storageKey));
+    const managedStorageKeys = [...new Set(Object.values(backupMap))];
+
+    return {
+        entries,
+        keysToRemove: managedStorageKeys.filter((storageKey) => !restoredStorageKeys.has(storageKey))
+    };
+}
+
 export {
     normalizeBackupEntry,
     extractValidBackupEntries,
+    buildBackupRestorePlan,
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
     buildAutomaticBackupPathLabel
