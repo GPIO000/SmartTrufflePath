@@ -26,8 +26,8 @@ const REMOTE_ASSETS = [
 async function warmRemoteAssets(cache) {
   await Promise.allSettled(
     REMOTE_ASSETS.map(async (url) => {
-      const response = await fetch(url, { mode: 'no-cors', cache: 'no-store' });
-      if (response) {
+      const response = await fetch(url, { mode: 'cors', cache: 'no-store' });
+      if (response.ok) {
         await cache.put(url, response.clone());
       }
     })
