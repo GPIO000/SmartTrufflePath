@@ -24,14 +24,19 @@ const REMOTE_ASSETS = [
 ];
 
 async function warmRemoteAssets(cache) {
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     REMOTE_ASSETS.map(async (url) => {
       const response = await fetch(url, { mode: 'cors' });
       if (response.ok) {
-        await cache.put(url, response.clone());
+        await cache.put(url, response);
       }
     })
   );
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      console.warn('[Service Worker] Warmup asset non disponibile:', REMOTE_ASSETS[index], result.reason);
+    }
+  });
 }
 
 function serviceUnavailableResponse() {
