@@ -4981,10 +4981,11 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 
     if (!deveRiscaricare) return;
 
-    showToast('🔄 Cache mappa offline assente o incompleta. Re-download automatico in corso…', 'info');
+    showToast('🔄 Cache mappa offline assente o incompleta. Ripristino completo in corso…', 'info');
 
     let cache;
     try {
+        await caches.delete(OFFLINE_MAP_CACHE_NAME);
         cache = await caches.open(OFFLINE_MAP_CACHE_NAME);
     } catch {
         return;
@@ -4996,12 +4997,9 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
         const batch = allUrls.slice(i, i + BATCH_SIZE);
         await Promise.all(batch.map(async (url) => {
             try {
-                const cached = await cache.match(url);
-                if (!cached) {
-                    const res = await fetch(url, { mode: 'cors' });
-                    if (res.ok) await cache.put(url, res.clone());
-                    else errors++;
-                }
+                const res = await fetch(url, { mode: 'cors' });
+                if (res.ok) await cache.put(url, res.clone());
+                else errors++;
             } catch {
                 errors++;
             }
