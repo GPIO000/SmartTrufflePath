@@ -24,9 +24,17 @@ try {
 }
 
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
-        .then((reg) => console.log('Service Worker registrato con successo:', reg.scope))
-        .catch((err) => console.log('Registrazione Service Worker fallita:', err));
+    const registerServiceWorker = () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then((reg) => console.log('Service Worker registrato con successo:', reg.scope))
+            .catch((err) => console.log('Registrazione Service Worker fallita:', err));
+    };
+
+    if (document.readyState === 'complete') {
+        registerServiceWorker();
+    } else {
+        window.addEventListener('load', registerServiceWorker, { once: true });
+    }
 }
 
 // Inizializzazione Mappa corretta (ordine invertito per evitare ReferenceError)
