@@ -1,5 +1,5 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-15';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-16';
 const MAP_OFFLINE_CACHE_NAME = 'smarttruffle-map-offline';
 let legacyAppCacheNames = null;
 let legacyAppCacheNamesPromise = null;
@@ -33,6 +33,26 @@ function isOsmTileRequestUrl(url) {
   } catch {
     return false;
   }
+}
+
+async function getCachedAppShellResponse() {
+  const candidates = [
+    ['./index.html', undefined],
+    ['./', undefined],
+    ['./index.html', { ignoreSearch: true }],
+    ['./', { ignoreSearch: true }]
+  ];
+
+  for (const [request, options] of candidates) {
+    try {
+      const response = await caches.match(request, options);
+      if (response) return response;
+    } catch {
+      // Ignora lookup non supportati dal browser.
+    }
+  }
+
+  return null;
 }
 
 function getLegacyAppCacheNamesFromKeys(keys) {
@@ -116,6 +136,20 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   // Ignora richieste non GET
   if (e.request.method !== 'GET') return;
+
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      (async () => {
+        try {
+          return await fetch(e.request);
+        } catch {
+          const cachedAppShell = await getCachedAppShellResponse();
+          return cachedAppShell || serviceUnavailableResponse();
+        }
+      })()
+    );
+    return;
+  }
 
   const requestUrl = new URL(e.request.url);
 
