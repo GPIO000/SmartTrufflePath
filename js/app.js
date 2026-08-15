@@ -5,6 +5,11 @@ import {
     buildAutomaticBackupPathLabel,
     buildBackupRestorePlan
 } from './backup-utils.js';
+import {
+    countCachedTileUrls,
+    isOfflineRegionFullyCached,
+    shouldRestoreOfflineMapCache
+} from './offline-cache-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
 
 window.TruffleStorage = TruffleStorage;
@@ -4922,9 +4927,12 @@ async function aggiornaStatoCacheRegioni() {
     let html = '';
     for (const regione of REGIONI_ITALIA_OFFLINE) {
         const sampleUrls = getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, maxZoom);
-        const hasTiles = sampleUrls.some(url => cachedUrls.has(url));
-        const badge = hasTiles
+        const cachedTileCount = countCachedTileUrls(cachedUrls, sampleUrls);
+        const isFullyCached = isOfflineRegionFullyCached(cachedUrls, sampleUrls);
+        const badge = isFullyCached
             ? `<span style="color:#22c55e; font-size:0.75rem; font-weight:bold; margin-left:4px;">✅ in cache</span>`
+            : cachedTileCount > 0
+                ? `<span style="color:#f59e0b; font-size:0.75rem; margin-left:4px;">🟨 cache parziale</span>`
             : `<span style="color:#6b7280; font-size:0.75rem; margin-left:4px;">⬜ non scaricata</span>`;
         html += `<div style="display:flex; align-items:center; justify-content:space-between; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
             <span style="font-size:0.82rem; color:#ddd6c8;">${escapeHtml(regione.nome)}</span>${badge}</div>`;
@@ -4952,21 +4960,8 @@ async function eliminaCacheMappaOffline() {
 async function autoRiscaricaRegioniOfflineSeNecessario() {
     const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, null);
     if (!pref || !Array.isArray(pref.regioni) || pref.regioni.length === 0) return;
-
-    // Controlla se la cache è assente o vuota
-    let cacheEsistente = false;
-    try {
-        const cachedUrls = await getOfflineMapCachedUrlsSet({ includeLegacy: true });
-        cacheEsistente = cachedUrls.size > 0;
-    } catch {
-        return; // Cache API non disponibile, nessuna azione
-    }
-
-    if (cacheEsistente) return;
-
-    showToast('🔄 Cache mappa offline assente. Re-download automatico in corso…', 'info');
-
     const maxZoom = typeof pref.maxZoom === 'number' ? pref.maxZoom : 14;
+
     let allUrls = [];
     for (const id of pref.regioni) {
         const regione = REGIONI_ITALIA_OFFLINE.find(r => r.id === id);
@@ -4974,6 +4969,19 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
         allUrls = allUrls.concat(getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, maxZoom));
     }
     allUrls = [...new Set(allUrls)];
+    if (allUrls.length === 0) return;
+
+    let deveRiscaricare = false;
+    try {
+        const cachedUrls = await getOfflineMapCachedUrlsSet({ includeLegacy: true });
+        deveRiscaricare = shouldRestoreOfflineMapCache(cachedUrls, allUrls);
+    } catch {
+        return; // Cache API non disponibile, nessuna azione
+    }
+
+    if (!deveRiscaricare) return;
+
+    showToast('🔄 Cache mappa offline assente o incompleta. Re-download automatico in corso…', 'info');
 
     let cache;
     try {
@@ -4992,6 +5000,7 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
                 if (!cached) {
                     const res = await fetch(url, { mode: 'cors' });
                     if (res.ok) await cache.put(url, res.clone());
+                    else errors++;
                 }
             } catch {
                 errors++;
