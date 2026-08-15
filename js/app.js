@@ -10,6 +10,7 @@ import {
     isOfflineRegionFullyCached,
     shouldRestoreOfflineMapCache
 } from './offline-cache-utils.js';
+import { downloadTileWithRetry, summarizeTileDownloadResults } from './offline-map-download-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
 
 window.TruffleStorage = TruffleStorage;
@@ -4787,58 +4788,8 @@ function isOsmTileUrl(url) {
     }
 }
 
-const TILE_MIN_VALID_SIZE = 512; // byte: tile PNG valide pesano sempre più di questo
-const TILE_MAX_RETRIES = 2;
 const OFFLINE_DOWNLOAD_BATCH_SIZE = 6;
 const OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT = 8;
-
-function isQuotaExceededError(error) {
-    if (!error) return false;
-    return error.name === 'QuotaExceededError'
-        || error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
-        || error.code === 22
-        || error.code === 1014;
-}
-
-/**
- * Scarica una singola tile in cache applicando la strategia skip-if-cached con retry.
- * - Se la tile è già presente e valida (Content-Length > soglia minima) non viene riscaricata.
- * - In caso di errore o risposta non valida, riprova fino a maxRetries volte.
- * Restituisce un oggetto:
- * - { ok: true } se la tile è in cache al termine
- * - { ok: false, reason: 'quota_exceeded'|'network_or_server' } se tutti i tentativi falliscono.
- */
-async function downloadTileWithRetry(cache, url, maxRetries = TILE_MAX_RETRIES) {
-    // Controlla se esiste già una copia valida in cache
-    try {
-        const cached = await cache.match(url);
-        if (cached) {
-            const cl = parseInt(cached.headers.get('content-length') || '0', 10);
-            if (cl >= TILE_MIN_VALID_SIZE) return { ok: true }; // tile già presente e valida
-            // tile in cache ma sospettosamente piccola: la consideriamo corrotta e la riscariciamo
-            await cache.delete(url).catch(() => {});
-        }
-    } catch {
-        // match() o delete() non disponibili: procedi comunque con il download
-    }
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-            const res = await fetch(url, { mode: 'cors' });
-            if (!res.ok) { res.body?.cancel(); continue; }
-            const cl = parseInt(res.headers.get('content-length') || '0', 10);
-            if (cl > 0 && cl < TILE_MIN_VALID_SIZE) { res.body?.cancel(); continue; } // risposta troppo piccola: errore mascherato da 200
-            await cache.put(url, res.clone());
-            return { ok: true };
-        } catch (error) {
-            if (isQuotaExceededError(error)) {
-                return { ok: false, reason: 'quota_exceeded' };
-            }
-            // Errore di rete: riprova al prossimo ciclo
-        }
-    }
-    return { ok: false, reason: 'network_or_server' };
-}
 
 function buildOfflineTileUrlsByZoom(regionIds, maxZoom) {
     const urlsByZoom = [];
@@ -4932,6 +4883,19 @@ function saveOfflinePreferences(preferenze) {
     localStorage.setItem(OFFLINE_REGIONI_PREFERITE_KEY, JSON.stringify(preferenze));
 }
 
+function buildOfflineFailureDetail(quotaErrors, networkErrors) {
+    if (quotaErrors > 0 && networkErrors > 0) {
+        return `${quotaErrors} da spazio cache esaurito, ${networkErrors} da rete/provider`;
+    }
+    if (quotaErrors > 0) {
+        return `${quotaErrors} da spazio cache esaurito`;
+    }
+    if (networkErrors > 0) {
+        return `${networkErrors} da rete/provider`;
+    }
+    return 'nessun errore rilevato';
+}
+
 async function salvaPreferenzeMappaOffline() {
     const preferenze = getOfflinePreferencesFromInputs();
     saveOfflinePreferences(preferenze);
@@ -4981,13 +4945,9 @@ async function scaricaRegioniOffline() {
         for (let i = 0; i < level.urls.length; i += OFFLINE_DOWNLOAD_BATCH_SIZE) {
             const batch = level.urls.slice(i, i + OFFLINE_DOWNLOAD_BATCH_SIZE);
             const results = await Promise.all(batch.map((url) => downloadTileWithRetry(cache, url)));
-            for (const result of results) {
-                if (result.ok) continue;
-                errors++;
-                if (result.reason === 'quota_exceeded') {
-                    quotaErrors++;
-                }
-            }
+            const summary = summarizeTileDownloadResults(results);
+            errors += summary.errors;
+            quotaErrors += summary.quotaErrors;
             done += batch.length;
             const pct = Math.round((done / total) * 100);
             if (progressBar) progressBar.style.width = pct + '%';
@@ -5001,10 +4961,11 @@ async function scaricaRegioniOffline() {
     }
 
     if (progressArea) progressArea.style.display = 'none';
+    const networkErrors = Math.max(0, errors - quotaErrors);
     if (abortedByQuota) {
-        showToast(`⚠️ Spazio cache esaurito dopo ${done} tile. Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
+        showToast(`⚠️ Download interrotto: spazio cache esaurito dopo ${done} tile (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
     } else if (errors > 0) {
-        showToast(`Download completato con ${errors} errori su ${total} tile. Riprova in caso di mappa incompleta.`, 'error');
+        showToast(`⚠️ Download completato con ${errors} errori su ${total} tile (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Riprova in caso di mappa incompleta.`, 'error');
     } else {
         showToast(`✅ Download completato! ${total} tile salvati per uso offline.`, 'success');
     }
@@ -5098,22 +5059,20 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
         for (let i = 0; i < level.urls.length; i += OFFLINE_DOWNLOAD_BATCH_SIZE) {
             const batch = level.urls.slice(i, i + OFFLINE_DOWNLOAD_BATCH_SIZE);
             const results = await Promise.all(batch.map((url) => downloadTileWithRetry(cache, url)));
-            for (const result of results) {
-                if (result.ok) continue;
-                errors++;
-                if (result.reason === 'quota_exceeded') {
-                    quotaErrors++;
-                }
-            }
+            const summary = summarizeTileDownloadResults(results);
+            errors += summary.errors;
+            quotaErrors += summary.quotaErrors;
             if (quotaErrors >= OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT) {
-                showToast('⚠️ Spazio cache insufficiente: ripristino automatico interrotto.', 'error');
+                const networkErrors = Math.max(0, errors - quotaErrors);
+                showToast(`⚠️ Ripristino automatico interrotto: spazio cache insufficiente (${buildOfflineFailureDetail(quotaErrors, networkErrors)}).`, 'error');
                 return;
             }
         }
     }
 
     if (errors > 0) {
-        showToast(`⚠️ Re-download completato con ${errors} errori. Riprova manualmente se la mappa è incompleta.`, 'error');
+        const networkErrors = Math.max(0, errors - quotaErrors);
+        showToast(`⚠️ Re-download completato con ${errors} errori (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Riprova manualmente se la mappa è incompleta.`, 'error');
     } else {
         showToast('✅ Mappa offline ripristinata automaticamente.', 'success');
     }
