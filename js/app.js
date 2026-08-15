@@ -3555,6 +3555,7 @@ function syncAutomaticBackupStatusUI() {
 }
 
 let _automaticBackupDirHandle = null;
+let _automaticBackupSubDirHandle = null;
 
 async function _loadBackupDirHandle() {
     if (_automaticBackupDirHandle) return _automaticBackupDirHandle;
@@ -3568,8 +3569,10 @@ async function _loadBackupDirHandle() {
 }
 
 async function _ensureAutomaticBackupSubdirectory(rootDirHandle) {
+    if (_automaticBackupSubDirHandle) return _automaticBackupSubDirHandle;
     const appDirHandle = await rootDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_APP_FOLDER_NAME, { create: true });
-    return appDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_FILES_FOLDER_NAME, { create: true });
+    _automaticBackupSubDirHandle = await appDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_FILES_FOLDER_NAME, { create: true });
+    return _automaticBackupSubDirHandle;
 }
 
 async function configureAutomaticBackupFolder(forceReselect = false) {
@@ -3592,6 +3595,7 @@ async function configureAutomaticBackupFolder(forceReselect = false) {
             const permission = await rootDirHandle.requestPermission({ mode: 'readwrite' });
             if (permission !== 'granted') {
                 _automaticBackupDirHandle = null;
+                _automaticBackupSubDirHandle = null;
                 await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
                 setAutomaticBackupDestinationLabel(null);
                 await appAlert("⚠️ Permesso negato\n\nNon posso più usare la cartella backup registrata. Seleziona di nuovo la cartella Download per ricreare il percorso guidato.");
@@ -3599,8 +3603,9 @@ async function configureAutomaticBackupFolder(forceReselect = false) {
             }
         }
 
-        const backupDirHandle = await _ensureAutomaticBackupSubdirectory(rootDirHandle);
+        _automaticBackupSubDirHandle = null;
         _automaticBackupDirHandle = rootDirHandle;
+        const backupDirHandle = await _ensureAutomaticBackupSubdirectory(rootDirHandle);
         await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, rootDirHandle);
         const destinationLabel = buildAutomaticBackupPathLabel(rootDirHandle.name);
         setAutomaticBackupDestinationLabel(destinationLabel);
@@ -3610,6 +3615,7 @@ async function configureAutomaticBackupFolder(forceReselect = false) {
             return null;
         }
         _automaticBackupDirHandle = null;
+        _automaticBackupSubDirHandle = null;
         await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
         setAutomaticBackupDestinationLabel(null);
         await appAlert("⚠️ Cartella backup non disponibile\n\nLa cartella selezionata non è accessibile. Reimposta la cartella Download per registrare di nuovo il percorso guidato.");
@@ -3661,6 +3667,7 @@ async function downloadBackupFile(data, { automatic = false } = {}) {
                 await writable.close();
                 lastAutomaticBackupSavedAt = new Date().toISOString();
                 syncAutomaticBackupStatusUI();
+                await TruffleStorage.saveAutomaticBackupSnapshot(data, automatic ? 'automatic' : 'manual').catch(() => {});
                 return true;
             } catch {
                 // Write failed — in automatic mode exit silently, otherwise fall through to anchor download
@@ -3684,6 +3691,7 @@ async function downloadBackupFile(data, { automatic = false } = {}) {
     a.remove();
     lastAutomaticBackupSavedAt = new Date().toISOString();
     syncAutomaticBackupStatusUI();
+    await TruffleStorage.saveAutomaticBackupSnapshot(data, 'manual').catch(() => {});
     return true;
 }
 
