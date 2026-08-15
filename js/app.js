@@ -1,6 +1,5 @@
 import * as TruffleStorage from './storage-sync.js';
 import {
-    normalizeBackupEntry,
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
     buildAutomaticBackupPathLabel
@@ -126,10 +125,18 @@ function appConfirm(message) {
         if (!dialog) { resolve(window.confirm(message)); return; }
         msg.textContent = message;
         inputField.style.display = 'none';
-        cancelBtn.style.display = 'none';
+        cancelBtn.style.display = '';
+        cancelBtn.textContent = 'Annulla';
         okBtn.textContent = 'OK';
-        const onOk = () => { dialog.close(); okBtn.removeEventListener('click', onOk); resolve(true); };
+        const cleanup = () => {
+            dialog.close();
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+        };
+        const onOk = () => { cleanup(); resolve(true); };
+        const onCancel = () => { cleanup(); resolve(false); };
         okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
         dialog.showModal();
     });
 }
@@ -375,10 +382,8 @@ const ACTION_HANDLERS = {
     saveSpesa: () => saveSpesa(),
     deleteSpesa: (_event, index) => deleteSpesa(index),
     esportaDatiCSV: () => esportaDatiCSV(),
-    esportaBackupJSON: () => esportaBackupJSON(),
     configureAutomaticBackupFolder: () => chooseAutomaticBackupFolder(),
     forceLocalBackupNow: () => forceLocalBackupNow(),
-    restoreLatestAutomaticBackup: () => restoreLatestAutomaticBackup(),
     saveVetClinic: () => saveVetClinic(),
     shareLocationToVetByIndex: (_event, index) => shareLocationToVetByIndex(index),
     deleteVetClinic: (_event, index) => deleteVetClinic(index),
@@ -405,7 +410,6 @@ const ACTION_HANDLERS = {
     calcolaRitenutaAcconto: () => calcolaRitenutaAcconto(),
     toggleCoordinateBancarie: () => toggleCoordinateBancarie(),
     autocompilaDatiCliente: (event) => autocompilaDatiCliente(event.target.value),
-    importBackupData: (event) => importBackupData(event),
     archiviaAnnoPrecedente: () => archiviaAnnoPrecedente(),
     setArchivioRegione: (event) => {
         window.currentArchivioRegione = event.target.value;
@@ -520,53 +524,6 @@ function viewStoredDocument(storageKey, title, moduleName) {
         return;
     }
     visualizzaImmagineSalvata(base64Data, title, moduleName);
-}
-
-function restoreBackupEntries(data) {
-    const backupSchema = {
-        tesserino: { storageKey: 'tesserino_data', fallbackValue: {} },
-        pagopa: { storageKey: 'pagopa_data', fallbackValue: {} },
-        archivioDocumentiList: { storageKey: 'archivio_documenti_list', fallbackValue: [] },
-        f24: { storageKey: 'f24_data', fallbackValue: {} },
-        storicoVendite: { storageKey: 'storico_vendite', fallbackValue: [] },
-        luoghiRaccolta: { storageKey: 'luoghi_raccolta', fallbackValue: [] },
-        archivioLuoghiRaccolta: { storageKey: 'luoghi_raccolta', fallbackValue: [] },
-        archivioAreeLuoghiRaccolta: { storageKey: 'luoghi_raccolta', fallbackValue: [] },
-        poiList: { storageKey: 'poi_list', fallbackValue: [] },
-        dogsList: { storageKey: 'dogs_list', fallbackValue: [] },
-        caneData: { storageKey: 'cane_data', fallbackValue: {} },
-        polizzeList: { storageKey: 'polizze_list', fallbackValue: [] },
-        storicoRaccolta: { storageKey: 'storico_raccolta_giornaliera', fallbackValue: [] },
-        rubricaClienti: { storageKey: 'rubrica_clienti', fallbackValue: [] },
-        speseList: { storageKey: 'spese_list', fallbackValue: [] },
-        vetHistoryList: { storageKey: 'vet_history_list', fallbackValue: [] },
-        heatDiaryList: { storageKey: 'heat_diary_list', fallbackValue: [] },
-        vetClinicsList: { storageKey: 'vet_clinics_list', fallbackValue: [] },
-        calendariTartufiCustom: { storageKey: 'calendari_tartufi_custom', fallbackValue: {} },
-        noteRegionaliTartufi: { storageKey: 'note_regionali_tartufi', fallbackValue: {} },
-        offlineRegioniPreferite: { storageKey: OFFLINE_REGIONI_PREFERITE_KEY, fallbackValue: { regioni: [], maxZoom: 14 } },
-        carCoords: { storageKey: 'car_coords', fallbackValue: {} }
-    };
-
-    const normalizedEntries = [];
-
-    Object.entries(backupSchema).forEach(([backupKey, config]) => {
-        if (!Object.prototype.hasOwnProperty.call(data, backupKey) || data[backupKey] === null) return;
-        const normalizedValue = normalizeBackupEntry(data[backupKey], config.fallbackValue);
-        normalizedEntries.push([config.storageKey, normalizedValue]);
-    });
-
-    normalizedEntries.forEach(([storageKey, normalizedValue]) => {
-        localStorage.setItem(storageKey, normalizedValue);
-    });
-
-    if (Object.prototype.hasOwnProperty.call(data, 'backupDirLabel') && typeof data.backupDirLabel === 'string' && data.backupDirLabel) {
-        setAutomaticBackupDestinationLabel(data.backupDirLabel);
-    }
-
-    // Avvia il re-download automatico delle mappe offline se le preferenze sono state
-    // ripristinate dal backup ma la cache è assente (es. dopo reinstallazione dell'app).
-    autoRiscaricaRegioniOfflineSeNecessario();
 }
 
 setTimeout(() => {
@@ -1949,12 +1906,9 @@ function openModule(moduleName, editMode = false) {
             contentHTML = `
                 <h2>Report & Backup Dati</h2>
                 <div class="module-card">
-                    <p>Esporta i dati contabili o gestisci backup locali senza cloud.</p>
-                    <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('esportaDatiCSV')}>Scarica Contabilità in CSV</button>
-                    <button class="overlay-btn" style="margin-top:10px; width:100%; background:#16a34a;" ${actionAttrs('esportaBackupJSON')}>Esporta Backup Manuale (JSON)</button>
-                    <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
-                    <label style="font-weight:bold; color:#f6f1e6;">Ripristina Backup da File JSON:</label>
-                    <input type="file" id="import-file" accept=".json,application/json" class="mod-input" style="padding:8px;" ${eventActionAttrs('change', 'importBackupData')}>
+                    <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Report contabili</h3>
+                    <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">Esporta la contabilità in formato CSV per consultazione esterna.</p>
+                    <button class="overlay-btn btn-primary btn-full" ${actionAttrs('esportaDatiCSV')}>Scarica Contabilità in CSV</button>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#4d8a98;">Backup automatico locale</h3>
                     <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">L'app ti guida a scegliere la cartella <strong>Download</strong> e poi crea/usa automaticamente il percorso <strong>Download/SmartTrufflePath/file backup</strong> per salvare <strong>backup_truffle_automatico.json</strong>. Nessun cloud.</p>
@@ -1962,7 +1916,6 @@ function openModule(moduleName, editMode = false) {
                     <p id="local-backup-status" style="font-size:0.82rem; color:#b8b0a0; margin:0 0 10px 0;">Stato ultimo backup automatico: non disponibile</p>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#7c3aed;" ${actionAttrs('configureAutomaticBackupFolder')}>📁 Imposta Cartella Backup</button>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('forceLocalBackupNow')}>💾 Salva Backup Ora</button>
-                    <button class="overlay-btn" style="margin-top:8px; width:100%; background:#0f766e;" ${actionAttrs('restoreLatestAutomaticBackup')}>📂 Ripristina da File...</button>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#b45309;">🗂️ Archiviazione per Anno</h3>
                     <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">Crea un file di backup JSON con i dati dell'anno precedente (ricevute vendita, registro raccolta, spese) e rimuove dall'app <strong>soltanto quei record</strong>, lasciando intatti tutti i dati dell'anno corrente e di qualsiasi altro anno.</p>
@@ -3558,38 +3511,6 @@ function buildCompleteBackupData() {
     };
 }
 
-function esportaBackupJSON() {
-    const backupData = buildCompleteBackupData();
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr); 
-    downloadAnchor.setAttribute("download", "backup_truffle_completo.json");
-    document.body.appendChild(downloadAnchor); 
-    downloadAnchor.click(); 
-    downloadAnchor.remove();
-}
-
-function importBackupData(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            if (!data || typeof data !== 'object' || Array.isArray(data)) {
-                throw new Error('Backup non valido');
-            }
-            restoreBackupEntries(data);
-            
-            showToast("Backup ripristinato!", 'success'); 
-            location.reload();
-        } catch(err) { 
-            showToast("Errore lettura backup.", 'error'); 
-        }
-    };
-    reader.readAsText(file);
-}
-
 function formatBackupTimestamp(isoDate) {
     if (!isoDate) return 'n/d';
     const date = new Date(isoDate);
@@ -3634,6 +3555,7 @@ function syncAutomaticBackupStatusUI() {
 }
 
 let _automaticBackupDirHandle = null;
+let _automaticBackupSubDirHandle = null;
 
 async function _loadBackupDirHandle() {
     if (_automaticBackupDirHandle) return _automaticBackupDirHandle;
@@ -3647,8 +3569,10 @@ async function _loadBackupDirHandle() {
 }
 
 async function _ensureAutomaticBackupSubdirectory(rootDirHandle) {
+    if (_automaticBackupSubDirHandle) return _automaticBackupSubDirHandle;
     const appDirHandle = await rootDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_APP_FOLDER_NAME, { create: true });
-    return appDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_FILES_FOLDER_NAME, { create: true });
+    _automaticBackupSubDirHandle = await appDirHandle.getDirectoryHandle(AUTOMATIC_BACKUP_FILES_FOLDER_NAME, { create: true });
+    return _automaticBackupSubDirHandle;
 }
 
 async function configureAutomaticBackupFolder(forceReselect = false) {
@@ -3671,6 +3595,7 @@ async function configureAutomaticBackupFolder(forceReselect = false) {
             const permission = await rootDirHandle.requestPermission({ mode: 'readwrite' });
             if (permission !== 'granted') {
                 _automaticBackupDirHandle = null;
+                _automaticBackupSubDirHandle = null;
                 await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
                 setAutomaticBackupDestinationLabel(null);
                 await appAlert("⚠️ Permesso negato\n\nNon posso più usare la cartella backup registrata. Seleziona di nuovo la cartella Download per ricreare il percorso guidato.");
@@ -3678,8 +3603,9 @@ async function configureAutomaticBackupFolder(forceReselect = false) {
             }
         }
 
-        const backupDirHandle = await _ensureAutomaticBackupSubdirectory(rootDirHandle);
+        _automaticBackupSubDirHandle = null;
         _automaticBackupDirHandle = rootDirHandle;
+        const backupDirHandle = await _ensureAutomaticBackupSubdirectory(rootDirHandle);
         await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, rootDirHandle);
         const destinationLabel = buildAutomaticBackupPathLabel(rootDirHandle.name);
         setAutomaticBackupDestinationLabel(destinationLabel);
@@ -3689,6 +3615,7 @@ async function configureAutomaticBackupFolder(forceReselect = false) {
             return null;
         }
         _automaticBackupDirHandle = null;
+        _automaticBackupSubDirHandle = null;
         await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
         setAutomaticBackupDestinationLabel(null);
         await appAlert("⚠️ Cartella backup non disponibile\n\nLa cartella selezionata non è accessibile. Reimposta la cartella Download per registrare di nuovo il percorso guidato.");
@@ -3703,22 +3630,56 @@ async function chooseAutomaticBackupFolder() {
     }
 }
 
-async function downloadBackupFile(data) {
+async function downloadBackupFile(data, { automatic = false } = {}) {
     const jsonStr = JSON.stringify(data, null, 2);
     const fileName = 'backup_truffle_automatico.json';
 
     if (window.showDirectoryPicker) {
-        const configuredFolder = await configureAutomaticBackupFolder();
-        if (configuredFolder) {
-            const fileHandle = await configuredFolder.backupDirHandle.getFileHandle(fileName, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(jsonStr);
-            await writable.close();
-            lastAutomaticBackupSavedAt = new Date().toISOString();
-            syncAutomaticBackupStatusUI();
-            return;
+        let backupDirHandle = null;
+        if (automatic) {
+            // In automatic mode never open pickers: use only the already-granted handle.
+            const rootDirHandle = await _loadBackupDirHandle();
+            if (rootDirHandle) {
+                try {
+                    // Use queryPermission to avoid triggering a browser prompt (requestPermission
+                    // may require a user gesture on some browsers).
+                    const permission = await rootDirHandle.queryPermission({ mode: 'readwrite' });
+                    if (permission === 'granted') {
+                        backupDirHandle = await _ensureAutomaticBackupSubdirectory(rootDirHandle);
+                    }
+                } catch {
+                    // Permission check unavailable — exit silently without any fallback
+                }
+            }
+        } else {
+            const configuredFolder = await configureAutomaticBackupFolder();
+            if (!configuredFolder) {
+                return false;
+            }
+            backupDirHandle = configuredFolder.backupDirHandle;
+        }
+
+        if (backupDirHandle) {
+            try {
+                const fileHandle = await backupDirHandle.getFileHandle(fileName, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(jsonStr);
+                await writable.close();
+                lastAutomaticBackupSavedAt = new Date().toISOString();
+                syncAutomaticBackupStatusUI();
+                await TruffleStorage.saveAutomaticBackupSnapshot(data, automatic ? 'automatic' : 'manual').catch(() => {});
+                return true;
+            } catch {
+                // Write failed — in automatic mode exit silently, otherwise fall through to anchor download
+                if (!automatic) {
+                    showToast("Cartella backup non scrivibile: verrà usato il download del file.", 'info');
+                }
+            }
         }
     }
+
+    // In automatic mode, skip anchor download to avoid unexpected browser dialogs.
+    if (automatic) return false;
 
     // Fallback: anchor download
     const dataStr = "data:application/json;charset=utf-8," + encodeURIComponent(jsonStr);
@@ -3730,48 +3691,24 @@ async function downloadBackupFile(data) {
     a.remove();
     lastAutomaticBackupSavedAt = new Date().toISOString();
     syncAutomaticBackupStatusUI();
+    await TruffleStorage.saveAutomaticBackupSnapshot(data, 'manual').catch(() => {});
+    return true;
 }
 
 async function forceLocalBackupNow() {
-    const backupData = buildCompleteBackupData();
-    await downloadBackupFile(backupData);
-    lastAutomaticBackupFingerprint = JSON.stringify(backupData);
-    const destinationLabel = getAutomaticBackupDestinationLabel();
-    showToast(destinationLabel ? `Backup salvato in ${destinationLabel}.` : "Backup salvato.", 'success');
-}
-
-async function restoreLatestAutomaticBackup() {
-    const destinationLabel = getAutomaticBackupDestinationLabel() || buildAutomaticBackupPathLabel('Download');
-    if (!await appConfirm(`Scegli il file di backup automatico (backup_truffle_automatico.json) dal percorso ${destinationLabel}.`)) return;
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json,application/json';
-    fileInput.style.display = 'none';
-    document.body.appendChild(fileInput);
-    fileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        fileInput.remove();
-        if (!file) {
-            showToast("Nessun file selezionato.", 'info');
+    try {
+        const backupData = buildCompleteBackupData();
+        const backupSaved = await downloadBackupFile(backupData, { automatic: false });
+        if (!backupSaved) {
+            showToast("Backup non completato.", 'info');
             return;
         }
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = JSON.parse(e.target.result);
-                if (!data || typeof data !== 'object' || Array.isArray(data)) {
-                    throw new Error('Backup non valido');
-                }
-                restoreBackupEntries(data);
-                showToast("Backup ripristinato!", 'success');
-                setTimeout(() => location.reload(), 500);
-            } catch {
-                showToast("Errore lettura backup.", 'error');
-            }
-        };
-        reader.readAsText(file);
-    });
-    fileInput.click();
+        lastAutomaticBackupFingerprint = JSON.stringify(backupData);
+        const destinationLabel = getAutomaticBackupDestinationLabel();
+        showToast(destinationLabel ? `Backup salvato in ${destinationLabel}.` : "Backup salvato.", 'success');
+    } catch {
+        showToast("Errore durante il salvataggio del backup.", 'error');
+    }
 }
 
 async function archiviaAnnoPrecedente() {
@@ -3831,10 +3768,12 @@ async function archiviaAnnoPrecedente() {
 }
 
 async function runAutomaticLocalBackup() {
+    if (!getAutomaticBackupDestinationLabel()) return;
     const backupData = buildCompleteBackupData();
     const fingerprint = JSON.stringify(backupData);
     if (fingerprint === lastAutomaticBackupFingerprint) return;
-    await downloadBackupFile(backupData);
+    const backupSaved = await downloadBackupFile(backupData, { automatic: true });
+    if (!backupSaved) return;
     lastAutomaticBackupFingerprint = fingerprint;
 }
 
@@ -4668,7 +4607,7 @@ async function mostraInfoModulo(moduleName) {
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
-        'export': `ℹ️ Guida - Report & Backup Dati\n\nEsporta i dati contabili in formato CSV o crea un backup manuale JSON.\n\nIl backup automatico ti guida a scegliere la cartella Download del dispositivo e poi crea/usa sempre il percorso ${buildAutomaticBackupPathLabel('Download')} per salvare backup_truffle_automatico.json. Usa '📁 Imposta Cartella Backup' per registrare o cambiare il percorso, poi '💾 Salva Backup Ora' per forzarlo manualmente. Per ripristinare, premi '📂 Ripristina da File...' e scegli il file dalla cartella registrata.\n\nSe il browser non supporta la scelta guidata della cartella, l'app usa il normale download del file JSON.`,
+        'export': `ℹ️ Guida - Report & Backup Dati\n\nEsporta i dati contabili in formato CSV.\n\nIl backup automatico ti guida a scegliere la cartella Download del dispositivo e poi crea/usa sempre il percorso ${buildAutomaticBackupPathLabel('Download')} per salvare backup_truffle_automatico.json. Usa '📁 Imposta Cartella Backup' per registrare o cambiare il percorso, poi '💾 Salva Backup Ora' per forzarlo manualmente.\n\nSe il browser non supporta la scelta guidata della cartella, l'app usa il normale download del file JSON.`,
         'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
         'clienti': "ℹ️ **Guida - Rubrica Clienti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico, aggiungi nuovi nominativi e gestisci modifiche, note ed eliminazioni.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",

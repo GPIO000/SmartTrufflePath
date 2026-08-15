@@ -71,6 +71,24 @@ describe('getLatestAutomaticBackupSnapshot', () => {
     expect(snapshot.data).toEqual({ second: true });
     expect(snapshot.reason).toBe('periodic');
   });
+
+  it('preserva la reason "automatic" nello snapshot', async () => {
+    const data = { vendite: [{ data: '01/06/2026', importo: '50' }] };
+    await saveAutomaticBackupSnapshot(data, 'automatic');
+    const snapshot = getLatestAutomaticBackupSnapshot();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot.reason).toBe('automatic');
+    expect(snapshot.data).toEqual(data);
+  });
+
+  it('preserva la reason "manual" nello snapshot', async () => {
+    const data = { foo: 'manuale' };
+    await saveAutomaticBackupSnapshot(data, 'manual');
+    const snapshot = getLatestAutomaticBackupSnapshot();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot.reason).toBe('manual');
+    expect(snapshot.data).toEqual(data);
+  });
 });
 
 describe('getLatestAutomaticBackupSnapshotAsync', () => {
