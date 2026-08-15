@@ -3,7 +3,24 @@ import {
   countCachedTileUrls,
   isOfflineRegionFullyCached,
   shouldRestoreOfflineMapCache,
+  normalizeTileUrls,
 } from '../js/offline-cache-utils.js';
+
+describe('normalizeTileUrls', () => {
+  it('restituisce array vuoto se tileUrls non è un array', () => {
+    expect(normalizeTileUrls(null)).toEqual([]);
+    expect(normalizeTileUrls(undefined)).toEqual([]);
+    expect(normalizeTileUrls('tile-a')).toEqual([]);
+  });
+
+  it('rimuove stringhe vuote e non-stringhe', () => {
+    expect(normalizeTileUrls(['tile-a', '', null, 42, 'tile-b'])).toEqual(['tile-a', 'tile-b']);
+  });
+
+  it('deduplica gli URL', () => {
+    expect(normalizeTileUrls(['tile-a', 'tile-a', 'tile-b'])).toEqual(['tile-a', 'tile-b']);
+  });
+});
 
 describe('countCachedTileUrls', () => {
   it('conta solo le tile presenti nella cache', () => {
@@ -15,11 +32,23 @@ describe('countCachedTileUrls', () => {
     const cachedUrls = new Set(['tile-a']);
     expect(countCachedTileUrls(cachedUrls, ['tile-a', 'tile-a'])).toBe(1);
   });
+
+  it('restituisce 0 se cachedUrls non è un Set', () => {
+    expect(countCachedTileUrls(null, ['tile-a'])).toBe(0);
+  });
+
+  it('restituisce 0 se tileUrls è vuoto', () => {
+    expect(countCachedTileUrls(new Set(['tile-a']), [])).toBe(0);
+  });
 });
 
 describe('isOfflineRegionFullyCached', () => {
   it('restituisce false se cachedUrls non è un Set', () => {
     expect(isOfflineRegionFullyCached(null, ['tile-a'])).toBe(false);
+  });
+
+  it('restituisce false se tileUrls è vuoto', () => {
+    expect(isOfflineRegionFullyCached(new Set(['tile-a']), [])).toBe(false);
   });
 
   it('restituisce false quando la cache è parziale', () => {
