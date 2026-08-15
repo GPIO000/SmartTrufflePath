@@ -3711,20 +3711,42 @@ async function chooseAutomaticBackupFolder() {
     }
 }
 
-async function downloadBackupFile(data) {
+async function downloadBackupFile(data, { automatic = false } = {}) {
     const jsonStr = JSON.stringify(data, null, 2);
     const fileName = 'backup_truffle_automatico.json';
 
     if (window.showDirectoryPicker) {
-        let configuredFolder = null;
-        try {
-            configuredFolder = await configureAutomaticBackupFolder();
-        } catch {
-            // configureAutomaticBackupFolder already handles and reports errors internally
-        }
-        if (configuredFolder) {
+        let backupDirHandle = null;
+        if (automatic) {
+            // In automatic mode never open pickers: use only the already-granted handle.
+            const rootDirHandle = await _loadBackupDirHandle();
+            if (rootDirHandle) {
+                try {
+                    // Use queryPermission to avoid triggering a browser prompt (requestPermission
+                    // may require a user gesture on some browsers).
+                    const permission = await rootDirHandle.queryPermission({ mode: 'readwrite' });
+                    if (permission === 'granted') {
+                        backupDirHandle = await _ensureAutomaticBackupSubdirectory(rootDirHandle);
+                    }
+                } catch {
+                    // Permission check unavailable — exit silently without any fallback
+                }
+            }
+        } else {
+            let configuredFolder = null;
             try {
-                const fileHandle = await configuredFolder.backupDirHandle.getFileHandle(fileName, { create: true });
+                configuredFolder = await configureAutomaticBackupFolder();
+            } catch {
+                // configureAutomaticBackupFolder already handles and reports errors internally
+            }
+            if (configuredFolder) {
+                backupDirHandle = configuredFolder.backupDirHandle;
+            }
+        }
+
+        if (backupDirHandle) {
+            try {
+                const fileHandle = await backupDirHandle.getFileHandle(fileName, { create: true });
                 const writable = await fileHandle.createWritable();
                 await writable.write(jsonStr);
                 await writable.close();
@@ -3732,10 +3754,13 @@ async function downloadBackupFile(data) {
                 syncAutomaticBackupStatusUI();
                 return;
             } catch {
-                // Fall through to anchor download fallback
+                // Write failed — in automatic mode exit silently, otherwise fall through to anchor download
             }
         }
     }
+
+    // In automatic mode, skip anchor download to avoid unexpected browser dialogs.
+    if (automatic) return;
 
     // Fallback: anchor download
     const dataStr = "data:application/json;charset=utf-8," + encodeURIComponent(jsonStr);
@@ -3856,7 +3881,7 @@ async function runAutomaticLocalBackup() {
     const backupData = buildCompleteBackupData();
     const fingerprint = JSON.stringify(backupData);
     if (fingerprint === lastAutomaticBackupFingerprint) return;
-    await downloadBackupFile(backupData);
+    await downloadBackupFile(backupData, { automatic: true });
     lastAutomaticBackupFingerprint = fingerprint;
 }
 
