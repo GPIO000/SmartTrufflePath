@@ -69,10 +69,11 @@ describe('downloadTileWithRetry', () => {
   });
 
   it('scarica e salva una tile opaque quando il browser non espone CORS', async () => {
+    const cachedClone = { type: 'opaque', status: 0 };
     const response = {
       type: 'opaque',
       status: 0,
-      clone: vi.fn().mockReturnThis()
+      clone: vi.fn().mockReturnValue(cachedClone)
     };
     const cache = {
       match: vi.fn().mockResolvedValue(null),
@@ -85,7 +86,8 @@ describe('downloadTileWithRetry', () => {
 
     expect(result).toEqual({ ok: true });
     expect(fetchImpl).toHaveBeenCalledWith('https://b.tile.openstreetmap.org/8/1/1.png', { mode: 'no-cors', cache: 'no-store' });
-    expect(cache.put).toHaveBeenCalledWith('https://b.tile.openstreetmap.org/8/1/1.png', response);
+    expect(response.clone).toHaveBeenCalledTimes(1);
+    expect(cache.put).toHaveBeenCalledWith('https://b.tile.openstreetmap.org/8/1/1.png', cachedClone);
   });
 
   it('classifica correttamente gli errori di quota', async () => {

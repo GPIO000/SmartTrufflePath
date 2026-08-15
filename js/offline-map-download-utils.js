@@ -10,7 +10,7 @@ function isQuotaExceededError(error) {
 }
 
 function isOpaqueTileResponse(response) {
-  return response?.type === 'opaque' || response?.status === 0;
+  return response?.type === 'opaque';
 }
 
 function isValidCachedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
@@ -25,7 +25,7 @@ function isValidDownloadedTileResponse(response, minValidSize = TILE_MIN_VALID_S
   if (isOpaqueTileResponse(response)) return true;
   if (!response.ok) return false;
   const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
-  return !(contentLength > 0 && contentLength < minValidSize);
+  return contentLength >= minValidSize;
 }
 
 async function downloadTileWithRetry(cache, url, {
