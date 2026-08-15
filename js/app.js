@@ -133,7 +133,6 @@ function appConfirm(message) {
             dialog.close();
             okBtn.removeEventListener('click', onOk);
             cancelBtn.removeEventListener('click', onCancel);
-            cancelBtn.style.display = 'none';
         };
         const onOk = () => { cleanup(); resolve(true); };
         const onCancel = () => { cleanup(); resolve(false); };
