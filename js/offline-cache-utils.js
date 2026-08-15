@@ -28,6 +28,7 @@ function shouldRestoreOfflineMapCache(cachedUrls, preferredTileUrls) {
 }
 
 export {
+    normalizeTileUrls,
     countCachedTileUrls,
     isOfflineRegionFullyCached,
     shouldRestoreOfflineMapCache

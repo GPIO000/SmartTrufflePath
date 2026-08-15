@@ -39,6 +39,10 @@ const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
 const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-15`;
 
+function getOfflinePreferences() {
+    return readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: 14 });
+}
+
 function getOfflinePreferredMaxZoom() {
     const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, null);
     if (!pref || typeof pref.maxZoom !== 'number') return null;
@@ -4776,6 +4780,44 @@ function isOsmTileUrl(url) {
     }
 }
 
+const TILE_MIN_VALID_SIZE = 512; // byte: tile PNG valide pesano sempre più di questo
+const TILE_MAX_RETRIES = 2;
+
+/**
+ * Scarica una singola tile in cache applicando la strategia skip-if-cached con retry.
+ * - Se la tile è già presente e valida (Content-Length > soglia minima) non viene riscaricata.
+ * - In caso di errore o risposta non valida, riprova fino a maxRetries volte.
+ * Restituisce true se la tile è in cache al termine, false se tutti i tentativi falliscono.
+ */
+async function downloadTileWithRetry(cache, url, maxRetries = TILE_MAX_RETRIES) {
+    // Controlla se esiste già una copia valida in cache
+    try {
+        const cached = await cache.match(url);
+        if (cached) {
+            const cl = parseInt(cached.headers.get('content-length') || '0', 10);
+            if (cl >= TILE_MIN_VALID_SIZE) return true; // tile già presente e valida
+            // tile in cache ma sospettosamente piccola: la consideriamo corrotta e la riscariciamo
+            await cache.delete(url).catch(() => {});
+        }
+    } catch {
+        // match() o delete() non disponibili: procedi comunque con il download
+    }
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const res = await fetch(url, { mode: 'cors' });
+            if (!res.ok) { res.body?.cancel(); continue; }
+            const cl = parseInt(res.headers.get('content-length') || '0', 10);
+            if (cl > 0 && cl < TILE_MIN_VALID_SIZE) { res.body?.cancel(); continue; } // risposta troppo piccola: errore mascherato da 200
+            await cache.put(url, res.clone());
+            return true;
+        } catch {
+            // Errore di rete: riprova al prossimo ciclo
+        }
+    }
+    return false;
+}
+
 async function getOfflineMapCachedUrlsSet({ includeLegacy = false } = {}) {
     const cacheStorage = getCacheStorageSafe();
     if (!cacheStorage) throw new Error('CACHE_API_UNAVAILABLE');
@@ -4902,16 +4944,8 @@ async function scaricaRegioniOffline() {
     for (let i = 0; i < allUrls.length; i += BATCH_SIZE) {
         const batch = allUrls.slice(i, i + BATCH_SIZE);
         await Promise.all(batch.map(async (url) => {
-            try {
-                const cached = await cache.match(url);
-                if (!cached) {
-                    const res = await fetch(url, { mode: 'cors' });
-                    if (res.ok) await cache.put(url, res.clone());
-                    else errors++;
-                }
-            } catch {
-                errors++;
-            }
+            const ok = await downloadTileWithRetry(cache, url);
+            if (!ok) errors++;
         }));
         done += batch.length;
         const pct = Math.round((done / total) * 100);
@@ -4943,8 +4977,10 @@ async function aggiornaStatoCacheRegioni() {
     const statusEl = document.getElementById('offline-cache-status');
     if (!statusEl) return;
 
-    const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: 14 });
-    const maxZoom = typeof pref.maxZoom === 'number' ? pref.maxZoom : 14;
+    const pref = getOfflinePreferences();
+    const zoomSelect = document.getElementById('offline-zoom-select');
+    const parsedZoom = zoomSelect ? parseInt(zoomSelect.value, 10) : NaN;
+    const maxZoom = Number.isFinite(parsedZoom) ? parsedZoom : (typeof pref.maxZoom === 'number' ? pref.maxZoom : 14);
 
     let html = '';
     for (const regione of REGIONI_ITALIA_OFFLINE) {
@@ -4980,8 +5016,8 @@ async function eliminaCacheMappaOffline() {
 
 // ── Re-download automatico regioni offline al ritorno della connessione ────────
 async function autoRiscaricaRegioniOfflineSeNecessario() {
-    const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, null);
-    if (!pref || !Array.isArray(pref.regioni) || pref.regioni.length === 0) return;
+    const pref = getOfflinePreferences();
+    if (!Array.isArray(pref.regioni) || pref.regioni.length === 0) return;
     const maxZoom = typeof pref.maxZoom === 'number' ? pref.maxZoom : 14;
 
     let allUrls = [];
@@ -5003,11 +5039,10 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 
     if (!deveRiscaricare) return;
 
-    showToast('🔄 Cache mappa offline assente o incompleta. Ripristino completo in corso…', 'info');
+    showToast('🔄 Cache mappa offline assente o incompleta. Ripristino in corso…', 'info');
 
     let cache;
     try {
-        await caches.delete(OFFLINE_MAP_CACHE_NAME);
         cache = await caches.open(OFFLINE_MAP_CACHE_NAME);
     } catch {
         return;
@@ -5018,13 +5053,8 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
     for (let i = 0; i < allUrls.length; i += BATCH_SIZE) {
         const batch = allUrls.slice(i, i + BATCH_SIZE);
         await Promise.all(batch.map(async (url) => {
-            try {
-                const res = await fetch(url, { mode: 'cors' });
-                if (res.ok) await cache.put(url, res.clone());
-                else errors++;
-            } catch {
-                errors++;
-            }
+            const ok = await downloadTileWithRetry(cache, url);
+            if (!ok) errors++;
         }));
     }
 
