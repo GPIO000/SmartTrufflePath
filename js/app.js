@@ -10,6 +10,7 @@ import {
     isOfflineRegionFullyCached,
     shouldRestoreOfflineMapCache
 } from './offline-cache-utils.js';
+import { downloadTileWithRetry } from './offline-map-download-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
 
 window.TruffleStorage = TruffleStorage;
@@ -4787,58 +4788,8 @@ function isOsmTileUrl(url) {
     }
 }
 
-const TILE_MIN_VALID_SIZE = 512; // byte: tile PNG valide pesano sempre più di questo
-const TILE_MAX_RETRIES = 2;
 const OFFLINE_DOWNLOAD_BATCH_SIZE = 6;
 const OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT = 8;
-
-function isQuotaExceededError(error) {
-    if (!error) return false;
-    return error.name === 'QuotaExceededError'
-        || error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
-        || error.code === 22
-        || error.code === 1014;
-}
-
-/**
- * Scarica una singola tile in cache applicando la strategia skip-if-cached con retry.
- * - Se la tile è già presente e valida (Content-Length > soglia minima) non viene riscaricata.
- * - In caso di errore o risposta non valida, riprova fino a maxRetries volte.
- * Restituisce un oggetto:
- * - { ok: true } se la tile è in cache al termine
- * - { ok: false, reason: 'quota_exceeded'|'network_or_server' } se tutti i tentativi falliscono.
- */
-async function downloadTileWithRetry(cache, url, maxRetries = TILE_MAX_RETRIES) {
-    // Controlla se esiste già una copia valida in cache
-    try {
-        const cached = await cache.match(url);
-        if (cached) {
-            const cl = parseInt(cached.headers.get('content-length') || '0', 10);
-            if (cl >= TILE_MIN_VALID_SIZE) return { ok: true }; // tile già presente e valida
-            // tile in cache ma sospettosamente piccola: la consideriamo corrotta e la riscariciamo
-            await cache.delete(url).catch(() => {});
-        }
-    } catch {
-        // match() o delete() non disponibili: procedi comunque con il download
-    }
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-            const res = await fetch(url, { mode: 'cors' });
-            if (!res.ok) { res.body?.cancel(); continue; }
-            const cl = parseInt(res.headers.get('content-length') || '0', 10);
-            if (cl > 0 && cl < TILE_MIN_VALID_SIZE) { res.body?.cancel(); continue; } // risposta troppo piccola: errore mascherato da 200
-            await cache.put(url, res.clone());
-            return { ok: true };
-        } catch (error) {
-            if (isQuotaExceededError(error)) {
-                return { ok: false, reason: 'quota_exceeded' };
-            }
-            // Errore di rete: riprova al prossimo ciclo
-        }
-    }
-    return { ok: false, reason: 'network_or_server' };
-}
 
 function buildOfflineTileUrlsByZoom(regionIds, maxZoom) {
     const urlsByZoom = [];
