@@ -1,9 +1,9 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-15';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-16';
 const MAP_OFFLINE_CACHE_NAME = 'smarttruffle-map-offline';
 let legacyAppCacheNames = null;
 let legacyAppCacheNamesPromise = null;
-const ASSETS = [
+const LOCAL_ASSETS = [
   './',
   './index.html',
   './css/style.css',
@@ -13,10 +13,26 @@ const ASSETS = [
   './js/app.js',
   './js/storage-sync.js',
   './js/fiscal-utils.js',
+  './js/backup-utils.js',
+  './js/offline-cache-utils.js',
+  './js/offline-map-download-utils.js',
+  './vendor/html2pdf/html2pdf.bundle.min.js',
+];
+const REMOTE_ASSETS = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
+
+async function warmRemoteAssets(cache) {
+  await Promise.allSettled(
+    REMOTE_ASSETS.map(async (url) => {
+      const response = await fetch(url, { mode: 'no-cors', cache: 'no-store' });
+      if (response) {
+        await cache.put(url, response.clone());
+      }
+    })
+  );
+}
 
 function serviceUnavailableResponse() {
   return new Response('Service Unavailable', {
@@ -83,8 +99,10 @@ async function getLegacyOsmTileResponse(request) {
 // Installazione Service Worker e salvataggio in cache
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS).then(() => self.skipWaiting());
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await cache.addAll(LOCAL_ASSETS);
+      await warmRemoteAssets(cache);
+      await self.skipWaiting();
     })
   );
 });

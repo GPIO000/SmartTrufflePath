@@ -24,11 +24,9 @@ try {
 }
 
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then((reg) => console.log('Service Worker registrato con successo:', reg.scope))
-            .catch((err) => console.log('Registrazione Service Worker fallita:', err));
-    });
+    navigator.serviceWorker.register('./sw.js')
+        .then((reg) => console.log('Service Worker registrato con successo:', reg.scope))
+        .catch((err) => console.log('Registrazione Service Worker fallita:', err));
 }
 
 // Inizializzazione Mappa corretta (ordine invertito per evitare ReferenceError)
@@ -545,6 +543,7 @@ function viewStoredDocument(storageKey, title, moduleName) {
 
 setTimeout(() => {
     map.invalidateSize();
+    clampMapZoomForOffline();
     mostraDisclaimerIniziale(); // <-- Mostra il disclaimer subito dopo l'avvio/GPS
     // Avvia il re-download automatico delle mappe offline se le preferenze esistono
     // ma la cache è assente (es. se l'app parte già connessa dopo una reinstallazione).
@@ -5026,6 +5025,8 @@ async function eliminaCacheMappaOffline() {
 
 // ── Re-download automatico regioni offline al ritorno della connessione ────────
 async function autoRiscaricaRegioniOfflineSeNecessario() {
+    if (!navigator.onLine) return;
+
     const pref = getOfflinePreferences();
     if (!Array.isArray(pref.regioni) || pref.regioni.length === 0) return;
     const maxZoom = typeof pref.maxZoom === 'number' ? pref.maxZoom : OFFLINE_MAP_DEFAULT_MAX_ZOOM;
