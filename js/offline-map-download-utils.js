@@ -31,18 +31,14 @@ function isValidTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
   return contentLength >= minValidSize;
 }
 
-function isValidCachedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
-  return isValidTileResponse(response, minValidSize);
-}
-
-function isValidDownloadedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
-  return isValidTileResponse(response, minValidSize);
-}
+const isValidCachedTileResponse = isValidTileResponse;
+const isValidDownloadedTileResponse = isValidTileResponse;
 
 async function downloadTileWithRetry(cache, url, {
   fetchImpl = globalThis.fetch,
   fetchMode,
   maxAttempts = TILE_MAX_ATTEMPTS,
+  maxRetries,
   minValidSize = TILE_MIN_VALID_SIZE
 } = {}) {
   try {
@@ -54,10 +50,14 @@ async function downloadTileWithRetry(cache, url, {
       await cache.delete(url).catch(() => {});
     }
   } catch {
-    // match() o delete() non disponibili: procedi comunque con il download
+    // If match() or delete() are unavailable, continue with a network attempt.
   }
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  const resolvedMaxAttempts = Number.isInteger(maxRetries) && maxRetries >= 0
+    ? maxRetries + 1
+    : maxAttempts;
+
+  for (let attempt = 0; attempt < resolvedMaxAttempts; attempt++) {
     try {
       const resolvedFetchMode = fetchMode ?? (isOpenStreetMapTileUrl(url) ? 'no-cors' : 'cors');
       const response = await fetchImpl(url, { mode: resolvedFetchMode, cache: 'no-store' });
