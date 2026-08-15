@@ -32,6 +32,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19,
 const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
 const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-15`;
 
 function getOfflinePreferredMaxZoom() {
     const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, null);
@@ -4801,7 +4802,9 @@ async function getOfflineMapCachedUrlsSet({ includeLegacy = false } = {}) {
         return cachedUrls;
     }
 
-    const legacyCacheNames = cacheNames.filter((name) => name.startsWith(APP_CACHE_NAME_PREFIX));
+    const legacyCacheNames = cacheNames.filter((name) =>
+        name.startsWith(APP_CACHE_NAME_PREFIX) && name !== APP_CACHE_NAME_CURRENT
+    );
     for (const legacyCacheName of legacyCacheNames) {
         let legacyCache;
         try {

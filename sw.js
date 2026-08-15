@@ -1,6 +1,8 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
 const CACHE_NAME = 'smarttruffle-path-' + '2026-08-15';
 const MAP_OFFLINE_CACHE_NAME = 'smarttruffle-map-offline';
+let legacyAppCacheNames = null;
+let legacyAppCacheNamesPromise = null;
 const ASSETS = [
   './',
   './index.html',
@@ -33,9 +35,23 @@ function isOsmTileRequestUrl(url) {
   }
 }
 
+function getLegacyAppCacheNamesFromKeys(keys) {
+  return keys.filter((key) => key.startsWith('smarttruffle-path-') && key !== CACHE_NAME);
+}
+
+async function loadLegacyAppCacheNames() {
+  if (Array.isArray(legacyAppCacheNames)) return legacyAppCacheNames;
+  if (!legacyAppCacheNamesPromise) {
+    legacyAppCacheNamesPromise = caches.keys().then((keys) => getLegacyAppCacheNamesFromKeys(keys));
+  }
+  const names = await legacyAppCacheNamesPromise;
+  legacyAppCacheNames = names;
+  legacyAppCacheNamesPromise = null;
+  return names;
+}
+
 async function migrateLegacyOsmTilesToOfflineCache() {
-  const keys = await caches.keys();
-  const legacyAppCaches = keys.filter((key) => key.startsWith('smarttruffle-path-'));
+  const legacyAppCaches = await loadLegacyAppCacheNames();
   if (!legacyAppCaches.length) return;
 
   const offlineCache = await caches.open(MAP_OFFLINE_CACHE_NAME);
@@ -55,8 +71,7 @@ async function migrateLegacyOsmTilesToOfflineCache() {
 }
 
 async function getLegacyOsmTileResponse(request) {
-  const keys = await caches.keys();
-  const legacyAppCaches = keys.filter((key) => key.startsWith('smarttruffle-path-'));
+  const legacyAppCaches = await loadLegacyAppCacheNames();
   for (const cacheName of legacyAppCaches) {
     const legacyCache = await caches.open(cacheName);
     const cachedResponse = await legacyCache.match(request);
@@ -86,7 +101,10 @@ self.addEventListener('activate', (e) => {
               return caches.delete(key);
             }
           })
-        );
+        ).then(() => {
+          legacyAppCacheNames = [];
+          legacyAppCacheNamesPromise = null;
+        });
       })
     )
   );
