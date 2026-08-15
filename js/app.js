@@ -38,9 +38,10 @@ const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
 const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
 const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-15`;
+const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
 
 function getOfflinePreferences() {
-    return readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: 14 });
+    return readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: OFFLINE_MAP_DEFAULT_MAX_ZOOM });
 }
 
 function getOfflinePreferredMaxZoom() {
@@ -2241,7 +2242,7 @@ function openModule(moduleName, editMode = false) {
 }
 
         case 'mappa_offline': {
-            const prefOffline = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: 14 });
+            const prefOffline = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: OFFLINE_MAP_DEFAULT_MAX_ZOOM });
             const regioniCheckboxes = REGIONI_ITALIA_OFFLINE.map(r => {
                 const checked = prefOffline.regioni.includes(r.id) ? ' checked' : '';
                 return `
@@ -2251,8 +2252,14 @@ function openModule(moduleName, editMode = false) {
                 </label>`;
             }).join('');
 
-            const zoomOptions = [13, 14, 15].map(z => {
-                const labels = { 13: '13 – Panoramico (più leggero, ~15–30 MB/regione)', 14: '14 – Sentieri boschivi (consigliato, ~30–50 MB/regione)', 15: '15 – Dettaglio elevato (pesante, ~120–200 MB/regione)' };
+            const zoomOptions = [11, 12, 13, 14, 15].map(z => {
+                const labels = {
+                    11: '11 – Ultra leggero (consigliato su telefoni con poco spazio)',
+                    12: '12 – Leggero',
+                    13: '13 – Panoramico',
+                    14: '14 – Sentieri boschivi (dettaglio medio)',
+                    15: '15 – Dettaglio elevato (molto pesante)'
+                };
                 const sel = prefOffline.maxZoom === z ? ' selected' : '';
                 return `<option value="${z}"${sel}>${labels[z]}</option>`;
             }).join('');
@@ -2261,7 +2268,7 @@ function openModule(moduleName, editMode = false) {
                 <h2>📥 Download Mappa Offline</h2>
                 <div class="module-card" style="margin-bottom:14px;">
                     <p style="font-size:0.85rem; color:#ddd6c8; margin:0 0 10px 0;">Seleziona una o più regioni da scaricare per usare la mappa <strong>senza connessione internet</strong>. Il download avviene via Wi-Fi (consigliato).</p>
-                    <p style="font-size:0.82rem; color:#b8b0a0; margin:0 0 14px 0;">⚠️ Ogni regione pesa indicativamente 30–50 MB. Assicurati di avere spazio sufficiente sul dispositivo.</p>
+                    <p style="font-size:0.82rem; color:#b8b0a0; margin:0 0 14px 0;">⚠️ Se hai poco spazio, usa zoom 11–12 e scarica una regione alla volta.</p>
                     <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
                         <button class="overlay-btn btn-neutral" style="font-size:0.8rem; padding:6px 10px;" ${actionAttrs('selezionaTutteRegioni')}>✅ Seleziona tutte</button>
                         <button class="overlay-btn btn-neutral" style="font-size:0.8rem; padding:6px 10px;" ${actionAttrs('deselezionaTutteRegioni')}>☐ Deseleziona tutte</button>
@@ -4782,12 +4789,24 @@ function isOsmTileUrl(url) {
 
 const TILE_MIN_VALID_SIZE = 512; // byte: tile PNG valide pesano sempre più di questo
 const TILE_MAX_RETRIES = 2;
+const OFFLINE_DOWNLOAD_BATCH_SIZE = 6;
+const OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT = 8;
+
+function isQuotaExceededError(error) {
+    if (!error) return false;
+    return error.name === 'QuotaExceededError'
+        || error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+        || error.code === 22
+        || error.code === 1014;
+}
 
 /**
  * Scarica una singola tile in cache applicando la strategia skip-if-cached con retry.
  * - Se la tile è già presente e valida (Content-Length > soglia minima) non viene riscaricata.
  * - In caso di errore o risposta non valida, riprova fino a maxRetries volte.
- * Restituisce true se la tile è in cache al termine, false se tutti i tentativi falliscono.
+ * Restituisce un oggetto:
+ * - { ok: true } se la tile è in cache al termine
+ * - { ok: false, reason: 'quota_exceeded'|'network_or_server' } se tutti i tentativi falliscono.
  */
 async function downloadTileWithRetry(cache, url, maxRetries = TILE_MAX_RETRIES) {
     // Controlla se esiste già una copia valida in cache
@@ -4795,7 +4814,7 @@ async function downloadTileWithRetry(cache, url, maxRetries = TILE_MAX_RETRIES) 
         const cached = await cache.match(url);
         if (cached) {
             const cl = parseInt(cached.headers.get('content-length') || '0', 10);
-            if (cl >= TILE_MIN_VALID_SIZE) return true; // tile già presente e valida
+            if (cl >= TILE_MIN_VALID_SIZE) return { ok: true }; // tile già presente e valida
             // tile in cache ma sospettosamente piccola: la consideriamo corrotta e la riscariciamo
             await cache.delete(url).catch(() => {});
         }
@@ -4810,12 +4829,37 @@ async function downloadTileWithRetry(cache, url, maxRetries = TILE_MAX_RETRIES) 
             const cl = parseInt(res.headers.get('content-length') || '0', 10);
             if (cl > 0 && cl < TILE_MIN_VALID_SIZE) { res.body?.cancel(); continue; } // risposta troppo piccola: errore mascherato da 200
             await cache.put(url, res.clone());
-            return true;
-        } catch {
+            return { ok: true };
+        } catch (error) {
+            if (isQuotaExceededError(error)) {
+                return { ok: false, reason: 'quota_exceeded' };
+            }
             // Errore di rete: riprova al prossimo ciclo
         }
     }
-    return false;
+    return { ok: false, reason: 'network_or_server' };
+}
+
+function buildOfflineTileUrlsByZoom(regionIds, maxZoom) {
+    const urlsByZoom = [];
+    const seenGlobal = new Set();
+    for (let zoom = OFFLINE_MAP_MIN_ZOOM; zoom <= maxZoom; zoom++) {
+        const urlsAtZoom = [];
+        for (const id of regionIds) {
+            const regione = REGIONI_ITALIA_OFFLINE.find(r => r.id === id);
+            if (!regione) continue;
+            const zoomUrls = getTileUrls(regione.bbox, zoom, zoom);
+            for (const url of zoomUrls) {
+                if (seenGlobal.has(url)) continue;
+                seenGlobal.add(url);
+                urlsAtZoom.push(url);
+            }
+        }
+        if (urlsAtZoom.length > 0) {
+            urlsByZoom.push({ zoom, urls: urlsAtZoom });
+        }
+    }
+    return urlsByZoom;
 }
 
 async function getOfflineMapCachedUrlsSet({ includeLegacy = false } = {}) {
@@ -4879,8 +4923,8 @@ async function getOfflineMapCachedUrlsSet({ includeLegacy = false } = {}) {
 function getOfflinePreferencesFromInputs() {
     const regioni = [...document.querySelectorAll('.offline-region-cb:checked')].map((cb) => cb.value);
     const zoomSelect = document.getElementById('offline-zoom-select');
-    const parsedZoom = parseInt(zoomSelect ? zoomSelect.value : '14', 10);
-    const maxZoom = Number.isFinite(parsedZoom) ? parsedZoom : 14;
+    const parsedZoom = parseInt(zoomSelect ? zoomSelect.value : `${OFFLINE_MAP_DEFAULT_MAX_ZOOM}`, 10);
+    const maxZoom = Number.isFinite(parsedZoom) ? parsedZoom : OFFLINE_MAP_DEFAULT_MAX_ZOOM;
     return { regioni, maxZoom };
 }
 
@@ -4915,20 +4959,12 @@ async function scaricaRegioniOffline() {
 
     const cacheName = OFFLINE_MAP_CACHE_NAME;
 
-    let allUrls = [];
-    for (const id of preferenze.regioni) {
-        const regione = REGIONI_ITALIA_OFFLINE.find(r => r.id === id);
-        if (!regione) continue;
-        allUrls = allUrls.concat(getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, preferenze.maxZoom));
-    }
-
-    // Deduplicazione
-    allUrls = [...new Set(allUrls)];
-
-    const total = allUrls.length;
+    const urlsByZoom = buildOfflineTileUrlsByZoom(preferenze.regioni, preferenze.maxZoom);
+    const total = urlsByZoom.reduce((sum, item) => sum + item.urls.length, 0);
     let done = 0;
     let errors = 0;
-    const BATCH_SIZE = 10;
+    let quotaErrors = 0;
+    let abortedByQuota = false;
 
     if (progressText) progressText.textContent = `Download in corso: 0 / ${total} tile…`;
 
@@ -4941,20 +4977,33 @@ async function scaricaRegioniOffline() {
         return;
     }
 
-    for (let i = 0; i < allUrls.length; i += BATCH_SIZE) {
-        const batch = allUrls.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(async (url) => {
-            const ok = await downloadTileWithRetry(cache, url);
-            if (!ok) errors++;
-        }));
-        done += batch.length;
-        const pct = Math.round((done / total) * 100);
-        if (progressBar) progressBar.style.width = pct + '%';
-        if (progressText) progressText.textContent = `Download in corso: ${done} / ${total} tile (${pct}%)…`;
+    for (const level of urlsByZoom) {
+        for (let i = 0; i < level.urls.length; i += OFFLINE_DOWNLOAD_BATCH_SIZE) {
+            const batch = level.urls.slice(i, i + OFFLINE_DOWNLOAD_BATCH_SIZE);
+            const results = await Promise.all(batch.map((url) => downloadTileWithRetry(cache, url)));
+            for (const result of results) {
+                if (result.ok) continue;
+                errors++;
+                if (result.reason === 'quota_exceeded') {
+                    quotaErrors++;
+                }
+            }
+            done += batch.length;
+            const pct = Math.round((done / total) * 100);
+            if (progressBar) progressBar.style.width = pct + '%';
+            if (progressText) progressText.textContent = `Download in corso: ${done} / ${total} tile (${pct}%)… z${level.zoom}`;
+            if (quotaErrors >= OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT) {
+                abortedByQuota = true;
+                break;
+            }
+        }
+        if (abortedByQuota) break;
     }
 
     if (progressArea) progressArea.style.display = 'none';
-    if (errors > 0) {
+    if (abortedByQuota) {
+        showToast(`⚠️ Spazio cache esaurito dopo ${done} tile. Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
+    } else if (errors > 0) {
         showToast(`Download completato con ${errors} errori su ${total} tile. Riprova in caso di mappa incompleta.`, 'error');
     } else {
         showToast(`✅ Download completato! ${total} tile salvati per uso offline.`, 'success');
@@ -4980,7 +5029,7 @@ async function aggiornaStatoCacheRegioni() {
     const pref = getOfflinePreferences();
     const zoomSelect = document.getElementById('offline-zoom-select');
     const parsedZoom = zoomSelect ? parseInt(zoomSelect.value, 10) : NaN;
-    const maxZoom = Number.isFinite(parsedZoom) ? parsedZoom : (typeof pref.maxZoom === 'number' ? pref.maxZoom : 14);
+    const maxZoom = Number.isFinite(parsedZoom) ? parsedZoom : (typeof pref.maxZoom === 'number' ? pref.maxZoom : OFFLINE_MAP_DEFAULT_MAX_ZOOM);
 
     let html = '';
     for (const regione of REGIONI_ITALIA_OFFLINE) {
@@ -5018,15 +5067,10 @@ async function eliminaCacheMappaOffline() {
 async function autoRiscaricaRegioniOfflineSeNecessario() {
     const pref = getOfflinePreferences();
     if (!Array.isArray(pref.regioni) || pref.regioni.length === 0) return;
-    const maxZoom = typeof pref.maxZoom === 'number' ? pref.maxZoom : 14;
+    const maxZoom = typeof pref.maxZoom === 'number' ? pref.maxZoom : OFFLINE_MAP_DEFAULT_MAX_ZOOM;
 
-    let allUrls = [];
-    for (const id of pref.regioni) {
-        const regione = REGIONI_ITALIA_OFFLINE.find(r => r.id === id);
-        if (!regione) continue;
-        allUrls = allUrls.concat(getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, maxZoom));
-    }
-    allUrls = [...new Set(allUrls)];
+    const urlsByZoom = buildOfflineTileUrlsByZoom(pref.regioni, maxZoom);
+    const allUrls = urlsByZoom.flatMap((item) => item.urls);
     if (allUrls.length === 0) return;
 
     let deveRiscaricare = false;
@@ -5048,14 +5092,24 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
         return;
     }
 
-    const BATCH_SIZE = 10;
+    let quotaErrors = 0;
     let errors = 0;
-    for (let i = 0; i < allUrls.length; i += BATCH_SIZE) {
-        const batch = allUrls.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(async (url) => {
-            const ok = await downloadTileWithRetry(cache, url);
-            if (!ok) errors++;
-        }));
+    for (const level of urlsByZoom) {
+        for (let i = 0; i < level.urls.length; i += OFFLINE_DOWNLOAD_BATCH_SIZE) {
+            const batch = level.urls.slice(i, i + OFFLINE_DOWNLOAD_BATCH_SIZE);
+            const results = await Promise.all(batch.map((url) => downloadTileWithRetry(cache, url)));
+            for (const result of results) {
+                if (result.ok) continue;
+                errors++;
+                if (result.reason === 'quota_exceeded') {
+                    quotaErrors++;
+                }
+            }
+            if (quotaErrors >= OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT) {
+                showToast('⚠️ Spazio cache insufficiente: ripristino automatico interrotto.', 'error');
+                return;
+            }
+        }
     }
 
     if (errors > 0) {
