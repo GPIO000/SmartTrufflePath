@@ -7,6 +7,8 @@ import {
   saveAutomaticBackupSnapshot,
   setDataChangeListener,
   notifyDataChange,
+  setItemSilent,
+  removeItemSilent,
 } from '../js/storage-sync.js';
 
 beforeEach(() => {
@@ -185,6 +187,45 @@ describe('setDataChangeListener', () => {
     setDataChangeListener(listener);
     notifyDataChange('spese_list');
     expect(listener).toHaveBeenCalledWith('spese_list');
+  });
+});
+
+describe('setItemSilent / removeItemSilent', () => {
+  afterEach(() => {
+    setDataChangeListener(null);
+    localStorage.clear();
+  });
+
+  it('setItemSilent scrive il valore in localStorage', () => {
+    setItemSilent('backup_dir_label', 'Download/SmartTrufflePath/file backup');
+    expect(localStorage.getItem('backup_dir_label')).toBe('Download/SmartTrufflePath/file backup');
+  });
+
+  it('setItemSilent non scrive nulla se il valore è null', () => {
+    setItemSilent('backup_dir_label', null);
+    expect(localStorage.getItem('backup_dir_label')).toBeNull();
+  });
+
+  it('setItemSilent non chiama il listener di cambio dati', () => {
+    const listener = vi.fn();
+    setDataChangeListener(listener);
+    setItemSilent('backup_dir_label', 'Download/SmartTrufflePath/file backup');
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('removeItemSilent rimuove il valore da localStorage', () => {
+    localStorage.setItem('backup_dir_label', 'Download/SmartTrufflePath/file backup');
+    removeItemSilent('backup_dir_label');
+    expect(localStorage.getItem('backup_dir_label')).toBeNull();
+  });
+
+  it('removeItemSilent non chiama il listener di cambio dati', () => {
+    const listener = vi.fn();
+    setDataChangeListener(listener);
+    localStorage.setItem('backup_dir_label', 'qualcosa');
+    listener.mockClear();
+    removeItemSilent('backup_dir_label');
+    expect(listener).not.toHaveBeenCalled();
   });
 });
 

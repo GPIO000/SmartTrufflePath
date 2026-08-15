@@ -214,6 +214,20 @@
     dataChangeListener = typeof fn === 'function' ? fn : null;
   }
 
+  function setItemSilent(key, value) {
+    if (value === null || value === undefined) return;
+    const normalizedValue = String(value);
+    const api = localStorageOriginals || rawLocalStorageApi;
+    api.setItem(key, normalizedValue);
+    putEntry(key, normalizedValue).catch(() => {});
+  }
+
+  function removeItemSilent(key) {
+    const api = localStorageOriginals || rawLocalStorageApi;
+    api.removeItem(key);
+    deleteEntry(key).catch(() => {});
+  }
+
   async function hydrateLocalStorageFromDb() {
     const entries = await getAllEntries();
     if (!entries || entries.length === 0) return false;
@@ -274,4 +288,4 @@
     });
   }
 
-export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshotAsync, getAutomaticBackupStatus, setDataChangeListener, notifyDataChange, saveDirectoryHandle, loadDirectoryHandle };
+export { init, saveAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshot, getLatestAutomaticBackupSnapshotAsync, getAutomaticBackupStatus, setDataChangeListener, notifyDataChange, saveDirectoryHandle, loadDirectoryHandle, setItemSilent, removeItemSilent };

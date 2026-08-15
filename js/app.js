@@ -3534,9 +3534,9 @@ function getAutomaticBackupDestinationLabel() {
 
 function setAutomaticBackupDestinationLabel(label) {
     if (label) {
-        localStorage.setItem(_BACKUP_DIR_LABEL_KEY, label);
+        TruffleStorage.setItemSilent(_BACKUP_DIR_LABEL_KEY, label);
     } else {
-        localStorage.removeItem(_BACKUP_DIR_LABEL_KEY);
+        TruffleStorage.removeItemSilent(_BACKUP_DIR_LABEL_KEY);
     }
     syncAutomaticBackupDestinationUI();
 }
