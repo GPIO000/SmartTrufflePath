@@ -126,10 +126,19 @@ function appConfirm(message) {
         if (!dialog) { resolve(window.confirm(message)); return; }
         msg.textContent = message;
         inputField.style.display = 'none';
-        cancelBtn.style.display = 'none';
+        cancelBtn.style.display = '';
+        cancelBtn.textContent = 'Annulla';
         okBtn.textContent = 'OK';
-        const onOk = () => { dialog.close(); okBtn.removeEventListener('click', onOk); resolve(true); };
+        const cleanup = () => {
+            dialog.close();
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            cancelBtn.style.display = 'none';
+        };
+        const onOk = () => { cleanup(); resolve(true); };
+        const onCancel = () => { cleanup(); resolve(false); };
         okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
         dialog.showModal();
     });
 }
@@ -3708,15 +3717,24 @@ async function downloadBackupFile(data) {
     const fileName = 'backup_truffle_automatico.json';
 
     if (window.showDirectoryPicker) {
-        const configuredFolder = await configureAutomaticBackupFolder();
+        let configuredFolder = null;
+        try {
+            configuredFolder = await configureAutomaticBackupFolder();
+        } catch {
+            // configureAutomaticBackupFolder already handles and reports errors internally
+        }
         if (configuredFolder) {
-            const fileHandle = await configuredFolder.backupDirHandle.getFileHandle(fileName, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(jsonStr);
-            await writable.close();
-            lastAutomaticBackupSavedAt = new Date().toISOString();
-            syncAutomaticBackupStatusUI();
-            return;
+            try {
+                const fileHandle = await configuredFolder.backupDirHandle.getFileHandle(fileName, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(jsonStr);
+                await writable.close();
+                lastAutomaticBackupSavedAt = new Date().toISOString();
+                syncAutomaticBackupStatusUI();
+                return;
+            } catch {
+                // Fall through to anchor download fallback
+            }
         }
     }
 
@@ -3733,11 +3751,15 @@ async function downloadBackupFile(data) {
 }
 
 async function forceLocalBackupNow() {
-    const backupData = buildCompleteBackupData();
-    await downloadBackupFile(backupData);
-    lastAutomaticBackupFingerprint = JSON.stringify(backupData);
-    const destinationLabel = getAutomaticBackupDestinationLabel();
-    showToast(destinationLabel ? `Backup salvato in ${destinationLabel}.` : "Backup salvato.", 'success');
+    try {
+        const backupData = buildCompleteBackupData();
+        await downloadBackupFile(backupData);
+        lastAutomaticBackupFingerprint = JSON.stringify(backupData);
+        const destinationLabel = getAutomaticBackupDestinationLabel();
+        showToast(destinationLabel ? `Backup salvato in ${destinationLabel}.` : "Backup salvato.", 'success');
+    } catch {
+        showToast("Errore durante il salvataggio del backup.", 'error');
+    }
 }
 
 async function restoreLatestAutomaticBackup() {
@@ -3831,6 +3853,7 @@ async function archiviaAnnoPrecedente() {
 }
 
 async function runAutomaticLocalBackup() {
+    if (!getAutomaticBackupDestinationLabel()) return;
     const backupData = buildCompleteBackupData();
     const fingerprint = JSON.stringify(backupData);
     if (fingerprint === lastAutomaticBackupFingerprint) return;
