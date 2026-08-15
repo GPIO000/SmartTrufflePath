@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   downloadTileWithRetry,
   isOpaqueTileResponse,
+  isOpenStreetMapTileUrl,
   isQuotaExceededError,
   isValidCachedTileResponse,
   isValidDownloadedTileResponse
@@ -18,6 +19,12 @@ describe('isQuotaExceededError', () => {
 });
 
 describe('tile response validation', () => {
+  it('riconosce gli URL tile di OpenStreetMap', () => {
+    expect(isOpenStreetMapTileUrl('https://a.tile.openstreetmap.org/8/1/1.png')).toBe(true);
+    expect(isOpenStreetMapTileUrl('https://tile.openstreetmap.org/8/1/1.png')).toBe(true);
+    expect(isOpenStreetMapTileUrl('https://example.com/8/1/1.png')).toBe(false);
+  });
+
   it('considera valide le risposte opaque per cache e download', () => {
     const response = { type: 'opaque', status: 0 };
     expect(isOpaqueTileResponse(response)).toBe(true);
@@ -30,6 +37,16 @@ describe('tile response validation', () => {
       type: 'basic',
       status: 200,
       headers: new Headers({ 'content-length': '128' })
+    };
+    expect(isValidCachedTileResponse(response)).toBe(false);
+  });
+
+  it('scarta le tile cached non ok anche se grandi', () => {
+    const response = {
+      type: 'basic',
+      status: 503,
+      ok: false,
+      headers: new Headers({ 'content-length': '2048' })
     };
     expect(isValidCachedTileResponse(response)).toBe(false);
   });
@@ -101,5 +118,26 @@ describe('downloadTileWithRetry', () => {
     const result = await downloadTileWithRetry(cache, 'https://c.tile.openstreetmap.org/8/1/1.png', { fetchImpl });
 
     expect(result).toEqual({ ok: false, reason: 'quota_exceeded' });
+  });
+
+  it('usa cors per provider non OSM se non viene forzata una modalità', async () => {
+    const response = {
+      type: 'cors',
+      status: 200,
+      ok: true,
+      headers: new Headers({ 'content-length': '2048' }),
+      clone: vi.fn().mockReturnValue({ ok: true })
+    };
+    const cache = {
+      match: vi.fn().mockResolvedValue(null),
+      delete: vi.fn(),
+      put: vi.fn().mockResolvedValue(undefined)
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(response);
+
+    const result = await downloadTileWithRetry(cache, 'https://example.com/tiles/8/1/1.png', { fetchImpl });
+
+    expect(result).toEqual({ ok: true });
+    expect(fetchImpl).toHaveBeenCalledWith('https://example.com/tiles/8/1/1.png', { mode: 'cors', cache: 'no-store' });
   });
 });

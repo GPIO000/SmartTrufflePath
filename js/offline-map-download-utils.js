@@ -1,6 +1,16 @@
 const TILE_MIN_VALID_SIZE = 512;
 const TILE_MAX_RETRIES = 2;
 
+function isOpenStreetMapTileUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'tile.openstreetmap.org'
+      || /^[abc]\.tile\.openstreetmap\.org$/.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function isQuotaExceededError(error) {
   if (!error) return false;
   return error.name === 'QuotaExceededError'
@@ -16,6 +26,7 @@ function isOpaqueTileResponse(response) {
 function isValidCachedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
   if (!response) return false;
   if (isOpaqueTileResponse(response)) return true;
+  if (!response.ok) return false;
   const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
   return contentLength >= minValidSize;
 }
@@ -30,6 +41,7 @@ function isValidDownloadedTileResponse(response, minValidSize = TILE_MIN_VALID_S
 
 async function downloadTileWithRetry(cache, url, {
   fetchImpl = globalThis.fetch,
+  fetchMode,
   maxRetries = TILE_MAX_RETRIES,
   minValidSize = TILE_MIN_VALID_SIZE
 } = {}) {
@@ -47,7 +59,8 @@ async function downloadTileWithRetry(cache, url, {
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetchImpl(url, { mode: 'no-cors', cache: 'no-store' });
+      const resolvedFetchMode = fetchMode ?? (isOpenStreetMapTileUrl(url) ? 'no-cors' : 'cors');
+      const response = await fetchImpl(url, { mode: resolvedFetchMode, cache: 'no-store' });
       if (!isValidDownloadedTileResponse(response, minValidSize)) {
         response?.body?.cancel?.();
         continue;
@@ -68,6 +81,7 @@ export {
   TILE_MIN_VALID_SIZE,
   downloadTileWithRetry,
   isOpaqueTileResponse,
+  isOpenStreetMapTileUrl,
   isQuotaExceededError,
   isValidCachedTileResponse,
   isValidDownloadedTileResponse
