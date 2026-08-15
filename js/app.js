@@ -458,6 +458,7 @@ const ACTION_HANDLERS = {
         closeActiveModule();
     },
     scaricaRegioniOffline: () => scaricaRegioniOffline(),
+    salvaPreferenzeMappaOffline: () => salvaPreferenzeMappaOffline(),
     eliminaCacheMappaOffline: () => eliminaCacheMappaOffline(),
     selezionaTutteRegioni: () => {
         document.querySelectorAll('.offline-region-cb').forEach(cb => { cb.checked = true; });
@@ -2270,6 +2271,7 @@ function openModule(moduleName, editMode = false) {
                             ${zoomOptions}
                         </select>
                     </div>
+                    <button class="overlay-btn btn-info" style="width:100%; margin-bottom:10px;" ${actionAttrs('salvaPreferenzeMappaOffline')}>💾 Salva Preferenze</button>
                     <div id="offline-progress-area" style="display:none; margin-bottom:14px;">
                         <p id="offline-progress-text" style="font-size:0.85rem; color:#4d8a98; margin:0 0 6px 0;">Download in corso…</p>
                         <div style="background:rgba(255,255,255,0.08); border-radius:6px; height:10px; overflow:hidden;">
@@ -4718,7 +4720,7 @@ async function mostraInfoModulo(moduleName) {
         'clienti': "ℹ️ **Guida - Rubrica Clienti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico, aggiungi nuovi nominativi e gestisci modifiche, note ed eliminazioni.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
         'calendario': "ℹ️ **Guida - Calendario Raccolta (GPS)**\n\nVerifica in base alla tua posizione GPS attuale quali specie di tartufo hanno il periodo di raccolta attualmente aperto o chiuso.",
-        'mappa_offline': "ℹ️ **Guida - Download Mappa Offline**\n\nSeleziona le regioni italiane che ti interessano e premi 'Scarica'. I quadratini della mappa (tile) vengono salvati nella memoria del browser. La mappa funzionerà anche senza connessione internet, finché la cache non viene svuotata dal sistema.\n\n🔄 **Re-download automatico**: l'app ricorda le regioni e il livello di zoom scelti. Se il browser svuota la cache, non appena torni online la mappa viene riscaricata in automatico, senza che tu debba fare nulla.\n\nConsigli:\n• Usa la connessione Wi-Fi per scaricare\n• Zoom 14 è il miglior compromesso tra dettaglio e spazio\n• Puoi eliminare la cache in qualsiasi momento con il tasto apposito"
+        'mappa_offline': "ℹ️ **Guida - Download Mappa Offline**\n\nSeleziona le regioni italiane che ti interessano, premi '💾 Salva Preferenze' per registrarle (anche per svuotarle) e poi usa '📥 Scarica Regioni Selezionate' quando vuoi scaricare la cache. I quadratini della mappa (tile) vengono salvati nella memoria del browser. La mappa funzionerà anche senza connessione internet, finché la cache non viene svuotata dal sistema.\n\n🔄 **Re-download automatico**: l'app ricorda le regioni e il livello di zoom scelti. Se il browser svuota la cache, non appena torni online la mappa viene riscaricata in automatico, senza che tu debba fare nulla.\n\nConsigli:\n• Usa la connessione Wi-Fi per scaricare\n• Zoom 14 è il miglior compromesso tra dettaglio e spazio\n• Puoi eliminare la cache in qualsiasi momento con il tasto apposito"
     };
 
     const messaggio = guideTesti[moduleName] || "ℹ️ Guida non disponibile per questo modulo.";
@@ -4832,17 +4834,37 @@ async function getOfflineMapCachedUrlsSet({ includeLegacy = false } = {}) {
     return cachedUrls;
 }
 
+function getOfflinePreferencesFromInputs() {
+    const regioni = [...document.querySelectorAll('.offline-region-cb:checked')].map((cb) => cb.value);
+    const zoomSelect = document.getElementById('offline-zoom-select');
+    const parsedZoom = parseInt(zoomSelect ? zoomSelect.value : '14', 10);
+    const maxZoom = Number.isFinite(parsedZoom) ? parsedZoom : 14;
+    return { regioni, maxZoom };
+}
+
+function saveOfflinePreferences(preferenze) {
+    localStorage.setItem(OFFLINE_REGIONI_PREFERITE_KEY, JSON.stringify(preferenze));
+}
+
+async function salvaPreferenzeMappaOffline() {
+    const preferenze = getOfflinePreferencesFromInputs();
+    saveOfflinePreferences(preferenze);
+    await runAutomaticLocalBackup();
+    aggiornaStatoCacheRegioni();
+    if (preferenze.regioni.length > 0) {
+        showToast('✅ Preferenze mappa offline salvate.', 'success');
+    } else {
+        showToast('✅ Preferenze salvate: nessuna regione selezionata.', 'success');
+    }
+}
+
 async function scaricaRegioniOffline() {
-    const selezionate = [...document.querySelectorAll('.offline-region-cb:checked')].map(cb => cb.value);
-    if (selezionate.length === 0) {
+    const preferenze = getOfflinePreferencesFromInputs();
+    if (preferenze.regioni.length === 0) {
         showToast('Seleziona almeno una regione prima di scaricare.', 'error');
         return;
     }
-    const zoomSelect = document.getElementById('offline-zoom-select');
-    const maxZoom = parseInt(zoomSelect ? zoomSelect.value : '14', 10);
-
-    // Salva le preferenze dell'utente per il re-download automatico
-    localStorage.setItem(OFFLINE_REGIONI_PREFERITE_KEY, JSON.stringify({ regioni: selezionate, maxZoom }));
+    saveOfflinePreferences(preferenze);
 
     const progressArea = document.getElementById('offline-progress-area');
     const progressBar = document.getElementById('offline-progress-bar');
@@ -4852,10 +4874,10 @@ async function scaricaRegioniOffline() {
     const cacheName = OFFLINE_MAP_CACHE_NAME;
 
     let allUrls = [];
-    for (const id of selezionate) {
+    for (const id of preferenze.regioni) {
         const regione = REGIONI_ITALIA_OFFLINE.find(r => r.id === id);
         if (!regione) continue;
-        allUrls = allUrls.concat(getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, maxZoom));
+        allUrls = allUrls.concat(getTileUrls(regione.bbox, OFFLINE_MAP_MIN_ZOOM, preferenze.maxZoom));
     }
 
     // Deduplicazione
