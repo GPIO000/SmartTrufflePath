@@ -4981,7 +4981,7 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 
     if (!deveRiscaricare) return;
 
-    showToast('🔄 Cache mappa offline assente. Re-download automatico in corso…', 'info');
+    showToast('🔄 Cache mappa offline assente o incompleta. Re-download automatico in corso…', 'info');
 
     let cache;
     try {

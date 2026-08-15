@@ -14,12 +14,14 @@ function countCachedTileUrls(cachedUrls, tileUrls) {
 }
 
 function isOfflineRegionFullyCached(cachedUrls, tileUrls) {
+    if (!(cachedUrls instanceof Set)) return false;
     const normalizedUrls = normalizeTileUrls(tileUrls);
     if (normalizedUrls.length === 0) return false;
     return countCachedTileUrls(cachedUrls, normalizedUrls) === normalizedUrls.length;
 }
 
 function shouldRestoreOfflineMapCache(cachedUrls, preferredTileUrls) {
+    if (!(cachedUrls instanceof Set)) return true;
     const normalizedPreferredTileUrls = normalizeTileUrls(preferredTileUrls);
     if (normalizedPreferredTileUrls.length === 0) return false;
     return countCachedTileUrls(cachedUrls, normalizedPreferredTileUrls) < normalizedPreferredTileUrls.length;

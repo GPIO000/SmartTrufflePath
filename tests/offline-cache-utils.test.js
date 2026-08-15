@@ -18,6 +18,10 @@ describe('countCachedTileUrls', () => {
 });
 
 describe('isOfflineRegionFullyCached', () => {
+  it('restituisce false se cachedUrls non è un Set', () => {
+    expect(isOfflineRegionFullyCached(null, ['tile-a'])).toBe(false);
+  });
+
   it('restituisce false quando la cache è parziale', () => {
     const cachedUrls = new Set(['tile-a']);
     expect(isOfflineRegionFullyCached(cachedUrls, ['tile-a', 'tile-b'])).toBe(false);
@@ -41,5 +45,9 @@ describe('shouldRestoreOfflineMapCache', () => {
 
   it('non richiede il re-download quando non ci sono tile preferite', () => {
     expect(shouldRestoreOfflineMapCache(new Set(['tile-a']), [])).toBe(false);
+  });
+
+  it('richiede il re-download se cachedUrls non è un Set', () => {
+    expect(shouldRestoreOfflineMapCache(null, ['tile-a'])).toBe(true);
   });
 });
