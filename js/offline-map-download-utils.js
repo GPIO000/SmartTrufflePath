@@ -39,6 +39,23 @@ function isValidDownloadedTileResponse(response, minValidSize = TILE_MIN_VALID_S
   return isValidTileResponse(response, minValidSize);
 }
 
+function summarizeTileDownloadResults(results = []) {
+  return results.reduce((summary, result) => {
+    if (result?.ok) return summary;
+    summary.errors++;
+    if (result?.reason === 'quota_exceeded') {
+      summary.quotaErrors++;
+    } else {
+      summary.networkErrors++;
+    }
+    return summary;
+  }, {
+    errors: 0,
+    quotaErrors: 0,
+    networkErrors: 0
+  });
+}
+
 async function downloadTileWithRetry(cache, url, {
   fetchImpl = globalThis.fetch,
   fetchMode,
@@ -91,5 +108,6 @@ export {
   isQuotaExceededError,
   isValidCachedTileResponse,
   isValidTileResponse,
-  isValidDownloadedTileResponse
+  isValidDownloadedTileResponse,
+  summarizeTileDownloadResults
 };

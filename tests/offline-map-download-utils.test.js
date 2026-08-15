@@ -5,7 +5,8 @@ import {
   isOpenStreetMapTileUrl,
   isQuotaExceededError,
   isValidCachedTileResponse,
-  isValidDownloadedTileResponse
+  isValidDownloadedTileResponse,
+  summarizeTileDownloadResults
 } from '../js/offline-map-download-utils.js';
 
 describe('isQuotaExceededError', () => {
@@ -139,5 +140,22 @@ describe('downloadTileWithRetry', () => {
 
     expect(result).toEqual({ ok: true });
     expect(fetchImpl).toHaveBeenCalledWith('https://example.com/tiles/8/1/1.png', { mode: 'cors', cache: 'no-store' });
+  });
+});
+
+describe('summarizeTileDownloadResults', () => {
+  it('counts quota and network/provider failures separately', () => {
+    const summary = summarizeTileDownloadResults([
+      { ok: true },
+      { ok: false, reason: 'quota_exceeded' },
+      { ok: false, reason: 'network_or_server' },
+      { ok: false, reason: 'unexpected_reason' }
+    ]);
+
+    expect(summary).toEqual({
+      errors: 3,
+      quotaErrors: 1,
+      networkErrors: 2
+    });
   });
 });
