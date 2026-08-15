@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   normalizeBackupEntry,
+  extractValidBackupEntries,
   AUTOMATIC_BACKUP_APP_FOLDER_NAME,
   AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
   buildAutomaticBackupPathLabel,
@@ -36,5 +37,35 @@ describe('buildAutomaticBackupPathLabel', () => {
     expect(buildAutomaticBackupPathLabel('')).toBe(
       `Download/${AUTOMATIC_BACKUP_APP_FOLDER_NAME}/${AUTOMATIC_BACKUP_FILES_FOLDER_NAME}`,
     );
+  });
+});
+
+describe('extractValidBackupEntries', () => {
+  const backupMap = { storicoVendite: 'storico_vendite', poiList: 'poi_list' };
+
+  it('restituisce le coppie [storageKey, valore] per le voci valide', () => {
+    const content = { storicoVendite: '[1,2,3]', poiList: '[]' };
+    expect(extractValidBackupEntries(content, backupMap)).toEqual([
+      ['storico_vendite', '[1,2,3]'],
+      ['poi_list', '[]'],
+    ]);
+  });
+
+  it('salta le voci null o undefined', () => {
+    const content = { storicoVendite: null, poiList: undefined };
+    expect(extractValidBackupEntries(content, backupMap)).toEqual([]);
+  });
+
+  it('salta le voci con stringhe JSON non valide', () => {
+    const content = { storicoVendite: 'not-json', poiList: '[]' };
+    expect(extractValidBackupEntries(content, backupMap)).toEqual([
+      ['poi_list', '[]'],
+    ]);
+  });
+
+  it('lancia un errore se il contenuto non è un oggetto valido', () => {
+    expect(() => extractValidBackupEntries(null, backupMap)).toThrow();
+    expect(() => extractValidBackupEntries([], backupMap)).toThrow();
+    expect(() => extractValidBackupEntries('stringa', backupMap)).toThrow();
   });
 });

@@ -2,7 +2,8 @@ import * as TruffleStorage from './storage-sync.js';
 import {
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
-    buildAutomaticBackupPathLabel
+    buildAutomaticBackupPathLabel,
+    extractValidBackupEntries
 } from './backup-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
 
@@ -384,6 +385,7 @@ const ACTION_HANDLERS = {
     esportaDatiCSV: () => esportaDatiCSV(),
     configureAutomaticBackupFolder: () => chooseAutomaticBackupFolder(),
     forceLocalBackupNow: () => forceLocalBackupNow(),
+    ripristinaBackupDaFile: (event) => ripristinaBackupDaFile(event),
     saveVetClinic: () => saveVetClinic(),
     shareLocationToVetByIndex: (_event, index) => shareLocationToVetByIndex(index),
     deleteVetClinic: (_event, index) => deleteVetClinic(index),
@@ -1916,6 +1918,10 @@ function openModule(moduleName, editMode = false) {
                     <p id="local-backup-status" style="font-size:0.82rem; color:#b8b0a0; margin:0 0 10px 0;">Stato ultimo backup automatico: non disponibile</p>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#7c3aed;" ${actionAttrs('configureAutomaticBackupFolder')}>📁 Imposta Cartella Backup</button>
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('forceLocalBackupNow')}>💾 Salva Backup Ora</button>
+                    <label class="overlay-btn" style="margin-top:10px; width:100%; background:#059669; display:block; text-align:center; cursor:pointer; box-sizing:border-box;">
+                        ♻️ Ripristina Backup da File
+                        <input type="file" id="restore-backup-file" accept=".json" style="display:none;" ${eventActionAttrs('change', 'ripristinaBackupDaFile')}>
+                    </label>
                     <hr style="border-color:rgba(255,255,255,0.07); margin:20px 0;">
                     <h3 style="margin:0 0 10px 0; font-size:0.95rem; color:#b45309;">🗂️ Archiviazione per Anno</h3>
                     <p style="font-size:0.82rem; color:#ddd6c8; margin:0 0 10px 0;">Crea un file di backup JSON con i dati dell'anno precedente (ricevute vendita, registro raccolta, spese) e rimuove dall'app <strong>soltanto quei record</strong>, lasciando intatti tutti i dati dell'anno corrente e di qualsiasi altro anno.</p>
@@ -3765,6 +3771,65 @@ async function archiviaAnnoPrecedente() {
     localStorage.setItem('spese_list', JSON.stringify(speseList.filter(item => getYearFromDateStr(item.data) !== annoPrecedente)));
 
     showToast(`✅ Archivio ${annoPrecedente} creato. Dati dell'anno rimossi dall'app.`, 'success');
+}
+
+async function ripristinaBackupDaFile(event) {
+    const input = event?.target;
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    const backupMap = {
+        tesserino: 'tesserino_data',
+        pagopa: 'pagopa_data',
+        archivioDocumentiList: 'archivio_documenti_list',
+        f24: 'f24_data',
+        storicoVendite: 'storico_vendite',
+        luoghiRaccolta: 'luoghi_raccolta',
+        poiList: 'poi_list',
+        dogsList: 'dogs_list',
+        caneData: 'cane_data',
+        polizzeList: 'polizze_list',
+        storicoRaccolta: 'storico_raccolta_giornaliera',
+        rubricaClienti: 'rubrica_clienti',
+        speseList: 'spese_list',
+        vetHistoryList: 'vet_history_list',
+        heatDiaryList: 'heat_diary_list',
+        vetClinicsList: 'vet_clinics_list',
+        calendariTartufiCustom: 'calendari_tartufi_custom',
+        noteRegionaliTartufi: 'note_regionali_tartufi',
+        offlineRegioniPreferite: OFFLINE_REGIONI_PREFERITE_KEY,
+        backupDirLabel: _BACKUP_DIR_LABEL_KEY,
+    };
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const content = JSON.parse(e.target.result);
+            const entries = extractValidBackupEntries(content, backupMap);
+
+            const confirmed = await appConfirm(
+                '⚠️ Ripristina Backup\n\n' +
+                'Questa operazione sovrascriverà i dati attuali dell\'app con quelli contenuti nel file di backup.\n\n' +
+                'Vuoi continuare?'
+            );
+            if (!confirmed) {
+                if (input) input.value = '';
+                return;
+            }
+
+            for (const [storageKey, value] of entries) {
+                localStorage.setItem(storageKey, value);
+            }
+
+            showToast('✅ Backup ripristinato con successo.', 'success');
+            setTimeout(() => location.reload(), 800);
+        } catch (err) {
+            if (input) input.value = '';
+            showToast('❌ File di backup non valido.', 'error');
+            console.error(err);
+        }
+    };
+    reader.readAsText(file);
 }
 
 async function runAutomaticLocalBackup() {

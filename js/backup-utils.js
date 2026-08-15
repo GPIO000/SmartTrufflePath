@@ -33,8 +33,38 @@ function buildAutomaticBackupPathLabel(rootFolderName = 'Download') {
     return `${safeRootFolderName}/${AUTOMATIC_BACKUP_APP_FOLDER_NAME}/${AUTOMATIC_BACKUP_FILES_FOLDER_NAME}`;
 }
 
+/**
+ * Validates a backup content object and returns an array of [storageKey, jsonString] pairs
+ * that are safe to write to localStorage. Entries with null/undefined values or
+ * invalid JSON strings are silently skipped.
+ *
+ * @param {unknown} content - Parsed backup JSON object.
+ * @param {Record<string, string>} backupMap - Mapping from backup field names to localStorage keys.
+ * @returns {Array<[string, string]>} Valid [storageKey, value] pairs to restore.
+ */
+function extractValidBackupEntries(content, backupMap) {
+    if (!content || typeof content !== 'object' || Array.isArray(content)) {
+        throw new Error('Formato backup non valido');
+    }
+    const entries = [];
+    for (const [backupKey, storageKey] of Object.entries(backupMap)) {
+        const value = content[backupKey];
+        if (value === null || value === undefined) continue;
+        if (typeof value === 'string') {
+            try {
+                JSON.parse(value);
+                entries.push([storageKey, value]);
+            } catch {
+                // skip entries that are not valid JSON strings
+            }
+        }
+    }
+    return entries;
+}
+
 export {
     normalizeBackupEntry,
+    extractValidBackupEntries,
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
     buildAutomaticBackupPathLabel
