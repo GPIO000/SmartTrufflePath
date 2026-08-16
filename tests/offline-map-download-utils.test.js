@@ -191,6 +191,7 @@ describe('downloadTileWithRetry', () => {
       maxAttempts: 3,
       baseRetryDelayMs: 100,
       maxRetryDelayMs: 150,
+      retryJitterRatio: 0,
       sleepImpl
     });
 

@@ -2,6 +2,7 @@ const TILE_MIN_VALID_SIZE = 512;
 const TILE_MAX_ATTEMPTS = 3;
 const TILE_RETRY_BASE_DELAY_MS = 250;
 const TILE_RETRY_MAX_DELAY_MS = 2000;
+const TILE_RETRY_JITTER_RATIO = 0.2;
 
 function isOpenStreetMapTileUrl(url) {
   try {
@@ -67,13 +68,28 @@ function sleep(ms, sleepImpl = globalThis.setTimeout) {
   return new Promise((resolve) => sleepImpl(resolve, ms));
 }
 
-function getRetryDelay(attempt, baseRetryDelayMs, maxRetryDelayMs) {
-  return Math.min(maxRetryDelayMs, baseRetryDelayMs * (2 ** attempt));
+function getRetryDelay(attempt, baseRetryDelayMs, maxRetryDelayMs, {
+  retryJitterRatio = TILE_RETRY_JITTER_RATIO,
+  randomFn = Math.random
+} = {}) {
+  const baseDelay = Math.min(maxRetryDelayMs, baseRetryDelayMs * (2 ** attempt));
+  if (!Number.isFinite(retryJitterRatio) || retryJitterRatio <= 0 || typeof randomFn !== 'function') {
+    return baseDelay;
+  }
+  const normalizedRandom = Math.max(0, Math.min(1, Number(randomFn())));
+  const jitter = Math.round(baseDelay * retryJitterRatio * normalizedRandom);
+  return Math.min(maxRetryDelayMs, baseDelay + jitter);
 }
 
-async function applyRetryDelayIfNeeded(attempt, resolvedMaxAttempts, baseRetryDelayMs, maxRetryDelayMs, sleepImpl) {
+async function applyRetryDelayIfNeeded(attempt, resolvedMaxAttempts, {
+  baseRetryDelayMs,
+  maxRetryDelayMs,
+  sleepImpl,
+  retryJitterRatio,
+  randomFn
+}) {
   if (attempt >= resolvedMaxAttempts - 1) return;
-  const delayMs = getRetryDelay(attempt, baseRetryDelayMs, maxRetryDelayMs);
+  const delayMs = getRetryDelay(attempt, baseRetryDelayMs, maxRetryDelayMs, { retryJitterRatio, randomFn });
   await sleep(delayMs, sleepImpl);
 }
 
@@ -102,6 +118,8 @@ async function downloadTileWithRetry(cache, url, {
   minValidSize = TILE_MIN_VALID_SIZE,
   baseRetryDelayMs = TILE_RETRY_BASE_DELAY_MS,
   maxRetryDelayMs = TILE_RETRY_MAX_DELAY_MS,
+  retryJitterRatio = TILE_RETRY_JITTER_RATIO,
+  randomFn = Math.random,
   sleepImpl = globalThis.setTimeout
 } = {}) {
   try {
@@ -123,34 +141,48 @@ async function downloadTileWithRetry(cache, url, {
   const shouldTryNoCorsFallback = fetchMode === undefined && isOpenStreetMapTileUrl(url);
 
   for (let attempt = 0; attempt < resolvedMaxAttempts; attempt++) {
+    let stored = false;
+    const primaryMode = fetchMode ?? 'cors';
     try {
-      const fetchModes = shouldTryNoCorsFallback ? ['cors', 'no-cors'] : [fetchMode ?? 'cors'];
-      let stored = false;
-      for (const mode of fetchModes) {
-        try {
-          const response = await fetchImpl(url, { mode, cache: 'no-store' });
-          const allowOpaque = mode === 'no-cors';
-          if (!isValidDownloadedTileResponse(response, minValidSize, { allowOpaque })) {
-            response?.body?.cancel?.();
-            continue;
-          }
-          await cache.put(url, response.clone());
-          stored = true;
-          break;
-        } catch (error) {
-          if (isQuotaExceededError(error)) {
-            return { ok: false, reason: 'quota_exceeded' };
-          }
-        }
+      const response = await fetchImpl(url, { mode: primaryMode, cache: 'no-store' });
+      if (isValidDownloadedTileResponse(response, minValidSize, { allowOpaque: false })) {
+        await cache.put(url, response.clone());
+        stored = true;
+      } else {
+        response?.body?.cancel?.();
       }
-      if (stored) return { ok: true };
-      await applyRetryDelayIfNeeded(attempt, resolvedMaxAttempts, baseRetryDelayMs, maxRetryDelayMs, sleepImpl);
     } catch (error) {
       if (isQuotaExceededError(error)) {
         return { ok: false, reason: 'quota_exceeded' };
       }
-      await applyRetryDelayIfNeeded(attempt, resolvedMaxAttempts, baseRetryDelayMs, maxRetryDelayMs, sleepImpl);
+      if (shouldTryNoCorsFallback) {
+        try {
+          const noCorsResponse = await fetchImpl(url, { mode: 'no-cors', cache: 'no-store' });
+          if (isValidDownloadedTileResponse(noCorsResponse, minValidSize, { allowOpaque: true })) {
+            await cache.put(url, noCorsResponse.clone());
+            stored = true;
+          } else {
+            noCorsResponse?.body?.cancel?.();
+          }
+        } catch (fallbackError) {
+          if (isQuotaExceededError(fallbackError)) {
+            return { ok: false, reason: 'quota_exceeded' };
+          }
+        }
+      }
     }
+    if (stored) return { ok: true };
+    await applyRetryDelayIfNeeded(
+      attempt,
+      resolvedMaxAttempts,
+      {
+        baseRetryDelayMs,
+        maxRetryDelayMs,
+        sleepImpl,
+        retryJitterRatio,
+        randomFn
+      }
+    );
   }
   return { ok: false, reason: 'network_or_server' };
 }
