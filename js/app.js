@@ -88,9 +88,6 @@ function applyMapConnectivityZoomCap({ notify = false } = {}) {
         ? Math.min(MAP_TILE_LAYER_MAX_ZOOM, offlineMaxZoom)
         : MAP_TILE_LAYER_MAX_ZOOM;
     const minZoomCap = hasOfflineCap ? OFFLINE_MAP_MIN_ZOOM : MAP_TILE_LAYER_MIN_ZOOM;
-    const currentZoom = map.getZoom();
-    toggleOfflineZoomButtonState(zoomInButton, hasOfflineCap && currentZoom >= maxZoomCap);
-    toggleOfflineZoomButtonState(zoomOutButton, hasOfflineCap && currentZoom <= minZoomCap);
     try {
         map.setMinZoom(minZoomCap);
         map.setMaxZoom(maxZoomCap);
@@ -105,6 +102,9 @@ function applyMapConnectivityZoomCap({ notify = false } = {}) {
                 showToast(`📈 Zoom aumentato a ${minZoomCap} per usare le mappe offline disponibili.`, 'info');
             }
         }
+        const updatedZoom = map.getZoom();
+        toggleOfflineZoomButtonState(zoomInButton, hasOfflineCap && updatedZoom >= maxZoomCap);
+        toggleOfflineZoomButtonState(zoomOutButton, hasOfflineCap && updatedZoom <= minZoomCap);
     } finally {
         isApplyingMapConnectivityZoomCap = false;
     }
