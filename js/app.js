@@ -32,13 +32,14 @@ if ('serviceWorker' in navigator) {
 }
 
 // Inizializzazione Mappa corretta (ordine invertito per evitare ReferenceError)
+const MAP_TILE_LAYER_MAX_ZOOM = 19;
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: MAP_TILE_LAYER_MAX_ZOOM, attribution: '© OpenStreetMap' }).addTo(map);
 const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
 const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-15`;
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-16`;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
 
 function getOfflinePreferences() {
@@ -59,14 +60,23 @@ function getAdaptiveFocusZoom(defaultZoom) {
     return defaultZoom;
 }
 
-function clampMapZoomForOffline() {
-    if (navigator.onLine) return;
+function applyMapConnectivityZoomCap({ notify = false } = {}) {
     const offlineMaxZoom = getOfflinePreferredMaxZoom();
-    if (offlineMaxZoom === null) return;
-    if (map.getZoom() > offlineMaxZoom) {
-        map.setZoom(offlineMaxZoom);
-        showToast(`📉 Zoom ridotto a ${offlineMaxZoom} per usare le mappe offline disponibili.`, 'info');
+    const hasOfflineCap = !navigator.onLine && Number.isFinite(offlineMaxZoom);
+    const maxZoomCap = hasOfflineCap
+        ? Math.min(MAP_TILE_LAYER_MAX_ZOOM, offlineMaxZoom)
+        : MAP_TILE_LAYER_MAX_ZOOM;
+    map.setMaxZoom(maxZoomCap);
+    if (hasOfflineCap && map.getZoom() > maxZoomCap) {
+        map.setZoom(maxZoomCap);
+        if (notify) {
+            showToast(`📉 Zoom ridotto a ${maxZoomCap} per usare le mappe offline disponibili.`, 'info');
+        }
     }
+}
+
+function clampMapZoomForOffline() {
+    applyMapConnectivityZoomCap({ notify: true });
 }
 
 // ── Regioni italiane per download mappa offline ───────────────────────────────
@@ -545,6 +555,7 @@ function viewStoredDocument(storageKey, title, moduleName) {
 
 setTimeout(() => {
     map.invalidateSize();
+    applyMapConnectivityZoomCap();
     mostraDisclaimerIniziale(); // <-- Mostra il disclaimer subito dopo l'avvio/GPS
     // Avvia il re-download automatico delle mappe offline se le preferenze esistono
     // ma la cache è assente (es. se l'app parte già connessa dopo una reinstallazione).
@@ -4899,6 +4910,7 @@ function buildOfflineFailureDetail(quotaErrors, networkErrors) {
 async function salvaPreferenzeMappaOffline() {
     const preferenze = getOfflinePreferencesFromInputs();
     saveOfflinePreferences(preferenze);
+    applyMapConnectivityZoomCap();
     await runAutomaticLocalBackup();
     aggiornaStatoCacheRegioni();
     if (preferenze.regioni.length > 0) {
@@ -5079,6 +5091,7 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 }
 
 window.addEventListener('online', () => {
+    applyMapConnectivityZoomCap();
     autoRiscaricaRegioniOfflineSeNecessario();
 });
 
