@@ -193,6 +193,39 @@ function appPrompt(message, defaultValue = '') {
     });
 }
 
+function appChooseSendMethod(message) {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('app-dialog');
+        const msg = document.getElementById('app-dialog-message');
+        const inputField = document.getElementById('app-dialog-input');
+        const cancelBtn = document.getElementById('app-dialog-cancel');
+        const altBtn = document.getElementById('app-dialog-alt');
+        const okBtn = document.getElementById('app-dialog-ok');
+        if (!dialog || !altBtn) { resolve(null); return; }
+        msg.textContent = message;
+        inputField.style.display = 'none';
+        cancelBtn.style.display = '';
+        cancelBtn.textContent = 'Annulla';
+        altBtn.style.display = '';
+        altBtn.textContent = '💬 WhatsApp';
+        okBtn.textContent = '✉️ SMS';
+        const cleanup = () => {
+            dialog.close();
+            okBtn.removeEventListener('click', onSms);
+            altBtn.removeEventListener('click', onWhatsApp);
+            cancelBtn.removeEventListener('click', onCancel);
+            altBtn.style.display = 'none';
+        };
+        const onSms = () => { cleanup(); resolve('sms'); };
+        const onWhatsApp = () => { cleanup(); resolve('whatsapp'); };
+        const onCancel = () => { cleanup(); resolve(null); };
+        okBtn.addEventListener('click', onSms);
+        altBtn.addEventListener('click', onWhatsApp);
+        cancelBtn.addEventListener('click', onCancel);
+        dialog.showModal();
+    });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 function cloneFallbackValue(value) {
@@ -925,13 +958,15 @@ function importSharedPoint() {
     openModule('poilist');
 }
 
-function triggerSOS() {
+async function triggerSOS() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
         const senderName = getSavedSenderName();
         const senderLine = senderName ? ` Da: ${senderName}.` : '';
         const msg = `EMERGENZA TARTUFAIA!${senderLine} Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
-        window.location.href = `sms:?body=${encodeURIComponent(msg)}`;
+        const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
+        if (method === 'sms') { window.location.href = `sms:?body=${encodeURIComponent(msg)}`; }
+        else if (method === 'whatsapp') { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
     } else { showToast("Impossibile rilevare le coordinate GPS.", 'error'); }
 }
 function openModule(moduleName, editMode = false) {
@@ -3974,11 +4009,15 @@ async function deleteVetClinic(index) {
     }
 }
 
-function shareLocationToVet(telNumber) {
+async function shareLocationToVet(telNumber) {
     if (userMarker) {
         const pos = userMarker.getLatLng();
-        const msg = `EMERGENZA VETERINARIA! Coordinate GPS: Lat: ${pos.lat.toFixed(6)}, Lng: ${pos.lng.toFixed(6)}`;
-        window.location.href = `sms:${telNumber}?body=${encodeURIComponent(msg)}`;
+        const senderName = getSavedSenderName();
+        const senderLine = senderName ? ` Da: ${senderName}.` : '';
+        const msg = `EMERGENZA VETERINARIA!${senderLine} Coordinate GPS: Lat: ${pos.lat.toFixed(6)}, Lng: ${pos.lng.toFixed(6)}`;
+        const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
+        if (method === 'sms') { window.location.href = `sms:${telNumber}?body=${encodeURIComponent(msg)}`; }
+        else if (method === 'whatsapp') { window.location.href = `whatsapp://send?phone=${encodeURIComponent(telNumber)}&text=${encodeURIComponent(msg)}`; }
     } else { showToast("GPS non disponibile.", 'error'); }
 }
 
