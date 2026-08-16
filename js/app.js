@@ -33,6 +33,7 @@ if ('serviceWorker' in navigator) {
 
 // Inizializzazione Mappa corretta (ordine invertito per evitare ReferenceError)
 const MAP_TILE_LAYER_MAX_ZOOM = 19;
+const MAP_TILE_LAYER_MIN_ZOOM = 0;
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: MAP_TILE_LAYER_MAX_ZOOM, attribution: '© OpenStreetMap' }).addTo(map);
@@ -61,16 +62,40 @@ function getAdaptiveFocusZoom(defaultZoom) {
 }
 
 function applyMapConnectivityZoomCap({ notify = false } = {}) {
+    const zoomInButton = document.querySelector('.leaflet-control-zoom-in');
+    const zoomOutButton = document.querySelector('.leaflet-control-zoom-out');
+    const toggleOfflineZoomButtonState = (button, disabled) => {
+        if (!button) return;
+        if (disabled) {
+            button.classList.add('offline-zoom-disabled');
+            button.setAttribute('aria-disabled', 'true');
+            button.setAttribute('tabindex', '-1');
+            return;
+        }
+        button.classList.remove('offline-zoom-disabled');
+        button.removeAttribute('aria-disabled');
+        button.removeAttribute('tabindex');
+    };
+
     const offlineMaxZoom = getOfflinePreferredMaxZoom();
     const hasOfflineCap = !navigator.onLine && Number.isFinite(offlineMaxZoom);
     const maxZoomCap = hasOfflineCap
         ? Math.min(MAP_TILE_LAYER_MAX_ZOOM, offlineMaxZoom)
         : MAP_TILE_LAYER_MAX_ZOOM;
+    const minZoomCap = hasOfflineCap ? OFFLINE_MAP_MIN_ZOOM : MAP_TILE_LAYER_MIN_ZOOM;
+    toggleOfflineZoomButtonState(zoomInButton, hasOfflineCap);
+    toggleOfflineZoomButtonState(zoomOutButton, hasOfflineCap);
+    map.setMinZoom(minZoomCap);
     map.setMaxZoom(maxZoomCap);
     if (hasOfflineCap && map.getZoom() > maxZoomCap) {
         map.setZoom(maxZoomCap);
         if (notify) {
             showToast(`📉 Zoom ridotto a ${maxZoomCap} per usare le mappe offline disponibili.`, 'info');
+        }
+    } else if (hasOfflineCap && map.getZoom() < minZoomCap) {
+        map.setZoom(minZoomCap);
+        if (notify) {
+            showToast(`📈 Zoom aumentato a ${minZoomCap} per usare le mappe offline disponibili.`, 'info');
         }
     }
 }
