@@ -33,6 +33,7 @@ if ('serviceWorker' in navigator) {
 
 // Inizializzazione Mappa corretta (ordine invertito per evitare ReferenceError)
 const MAP_TILE_LAYER_MAX_ZOOM = 19;
+const MAP_TILE_LAYER_MIN_ZOOM = 0;
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: MAP_TILE_LAYER_MAX_ZOOM, attribution: '© OpenStreetMap' }).addTo(map);
@@ -40,7 +41,9 @@ const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
 const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
 const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-16`;
+const OFFLINE_MAP_MIN_ZOOM = 8;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
+let isApplyingMapConnectivityZoomCap = false;
 
 function getOfflinePreferences() {
     return readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: OFFLINE_MAP_DEFAULT_MAX_ZOOM });
@@ -48,30 +51,63 @@ function getOfflinePreferences() {
 
 function getOfflinePreferredMaxZoom() {
     const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, null);
-    if (!pref || typeof pref.maxZoom !== 'number') return null;
-    return pref.maxZoom;
+    if (!pref) return null;
+    const parsedMaxZoom = Number(pref.maxZoom);
+    if (!Number.isFinite(parsedMaxZoom)) return null;
+    return parsedMaxZoom;
 }
 
 function getAdaptiveFocusZoom(defaultZoom) {
     const offlineMaxZoom = getOfflinePreferredMaxZoom();
-    if (!navigator.onLine && offlineMaxZoom !== null) {
+    if (!navigator.onLine && Number.isFinite(offlineMaxZoom)) {
         return Math.min(defaultZoom, offlineMaxZoom);
     }
     return defaultZoom;
 }
 
-function applyMapConnectivityZoomCap({ notify = false } = {}) {
+function applyMapConnectivityZoomCap({ notify = false, enforceBounds = true } = {}) {
+    if (isApplyingMapConnectivityZoomCap) return;
+    isApplyingMapConnectivityZoomCap = true;
+    const zoomInButton = document.querySelector('.leaflet-control-zoom-in');
+    const zoomOutButton = document.querySelector('.leaflet-control-zoom-out');
+    const toggleOfflineZoomButtonState = (button, disabled) => {
+        if (!button) return;
+        if (disabled) {
+            button.classList.add('offline-zoom-disabled');
+            button.setAttribute('aria-disabled', 'true');
+            button.setAttribute('tabindex', '-1');
+            return;
+        }
+        button.classList.remove('offline-zoom-disabled');
+        button.removeAttribute('aria-disabled');
+        button.removeAttribute('tabindex');
+    };
+
     const offlineMaxZoom = getOfflinePreferredMaxZoom();
     const hasOfflineCap = !navigator.onLine && Number.isFinite(offlineMaxZoom);
     const maxZoomCap = hasOfflineCap
         ? Math.min(MAP_TILE_LAYER_MAX_ZOOM, offlineMaxZoom)
         : MAP_TILE_LAYER_MAX_ZOOM;
-    map.setMaxZoom(maxZoomCap);
-    if (hasOfflineCap && map.getZoom() > maxZoomCap) {
-        map.setZoom(maxZoomCap);
-        if (notify) {
-            showToast(`📉 Zoom ridotto a ${maxZoomCap} per usare le mappe offline disponibili.`, 'info');
+    const minZoomCap = hasOfflineCap ? OFFLINE_MAP_MIN_ZOOM : MAP_TILE_LAYER_MIN_ZOOM;
+    try {
+        map.setMinZoom(minZoomCap);
+        map.setMaxZoom(maxZoomCap);
+        if (enforceBounds && hasOfflineCap && map.getZoom() > maxZoomCap) {
+            map.setZoom(maxZoomCap);
+            if (notify) {
+                showToast(`📉 Zoom ridotto a ${maxZoomCap} per usare le mappe offline disponibili.`, 'info');
+            }
+        } else if (enforceBounds && hasOfflineCap && map.getZoom() < minZoomCap) {
+            map.setZoom(minZoomCap);
+            if (notify) {
+                showToast(`📈 Zoom aumentato a ${minZoomCap} per usare le mappe offline disponibili.`, 'info');
+            }
         }
+        const updatedZoom = map.getZoom();
+        toggleOfflineZoomButtonState(zoomInButton, hasOfflineCap && updatedZoom >= maxZoomCap);
+        toggleOfflineZoomButtonState(zoomOutButton, hasOfflineCap && updatedZoom <= minZoomCap);
+    } finally {
+        isApplyingMapConnectivityZoomCap = false;
     }
 }
 
@@ -80,7 +116,6 @@ function clampMapZoomForOffline() {
 }
 
 // ── Regioni italiane per download mappa offline ───────────────────────────────
-const OFFLINE_MAP_MIN_ZOOM = 8;
 const REGIONI_ITALIA_OFFLINE = [
     { id: 'piemonte',            nome: "Piemonte",             bbox: [43.516, 6.627, 46.464, 9.217] },
     { id: 'valle_daosta',         nome: "Valle d'Aosta",        bbox: [45.461, 6.804, 45.988, 7.952] },
@@ -594,6 +629,9 @@ setTimeout(() => {
     // ma la cache è assente (es. se l'app parte già connessa dopo una reinstallazione).
     autoRiscaricaRegioniOfflineSeNecessario();
 }, 400);
+map.on('zoomend', () => {
+    if (!navigator.onLine) applyMapConnectivityZoomCap({ enforceBounds: false });
+});
 
 let userMarker = null;
 let poiMapMarkers = {}; 
