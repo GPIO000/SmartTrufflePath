@@ -26,11 +26,12 @@ describe('tile response validation', () => {
     expect(isOpenStreetMapTileUrl('https://example.com/8/1/1.png')).toBe(false);
   });
 
-  it('treats opaque responses as invalid for both cache and download flows', () => {
+  it('accepts opaque responses in cache and only for explicit download fallback', () => {
     const response = { type: 'opaque', status: 0 };
     expect(isOpaqueTileResponse(response)).toBe(true);
-    expect(isValidCachedTileResponse(response)).toBe(false);
+    expect(isValidCachedTileResponse(response)).toBe(true);
     expect(isValidDownloadedTileResponse(response)).toBe(false);
+    expect(isValidDownloadedTileResponse(response, 512, { allowOpaque: true })).toBe(true);
   });
 
   it('rejects cached tiles that are too small', () => {
@@ -93,44 +94,46 @@ describe('tile response validation', () => {
 });
 
 describe('downloadTileWithRetry', () => {
-  it('deletes an opaque tile from cache and re-fetches it as CORS', async () => {
-    const corsClone = { type: 'cors', status: 200, ok: true };
-    const corsResponse = {
-      type: 'cors',
-      status: 200,
-      ok: true,
-      headers: new Headers({ 'content-length': '2048', 'content-type': 'image/png' }),
-      clone: vi.fn().mockReturnValue(corsClone)
-    };
+  it('keeps a cached opaque tile as valid coverage', async () => {
     const cache = {
       match: vi.fn().mockResolvedValue({ type: 'opaque', status: 0 }),
       delete: vi.fn().mockResolvedValue(undefined),
       put: vi.fn().mockResolvedValue(undefined)
     };
-    const fetchImpl = vi.fn().mockResolvedValue(corsResponse);
+    const fetchImpl = vi.fn();
 
     const result = await downloadTileWithRetry(cache, 'https://a.tile.openstreetmap.org/8/1/1.png', { fetchImpl });
 
     expect(result).toEqual({ ok: true });
-    expect(cache.delete).toHaveBeenCalledWith('https://a.tile.openstreetmap.org/8/1/1.png');
-    expect(fetchImpl).toHaveBeenCalledWith('https://a.tile.openstreetmap.org/8/1/1.png', { mode: 'cors', cache: 'no-store' });
-    expect(cache.put).toHaveBeenCalledWith('https://a.tile.openstreetmap.org/8/1/1.png', corsClone);
+    expect(cache.delete).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(cache.put).not.toHaveBeenCalled();
   });
 
-  it('rejects an opaque network response and retries until all attempts exhausted', async () => {
-    const opaqueResponse = { type: 'opaque', status: 0 };
+  it('falls back to no-cors when CORS fetch fails on OSM tiles', async () => {
+    const opaqueClone = { type: 'opaque', status: 0 };
+    const opaqueResponse = {
+      type: 'opaque',
+      status: 0,
+      clone: vi.fn().mockReturnValue(opaqueClone)
+    };
     const cache = {
       match: vi.fn().mockResolvedValue(null),
       delete: vi.fn(),
       put: vi.fn().mockResolvedValue(undefined)
     };
-    const fetchImpl = vi.fn().mockResolvedValue(opaqueResponse);
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(opaqueResponse);
 
-    const result = await downloadTileWithRetry(cache, 'https://b.tile.openstreetmap.org/8/1/1.png', { fetchImpl, maxAttempts: 2 });
+    const result = await downloadTileWithRetry(cache, 'https://b.tile.openstreetmap.org/8/1/1.png', { fetchImpl, maxAttempts: 1 });
 
-    expect(result).toEqual({ ok: false, reason: 'network_or_server' });
+    expect(result).toEqual({ ok: true });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(cache.put).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenNthCalledWith(1, 'https://b.tile.openstreetmap.org/8/1/1.png', { mode: 'cors', cache: 'no-store' });
+    expect(fetchImpl).toHaveBeenNthCalledWith(2, 'https://b.tile.openstreetmap.org/8/1/1.png', { mode: 'no-cors', cache: 'no-store' });
+    expect(cache.put).toHaveBeenCalledWith('https://b.tile.openstreetmap.org/8/1/1.png', opaqueClone);
   });
 
   it('classifies quota errors correctly', async () => {
@@ -183,7 +186,7 @@ describe('downloadTileWithRetry', () => {
     const fetchImpl = vi.fn().mockResolvedValue(response);
     const sleepImpl = vi.fn((cb, _ms) => cb());
 
-    const result = await downloadTileWithRetry(cache, 'https://tile.openstreetmap.org/8/1/1.png', {
+    const result = await downloadTileWithRetry(cache, 'https://example.com/tiles/8/1/1.png', {
       fetchImpl,
       maxAttempts: 3,
       baseRetryDelayMs: 100,

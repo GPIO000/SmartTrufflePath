@@ -47,17 +47,16 @@ function isValidTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
 }
 
 function isValidCachedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
-  // Opaque responses cannot be validated; treat them as invalid so the cache
-  // cleanup removes them and the auto-redownload replaces them with proper CORS responses.
-  if (isOpaqueTileResponse(response)) return false;
+  // In some environments/providers CORS fetches can fail while tile downloads
+  // still succeed with no-cors (opaque responses). Keep opaque cached tiles as
+  // valid so offline coverage can progress instead of staying stuck at 0%.
+  if (isOpaqueTileResponse(response)) return true;
   return isValidTileResponse(response, minValidSize);
 }
 
-function isValidDownloadedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
+function isValidDownloadedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE, { allowOpaque = false } = {}) {
   if (!response) return false;
-  // Opaque responses (from no-cors requests) cannot have their status or body
-  // validated; they must not be accepted as valid downloads.
-  if (isOpaqueTileResponse(response)) return false;
+  if (isOpaqueTileResponse(response)) return allowOpaque;
   if (!response.ok) return false;
   if (!isImageTileResponse(response)) return false;
   return hasValidTileLengthHeader(response, minValidSize);
@@ -121,18 +120,31 @@ async function downloadTileWithRetry(cache, url, {
   const resolvedMaxAttempts = Number.isInteger(maxRetries) && maxRetries >= 0
     ? maxRetries + 1
     : maxAttempts;
+  const shouldTryNoCorsFallback = fetchMode === undefined && isOpenStreetMapTileUrl(url);
 
   for (let attempt = 0; attempt < resolvedMaxAttempts; attempt++) {
     try {
-      const resolvedFetchMode = fetchMode ?? 'cors';
-      const response = await fetchImpl(url, { mode: resolvedFetchMode, cache: 'no-store' });
-      if (!isValidDownloadedTileResponse(response, minValidSize)) {
-        response?.body?.cancel?.();
-        await applyRetryDelayIfNeeded(attempt, resolvedMaxAttempts, baseRetryDelayMs, maxRetryDelayMs, sleepImpl);
-        continue;
+      const fetchModes = shouldTryNoCorsFallback ? ['cors', 'no-cors'] : [fetchMode ?? 'cors'];
+      let stored = false;
+      for (const mode of fetchModes) {
+        try {
+          const response = await fetchImpl(url, { mode, cache: 'no-store' });
+          const allowOpaque = mode === 'no-cors';
+          if (!isValidDownloadedTileResponse(response, minValidSize, { allowOpaque })) {
+            response?.body?.cancel?.();
+            continue;
+          }
+          await cache.put(url, response.clone());
+          stored = true;
+          break;
+        } catch (error) {
+          if (isQuotaExceededError(error)) {
+            return { ok: false, reason: 'quota_exceeded' };
+          }
+        }
       }
-      await cache.put(url, response.clone());
-      return { ok: true };
+      if (stored) return { ok: true };
+      await applyRetryDelayIfNeeded(attempt, resolvedMaxAttempts, baseRetryDelayMs, maxRetryDelayMs, sleepImpl);
     } catch (error) {
       if (isQuotaExceededError(error)) {
         return { ok: false, reason: 'quota_exceeded' };
