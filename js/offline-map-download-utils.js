@@ -1,5 +1,7 @@
 const TILE_MIN_VALID_SIZE = 512;
 const TILE_MAX_ATTEMPTS = 3;
+const TILE_RETRY_BASE_DELAY_MS = 250;
+const TILE_RETRY_MAX_DELAY_MS = 2000;
 
 function isOpenStreetMapTileUrl(url) {
   try {
@@ -23,12 +25,25 @@ function isOpaqueTileResponse(response) {
   return response?.type === 'opaque';
 }
 
+function isImageTileResponse(response) {
+  const contentType = (response?.headers?.get?.('content-type') || '').toLowerCase();
+  return contentType.startsWith('image/');
+}
+
+function hasValidTileLengthHeader(response, minValidSize = TILE_MIN_VALID_SIZE) {
+  const raw = response?.headers?.get?.('content-length');
+  if (!raw) return true;
+  const contentLength = parseInt(raw, 10);
+  if (!Number.isFinite(contentLength)) return true;
+  return contentLength >= minValidSize;
+}
+
 function isValidTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
   if (!response) return false;
   if (isOpaqueTileResponse(response)) return true;
   if (!response.ok) return false;
-  const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
-  return contentLength >= minValidSize;
+  if (!isImageTileResponse(response)) return false;
+  return hasValidTileLengthHeader(response, minValidSize);
 }
 
 function isValidCachedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
@@ -44,8 +59,13 @@ function isValidDownloadedTileResponse(response, minValidSize = TILE_MIN_VALID_S
   // validated; they must not be accepted as valid downloads.
   if (isOpaqueTileResponse(response)) return false;
   if (!response.ok) return false;
-  const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
-  return contentLength >= minValidSize;
+  if (!isImageTileResponse(response)) return false;
+  return hasValidTileLengthHeader(response, minValidSize);
+}
+
+function sleep(ms, sleepImpl = globalThis.setTimeout) {
+  if (!Number.isFinite(ms) || ms <= 0 || typeof sleepImpl !== 'function') return Promise.resolve();
+  return new Promise((resolve) => sleepImpl(resolve, ms));
 }
 
 function summarizeTileDownloadResults(results = []) {
@@ -70,7 +90,10 @@ async function downloadTileWithRetry(cache, url, {
   fetchMode,
   maxAttempts = TILE_MAX_ATTEMPTS,
   maxRetries,
-  minValidSize = TILE_MIN_VALID_SIZE
+  minValidSize = TILE_MIN_VALID_SIZE,
+  baseRetryDelayMs = TILE_RETRY_BASE_DELAY_MS,
+  maxRetryDelayMs = TILE_RETRY_MAX_DELAY_MS,
+  sleepImpl = globalThis.setTimeout
 } = {}) {
   try {
     const cached = await cache.match(url);
@@ -95,6 +118,10 @@ async function downloadTileWithRetry(cache, url, {
       const response = await fetchImpl(url, { mode: resolvedFetchMode, cache: 'no-store' });
       if (!isValidDownloadedTileResponse(response, minValidSize)) {
         response?.body?.cancel?.();
+        if (attempt < resolvedMaxAttempts - 1) {
+          const delayMs = Math.min(maxRetryDelayMs, baseRetryDelayMs * (2 ** attempt));
+          await sleep(delayMs, sleepImpl);
+        }
         continue;
       }
       await cache.put(url, response.clone());
@@ -102,6 +129,10 @@ async function downloadTileWithRetry(cache, url, {
     } catch (error) {
       if (isQuotaExceededError(error)) {
         return { ok: false, reason: 'quota_exceeded' };
+      }
+      if (attempt < resolvedMaxAttempts - 1) {
+        const delayMs = Math.min(maxRetryDelayMs, baseRetryDelayMs * (2 ** attempt));
+        await sleep(delayMs, sleepImpl);
       }
     }
   }

@@ -68,6 +68,28 @@ describe('tile response validation', () => {
     expect(isValidDownloadedTileResponse(tooSmall)).toBe(false);
     expect(isValidDownloadedTileResponse(notOk)).toBe(false);
   });
+
+  it('accepts image responses without content-length header', () => {
+    const response = {
+      type: 'cors',
+      status: 200,
+      ok: true,
+      headers: new Headers({ 'content-type': 'image/png' })
+    };
+    expect(isValidCachedTileResponse(response)).toBe(true);
+    expect(isValidDownloadedTileResponse(response)).toBe(true);
+  });
+
+  it('rejects non-image responses even if status is ok and large', () => {
+    const response = {
+      type: 'cors',
+      status: 200,
+      ok: true,
+      headers: new Headers({ 'content-type': 'text/html', 'content-length': '2048' })
+    };
+    expect(isValidCachedTileResponse(response)).toBe(false);
+    expect(isValidDownloadedTileResponse(response)).toBe(false);
+  });
 });
 
 describe('downloadTileWithRetry', () => {
@@ -143,6 +165,37 @@ describe('downloadTileWithRetry', () => {
 
     expect(result).toEqual({ ok: true });
     expect(fetchImpl).toHaveBeenCalledWith('https://example.com/tiles/8/1/1.png', { mode: 'cors', cache: 'no-store' });
+  });
+
+  it('applies retry backoff between invalid attempts', async () => {
+    const response = {
+      type: 'cors',
+      status: 200,
+      ok: true,
+      headers: new Headers({ 'content-type': 'text/html' }),
+      body: { cancel: vi.fn() }
+    };
+    const cache = {
+      match: vi.fn().mockResolvedValue(null),
+      delete: vi.fn(),
+      put: vi.fn().mockResolvedValue(undefined)
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(response);
+    const sleepImpl = vi.fn((cb) => cb());
+
+    const result = await downloadTileWithRetry(cache, 'https://tile.openstreetmap.org/8/1/1.png', {
+      fetchImpl,
+      maxAttempts: 3,
+      baseRetryDelayMs: 100,
+      maxRetryDelayMs: 150,
+      sleepImpl
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'network_or_server' });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(sleepImpl).toHaveBeenCalledTimes(2);
+    expect(sleepImpl).toHaveBeenNthCalledWith(1, expect.any(Function), 100);
+    expect(sleepImpl).toHaveBeenNthCalledWith(2, expect.any(Function), 150);
   });
 });
 
