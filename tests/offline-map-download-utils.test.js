@@ -26,11 +26,11 @@ describe('tile response validation', () => {
     expect(isOpenStreetMapTileUrl('https://example.com/8/1/1.png')).toBe(false);
   });
 
-  it('treats opaque responses as valid for cache and download flows', () => {
+  it('treats opaque responses as invalid for both cache and download flows', () => {
     const response = { type: 'opaque', status: 0 };
     expect(isOpaqueTileResponse(response)).toBe(true);
-    expect(isValidCachedTileResponse(response)).toBe(true);
-    expect(isValidDownloadedTileResponse(response)).toBe(true);
+    expect(isValidCachedTileResponse(response)).toBe(false);
+    expect(isValidDownloadedTileResponse(response)).toBe(false);
   });
 
   it('rejects cached tiles that are too small', () => {
@@ -71,41 +71,44 @@ describe('tile response validation', () => {
 });
 
 describe('downloadTileWithRetry', () => {
-  it('reuses an opaque tile already stored in cache', async () => {
+  it('deletes an opaque tile from cache and re-fetches it as CORS', async () => {
+    const corsClone = { type: 'cors', status: 200, ok: true };
+    const corsResponse = {
+      type: 'cors',
+      status: 200,
+      ok: true,
+      headers: new Headers({ 'content-length': '2048' }),
+      clone: vi.fn().mockReturnValue(corsClone)
+    };
     const cache = {
       match: vi.fn().mockResolvedValue({ type: 'opaque', status: 0 }),
-      delete: vi.fn(),
-      put: vi.fn()
+      delete: vi.fn().mockResolvedValue(undefined),
+      put: vi.fn().mockResolvedValue(undefined)
     };
-    const fetchImpl = vi.fn();
+    const fetchImpl = vi.fn().mockResolvedValue(corsResponse);
 
     const result = await downloadTileWithRetry(cache, 'https://a.tile.openstreetmap.org/8/1/1.png', { fetchImpl });
 
     expect(result).toEqual({ ok: true });
-    expect(fetchImpl).not.toHaveBeenCalled();
-    expect(cache.put).not.toHaveBeenCalled();
+    expect(cache.delete).toHaveBeenCalledWith('https://a.tile.openstreetmap.org/8/1/1.png');
+    expect(fetchImpl).toHaveBeenCalledWith('https://a.tile.openstreetmap.org/8/1/1.png', { mode: 'cors', cache: 'no-store' });
+    expect(cache.put).toHaveBeenCalledWith('https://a.tile.openstreetmap.org/8/1/1.png', corsClone);
   });
 
-  it('downloads and stores an opaque tile when the browser cannot use CORS', async () => {
-    const cachedClone = { type: 'opaque', status: 0 };
-    const response = {
-      type: 'opaque',
-      status: 0,
-      clone: vi.fn().mockReturnValue(cachedClone)
-    };
+  it('rejects an opaque network response and retries until all attempts exhausted', async () => {
+    const opaqueResponse = { type: 'opaque', status: 0 };
     const cache = {
       match: vi.fn().mockResolvedValue(null),
       delete: vi.fn(),
       put: vi.fn().mockResolvedValue(undefined)
     };
-    const fetchImpl = vi.fn().mockResolvedValue(response);
+    const fetchImpl = vi.fn().mockResolvedValue(opaqueResponse);
 
-    const result = await downloadTileWithRetry(cache, 'https://b.tile.openstreetmap.org/8/1/1.png', { fetchImpl });
+    const result = await downloadTileWithRetry(cache, 'https://b.tile.openstreetmap.org/8/1/1.png', { fetchImpl, maxAttempts: 2 });
 
-    expect(result).toEqual({ ok: true });
-    expect(fetchImpl).toHaveBeenCalledWith('https://b.tile.openstreetmap.org/8/1/1.png', { mode: 'no-cors', cache: 'no-store' });
-    expect(response.clone).toHaveBeenCalledTimes(1);
-    expect(cache.put).toHaveBeenCalledWith('https://b.tile.openstreetmap.org/8/1/1.png', cachedClone);
+    expect(result).toEqual({ ok: false, reason: 'network_or_server' });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(cache.put).not.toHaveBeenCalled();
   });
 
   it('classifies quota errors correctly', async () => {

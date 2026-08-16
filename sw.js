@@ -1,5 +1,5 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-16';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-16b';
 const MAP_OFFLINE_CACHE_NAME = 'smarttruffle-map-offline';
 let legacyAppCacheNames = null;
 let legacyAppCacheNamesPromise = null;
@@ -191,8 +191,13 @@ self.addEventListener('fetch', (e) => {
             return legacyResponse;
           }
 
-          const networkResponse = await fetch(cacheRequest);
-          if (networkResponse && (networkResponse.ok || networkResponse.type === 'opaque')) {
+          // Always fetch with a fresh CORS request so the stored response is a
+          // readable (non-opaque) CORS response that can be validated and served
+          // correctly from the cache. The original request mode (e.g. no-cors
+          // for <img> elements) must not be forwarded to the network fetch.
+          const corsRequest = new Request(canonicalUrl, { mode: 'cors', cache: 'no-store' });
+          const networkResponse = await fetch(corsRequest);
+          if (networkResponse && networkResponse.ok) {
             offlineCache.put(cacheRequest, networkResponse.clone()).catch(() => {});
             notifyClientsTileNetworkStatus('tile-network-ok').catch(() => {});
           }
