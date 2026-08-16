@@ -629,7 +629,9 @@ setTimeout(() => {
     // ma la cache è assente (es. se l'app parte già connessa dopo una reinstallazione).
     autoRiscaricaRegioniOfflineSeNecessario();
 }, 400);
-map.on('zoomend', () => applyMapConnectivityZoomCap());
+map.on('zoomend', () => {
+    if (!navigator.onLine) applyMapConnectivityZoomCap();
+});
 
 let userMarker = null;
 let poiMapMarkers = {}; 
