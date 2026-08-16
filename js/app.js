@@ -5295,7 +5295,6 @@ window.addEventListener('online', () => {
 });
 
 window.addEventListener('offline', () => {
-    isTileNetworkUnavailable = true;
     clampMapZoomForOffline();
 });
 if ('serviceWorker' in navigator) {
