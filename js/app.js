@@ -565,6 +565,7 @@ setTimeout(() => {
 let userMarker = null;
 let poiMapMarkers = {}; 
 let targetNavigation = null;
+const GPS_NAVIGATION_EXPLANATION_SEEN_KEY = 'gps_navigation_explanation_seen';
 const GPS_NAVIGATION_EXPLANATION_TEXT = "La navigazione di SmartTruffle Path usa il GPS per calcolare distanza e direzione geografica del punto rispetto al Nord.\nNon usa il magnetometro / la bussola hardware del telefono, quindi non rileva dove stai guardando con il dispositivo.\n\nPer orientarti, confronta la mappa con i tuoi spostamenti reali.";
 const legacyCarCoordinates = readStorageJSON('car_coords', null);
 
@@ -848,11 +849,12 @@ async function savePoiPosition() {
 }
 async function navigateToPoi(index) {
     if (poiList[index]) {
+        await showGpsNavigationExplanationIfNeeded(poiList[index].note);
         targetNavigation = `poi_${index}`;
         map.setView([poiList[index].lat, poiList[index].lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
         closeActiveModule();
-        await appAlert(`🧭 Destinazione impostata: ${poiList[index].note}\n\n${GPS_NAVIGATION_EXPLANATION_TEXT}`);
+        showToast(`🧭 Destinazione: ${poiList[index].note}`, 'success');
     }
 }
 function sharePoi(index) {
@@ -5104,3 +5106,8 @@ window.addEventListener('online', () => {
 window.addEventListener('offline', () => {
     clampMapZoomForOffline();
 });
+async function showGpsNavigationExplanationIfNeeded(destinationLabel) {
+    if (localStorage.getItem(GPS_NAVIGATION_EXPLANATION_SEEN_KEY) === 'true') return;
+    await appAlert(`🧭 Destinazione: ${destinationLabel}\n\n${GPS_NAVIGATION_EXPLANATION_TEXT}`);
+    localStorage.setItem(GPS_NAVIGATION_EXPLANATION_SEEN_KEY, 'true');
+}
