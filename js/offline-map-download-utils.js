@@ -1,4 +1,10 @@
-const TILE_MIN_VALID_SIZE = 512;
+// Minimum byte size for a valid tile response. 67 bytes is the absolute
+// minimum for a well-formed PNG file (signature + IHDR + minimal IDAT + IEND).
+// Using 67 (rather than 512) avoids rejecting compact but perfectly valid
+// uniform-colour tiles (e.g. open-sea tiles at z11–z13) that compress to
+// ~100–400 bytes, which would otherwise be deleted and re-fetched in an
+// infinite loop while coverage stays permanently stuck at a non-zero count.
+const TILE_MIN_VALID_SIZE = 67;
 const TILE_MAX_ATTEMPTS = 3;
 const TILE_RETRY_BASE_DELAY_MS = 250;
 const TILE_RETRY_MAX_DELAY_MS = 2000;

@@ -39,13 +39,28 @@ describe('tile response validation', () => {
     expect(isValidDownloadedTileResponse(response, 512, { allowOpaque: true })).toBe(true);
   });
 
-  it('rejects cached tiles that are too small', () => {
+  it('rejects cached tiles that are below the minimum valid size', () => {
+    // content-length below TILE_MIN_VALID_SIZE (67 bytes) with a proper
+    // image content-type so the size check is the actual deciding factor.
     const response = {
       type: 'basic',
       status: 200,
-      headers: new Headers({ 'content-length': '128' })
+      ok: true,
+      headers: new Headers({ 'content-type': 'image/png', 'content-length': '10' })
     };
     expect(isValidCachedTileResponse(response)).toBe(false);
+  });
+
+  it('accepts compact but valid cached tiles (e.g. uniform-colour sea tiles)', () => {
+    // A uniform-colour 256×256 PNG (e.g. open-sea tile) can compress to
+    // ~100–400 bytes which is ≥ TILE_MIN_VALID_SIZE (67) and must be accepted.
+    const response = {
+      type: 'basic',
+      status: 200,
+      ok: true,
+      headers: new Headers({ 'content-type': 'image/png', 'content-length': '200' })
+    };
+    expect(isValidCachedTileResponse(response)).toBe(true);
   });
 
   it('rejects cached tiles that are not ok even when large', () => {
@@ -58,12 +73,13 @@ describe('tile response validation', () => {
     expect(isValidCachedTileResponse(response)).toBe(false);
   });
 
-  it('rejects downloads that are too small or not ok', () => {
+  it('rejects downloads that are below the minimum valid size or not ok', () => {
+    // content-length explicitly below 67 bytes with a valid content-type.
     const tooSmall = {
       type: 'cors',
       status: 200,
       ok: true,
-      headers: new Headers({ 'content-length': '128' })
+      headers: new Headers({ 'content-type': 'image/png', 'content-length': '10' })
     };
     const notOk = {
       type: 'cors',
@@ -73,6 +89,17 @@ describe('tile response validation', () => {
     };
     expect(isValidDownloadedTileResponse(tooSmall)).toBe(false);
     expect(isValidDownloadedTileResponse(notOk)).toBe(false);
+  });
+
+  it('accepts compact image downloads (e.g. uniform-colour sea tiles)', () => {
+    // 200 bytes ≥ TILE_MIN_VALID_SIZE (67) — must be downloaded and cached.
+    const response = {
+      type: 'cors',
+      status: 200,
+      ok: true,
+      headers: new Headers({ 'content-type': 'image/png', 'content-length': '200' })
+    };
+    expect(isValidDownloadedTileResponse(response)).toBe(true);
   });
 
   it('accepts image responses without content-length header', () => {
