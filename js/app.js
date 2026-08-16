@@ -963,7 +963,7 @@ async function triggerSOS() {
         const pos = userMarker.getLatLng();
         const senderName = getSavedSenderName();
         const senderLine = senderName ? ` Da: ${senderName}.` : '';
-        const msg = `EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO${senderLine} Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
+        const msg = `EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO.${senderLine} Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
         const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
         if (method === 'sms') { window.location.href = `sms:?body=${encodeURIComponent(msg)}`; }
         else if (method === 'whatsapp') { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
@@ -1029,7 +1029,7 @@ function openModule(moduleName, editMode = false) {
                 <p>Incolla qui il messaggio ricevuto da un altro utente (punto condiviso o SOS). Il sistema estrarrà automaticamente le coordinate e, se presente, anche il nome del mittente.</p>
                 <div class="module-card">
                     <label for="condiviso-msg-input" style="display:block; margin-bottom:8px; font-weight:bold;">Messaggio ricevuto:</label>
-                    <textarea id="condiviso-msg-input" class="mod-input" rows="6" placeholder="Incolla qui il messaggio ricevuto...&#10;&#10;Esempio:&#10;📍 TARTUFAIA CONDIVISA&#10;Da: Mario Rossi&#10;Nota: Quercia grande&#10;Google Maps: https://maps.google.com/?q=43.1234,11.5678&#10;&#10;oppure:&#10;EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO Da: Mario Rossi. Coordinate GPS: Lat: 43.1234, Lng: 11.5678." style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
+                    <textarea id="condiviso-msg-input" class="mod-input" rows="6" placeholder="Incolla qui il messaggio ricevuto...&#10;&#10;Esempio:&#10;📍 TARTUFAIA CONDIVISA&#10;Da: Mario Rossi&#10;Nota: Quercia grande&#10;Google Maps: https://maps.google.com/?q=43.1234,11.5678&#10;&#10;oppure:&#10;EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO. Da: Mario Rossi. Coordinate GPS: Lat: 43.1234, Lng: 11.5678." style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
                     <label for="condiviso-from-input" style="display:block; margin:12px 0 6px; font-weight:bold;">Da (mittente, opzionale solo per messaggi vecchi):</label>
                     <input type="text" id="condiviso-from-input" class="mod-input" placeholder="Es. Mario Rossi" style="width:100%; box-sizing:border-box;">
                     <button class="overlay-btn btn-primary" style="margin-top:14px; width:100%;" ${actionAttrs('importSharedPoint', [])}>📥 Importa Punto</button>
