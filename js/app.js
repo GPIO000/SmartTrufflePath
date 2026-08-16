@@ -42,6 +42,7 @@ const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
 const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-16`;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
+let isApplyingMapConnectivityZoomCap = false;
 
 function getOfflinePreferences() {
     return readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: OFFLINE_MAP_DEFAULT_MAX_ZOOM });
@@ -64,6 +65,8 @@ function getAdaptiveFocusZoom(defaultZoom) {
 }
 
 function applyMapConnectivityZoomCap({ notify = false } = {}) {
+    if (isApplyingMapConnectivityZoomCap) return;
+    isApplyingMapConnectivityZoomCap = true;
     const zoomInButton = document.querySelector('.leaflet-control-zoom-in');
     const zoomOutButton = document.querySelector('.leaflet-control-zoom-out');
     const toggleOfflineZoomButtonState = (button, disabled) => {
@@ -88,18 +91,22 @@ function applyMapConnectivityZoomCap({ notify = false } = {}) {
     const currentZoom = map.getZoom();
     toggleOfflineZoomButtonState(zoomInButton, hasOfflineCap && currentZoom >= maxZoomCap);
     toggleOfflineZoomButtonState(zoomOutButton, hasOfflineCap && currentZoom <= minZoomCap);
-    map.setMinZoom(minZoomCap);
-    map.setMaxZoom(maxZoomCap);
-    if (hasOfflineCap && map.getZoom() > maxZoomCap) {
-        map.setZoom(maxZoomCap);
-        if (notify) {
-            showToast(`📉 Zoom ridotto a ${maxZoomCap} per usare le mappe offline disponibili.`, 'info');
+    try {
+        map.setMinZoom(minZoomCap);
+        map.setMaxZoom(maxZoomCap);
+        if (hasOfflineCap && map.getZoom() > maxZoomCap) {
+            map.setZoom(maxZoomCap);
+            if (notify) {
+                showToast(`📉 Zoom ridotto a ${maxZoomCap} per usare le mappe offline disponibili.`, 'info');
+            }
+        } else if (hasOfflineCap && map.getZoom() < minZoomCap) {
+            map.setZoom(minZoomCap);
+            if (notify) {
+                showToast(`📈 Zoom aumentato a ${minZoomCap} per usare le mappe offline disponibili.`, 'info');
+            }
         }
-    } else if (hasOfflineCap && map.getZoom() < minZoomCap) {
-        map.setZoom(minZoomCap);
-        if (notify) {
-            showToast(`📈 Zoom aumentato a ${minZoomCap} per usare le mappe offline disponibili.`, 'info');
-        }
+    } finally {
+        isApplyingMapConnectivityZoomCap = false;
     }
 }
 
