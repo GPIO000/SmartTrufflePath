@@ -49,14 +49,16 @@ function getOfflinePreferences() {
 
 function getOfflinePreferredMaxZoom() {
     const pref = readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, null);
-    if (!pref || typeof pref.maxZoom !== 'number') return null;
-    return pref.maxZoom;
+    if (!pref) return null;
+    const parsedMaxZoom = Number(pref.maxZoom);
+    if (!Number.isFinite(parsedMaxZoom)) return null;
+    return parsedMaxZoom;
 }
 
 function getAdaptiveFocusZoom(defaultZoom) {
     const offlineMaxZoom = getOfflinePreferredMaxZoom();
-    if (!navigator.onLine && offlineMaxZoom !== null) {
-        return Math.min(defaultZoom, offlineMaxZoom);
+    if (!navigator.onLine && Number.isFinite(offlineMaxZoom)) {
+        return offlineMaxZoom;
     }
     return defaultZoom;
 }
