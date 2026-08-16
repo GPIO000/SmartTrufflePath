@@ -5218,9 +5218,9 @@ function scheduleOfflineRecoveryResume(preferenze, delayMs, trigger = 'resume') 
         runOfflineMapRecovery({
             preferenze,
             trigger,
-            showProgress: false,
-            startToastMessage: '',
-            waitingToastMessage: ''
+            showProgress: true,
+            startToastMessage: '🔄 Ripresa automatica download mappa offline…',
+            waitingToastMessage: '⏸️ Download temporaneamente rallentato dal provider.'
         }).catch(() => {});
     }, safeDelayMs);
 }
