@@ -191,7 +191,7 @@ self.addEventListener('fetch', (e) => {
             return legacyResponse;
           }
 
-          const networkResponse = await fetch(e.request);
+          const networkResponse = await fetch(cacheRequest);
           if (networkResponse && (networkResponse.ok || networkResponse.type === 'opaque')) {
             offlineCache.put(cacheRequest, networkResponse.clone()).catch(() => {});
             notifyClientsTileNetworkStatus('tile-network-ok').catch(() => {});
