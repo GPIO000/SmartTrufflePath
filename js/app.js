@@ -41,6 +41,7 @@ const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
 const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
 const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-16`;
+const OFFLINE_MAP_MIN_ZOOM = 8;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
 let isApplyingMapConnectivityZoomCap = false;
 
@@ -115,7 +116,6 @@ function clampMapZoomForOffline() {
 }
 
 // ── Regioni italiane per download mappa offline ───────────────────────────────
-const OFFLINE_MAP_MIN_ZOOM = 8;
 const REGIONI_ITALIA_OFFLINE = [
     { id: 'piemonte',            nome: "Piemonte",             bbox: [43.516, 6.627, 46.464, 9.217] },
     { id: 'valle_daosta',         nome: "Valle d'Aosta",        bbox: [45.461, 6.804, 45.988, 7.952] },
