@@ -32,11 +32,20 @@ function isValidTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
 }
 
 function isValidCachedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
+  // Opaque responses cannot be validated; treat them as invalid so the cache
+  // cleanup removes them and the auto-redownload replaces them with proper CORS responses.
+  if (isOpaqueTileResponse(response)) return false;
   return isValidTileResponse(response, minValidSize);
 }
 
 function isValidDownloadedTileResponse(response, minValidSize = TILE_MIN_VALID_SIZE) {
-  return isValidTileResponse(response, minValidSize);
+  if (!response) return false;
+  // Opaque responses (from no-cors requests) cannot have their status or body
+  // validated; they must not be accepted as valid downloads.
+  if (isOpaqueTileResponse(response)) return false;
+  if (!response.ok) return false;
+  const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+  return contentLength >= minValidSize;
 }
 
 function summarizeTileDownloadResults(results = []) {
@@ -82,7 +91,7 @@ async function downloadTileWithRetry(cache, url, {
 
   for (let attempt = 0; attempt < resolvedMaxAttempts; attempt++) {
     try {
-      const resolvedFetchMode = fetchMode ?? (isOpenStreetMapTileUrl(url) ? 'no-cors' : 'cors');
+      const resolvedFetchMode = fetchMode ?? 'cors';
       const response = await fetchImpl(url, { mode: resolvedFetchMode, cache: 'no-store' });
       if (!isValidDownloadedTileResponse(response, minValidSize)) {
         response?.body?.cancel?.();
