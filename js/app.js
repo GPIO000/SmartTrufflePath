@@ -5108,6 +5108,9 @@ window.addEventListener('offline', () => {
 });
 async function showGpsNavigationExplanationIfNeeded(destinationLabel) {
     if (localStorage.getItem(GPS_NAVIGATION_EXPLANATION_SEEN_KEY) === 'true') return;
-    await appAlert(`🧭 Destinazione: ${destinationLabel}\n\n${GPS_NAVIGATION_EXPLANATION_TEXT}`);
-    localStorage.setItem(GPS_NAVIGATION_EXPLANATION_SEEN_KEY, 'true');
+    try {
+        await appAlert(`🧭 Destinazione: ${destinationLabel}\n\n${GPS_NAVIGATION_EXPLANATION_TEXT}`);
+    } finally {
+        localStorage.setItem(GPS_NAVIGATION_EXPLANATION_SEEN_KEY, 'true');
+    }
 }
