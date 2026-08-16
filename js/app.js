@@ -5289,7 +5289,6 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 }
 
 window.addEventListener('online', () => {
-    isTileNetworkUnavailable = false;
     applyMapConnectivityZoomCap();
     autoRiscaricaRegioniOfflineSeNecessario();
 });
@@ -5308,7 +5307,7 @@ if ('serviceWorker' in navigator) {
             return;
         }
         if (messageType === 'tile-network-ok') {
-            if (isTileNetworkUnavailable) {
+            if (isTileNetworkUnavailable && navigator.onLine) {
                 isTileNetworkUnavailable = false;
                 applyMapConnectivityZoomCap();
             }

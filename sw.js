@@ -110,7 +110,13 @@ async function notifyClientsTileNetworkStatus(type) {
   lastTileNetworkSignalType = type;
   lastTileNetworkSignalAt = now;
   const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  clients.forEach((client) => client.postMessage({ type }));
+  for (const client of clients) {
+    try {
+      client.postMessage({ type });
+    } catch {
+      // Ignore unreachable clients.
+    }
+  }
 }
 
 // Installazione Service Worker e salvataggio in cache
