@@ -68,6 +68,16 @@ function sleep(ms, sleepImpl = globalThis.setTimeout) {
   return new Promise((resolve) => sleepImpl(resolve, ms));
 }
 
+function getRetryDelay(attempt, baseRetryDelayMs, maxRetryDelayMs) {
+  return Math.min(maxRetryDelayMs, baseRetryDelayMs * (2 ** attempt));
+}
+
+async function applyRetryDelayIfNeeded(attempt, resolvedMaxAttempts, baseRetryDelayMs, maxRetryDelayMs, sleepImpl) {
+  if (attempt >= resolvedMaxAttempts - 1) return;
+  const delayMs = getRetryDelay(attempt, baseRetryDelayMs, maxRetryDelayMs);
+  await sleep(delayMs, sleepImpl);
+}
+
 function summarizeTileDownloadResults(results = []) {
   return results.reduce((summary, result) => {
     if (result?.ok) return summary;
@@ -118,10 +128,7 @@ async function downloadTileWithRetry(cache, url, {
       const response = await fetchImpl(url, { mode: resolvedFetchMode, cache: 'no-store' });
       if (!isValidDownloadedTileResponse(response, minValidSize)) {
         response?.body?.cancel?.();
-        if (attempt < resolvedMaxAttempts - 1) {
-          const delayMs = Math.min(maxRetryDelayMs, baseRetryDelayMs * (2 ** attempt));
-          await sleep(delayMs, sleepImpl);
-        }
+        await applyRetryDelayIfNeeded(attempt, resolvedMaxAttempts, baseRetryDelayMs, maxRetryDelayMs, sleepImpl);
         continue;
       }
       await cache.put(url, response.clone());
@@ -130,10 +137,7 @@ async function downloadTileWithRetry(cache, url, {
       if (isQuotaExceededError(error)) {
         return { ok: false, reason: 'quota_exceeded' };
       }
-      if (attempt < resolvedMaxAttempts - 1) {
-        const delayMs = Math.min(maxRetryDelayMs, baseRetryDelayMs * (2 ** attempt));
-        await sleep(delayMs, sleepImpl);
-      }
+      await applyRetryDelayIfNeeded(attempt, resolvedMaxAttempts, baseRetryDelayMs, maxRetryDelayMs, sleepImpl);
     }
   }
   return { ok: false, reason: 'network_or_server' };

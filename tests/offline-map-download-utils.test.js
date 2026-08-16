@@ -181,7 +181,7 @@ describe('downloadTileWithRetry', () => {
       put: vi.fn().mockResolvedValue(undefined)
     };
     const fetchImpl = vi.fn().mockResolvedValue(response);
-    const sleepImpl = vi.fn((cb) => cb());
+    const sleepImpl = vi.fn((cb, _ms) => cb());
 
     const result = await downloadTileWithRetry(cache, 'https://tile.openstreetmap.org/8/1/1.png', {
       fetchImpl,
