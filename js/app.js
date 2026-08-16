@@ -565,6 +565,7 @@ setTimeout(() => {
 let userMarker = null;
 let poiMapMarkers = {}; 
 let targetNavigation = null;
+const GPS_NAVIGATION_EXPLANATION_TEXT = "La navigazione di SmartTruffle Path usa il GPS per calcolare distanza e direzione geografica del punto rispetto al Nord.\nNon usa il magnetometro / la bussola hardware del telefono, quindi non rileva dove stai guardando con il dispositivo.\n\nPer orientarti, confronta la mappa con i tuoi spostamenti reali.";
 const legacyCarCoordinates = readStorageJSON('car_coords', null);
 
 function parseLegacyDateToTimestamp(dateText) {
@@ -845,13 +846,13 @@ async function savePoiPosition() {
         showToast("📍 Punto salvato!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
-function navigateToPoi(index) {
+async function navigateToPoi(index) {
     if (poiList[index]) {
         targetNavigation = `poi_${index}`;
         map.setView([poiList[index].lat, poiList[index].lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
         closeActiveModule();
-        showToast(`🧭 Destinazione: ${poiList[index].note}`, 'success');
+        await appAlert(`🧭 Destinazione impostata: ${poiList[index].note}\n\n${GPS_NAVIGATION_EXPLANATION_TEXT}`);
     }
 }
 function sharePoi(index) {
@@ -945,7 +946,12 @@ function openModule(moduleName, editMode = false) {
     let contentHTML = '';
     switch(moduleName) {
         case 'poilist':
-            let poiHtml = '<h2>Elenco Punti & Tartufaie</h2><p>I tuoi punti di ricerca salvati con note:</p>';
+            let poiHtml = `<h2>Elenco Punti & Tartufaie</h2><p>I tuoi punti di ricerca salvati con note:</p>
+                <div class="module-card card-gap">
+                    <strong class="text-accent">ℹ️ Come funziona la navigazione</strong>
+                    <p class="text-muted small-text" style="margin-top:8px;">La bussola dell'app calcola via GPS la direzione geografica del punto rispetto al Nord e la distanza.</p>
+                    <p class="text-subtle small-text" style="margin-top:6px;">Non usa il magnetometro / la bussola hardware del telefono, quindi non indica dove stai guardando: per orientarti devi confrontare la mappa con i tuoi spostamenti reali.</p>
+                </div>`;
             if (poiList.length === 0) {
                 poiHtml += '<div class="module-card"><p>Nessun punto salvato. Usa i tasti "Segna Auto" o "Segna Punto" sulla mappa.</p></div>';
             } else {
@@ -4723,7 +4729,7 @@ function importaCalendariJSON(event) {
 }
 async function mostraInfoModulo(moduleName) {
     const guideTesti = {
-        'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
+        'poilist': `ℹ️ Guida - Elenco Punti & Tartufaie\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con coordinate e note. Il tasto '🧭 Vai' imposta una navigazione basata su GPS: l'app calcola la distanza e la direzione geografica del punto rispetto al Nord.\n\n${GPS_NAVIGATION_EXPLANATION_TEXT}\n\nPuoi anche condividere la posizione o eliminare i punti non più utili.`,
         'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS, rileva il nome del mittente quando presente nel testo e salva il punto nell'elenco con l'icona appropriata (📩 condiviso, 🚨 SOS).",
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
