@@ -8,7 +8,7 @@ const TILE_PROVIDER_COOLDOWN_THRESHOLD = 6;
 const TILE_PROVIDER_COOLDOWN_BASE_MS = 15000;
 const TILE_PROVIDER_COOLDOWN_MAX_MS = 120000;
 const TILE_ADAPTIVE_BATCH_PAUSE_MAX_MS = 4000;
-const TILE_PROVIDER_THROTTLED_STATUSES = [408, 425, 429];
+const TILE_PROVIDER_THROTTLED_STATUSES = [425, 429];
 
 function isOpenStreetMapTileUrl(url) {
   try {
@@ -206,13 +206,13 @@ function getAdaptiveBatchPauseMs(consecutiveProviderErrors, {
   return Math.min(maxDelayMs, scaledBaseDelay + jitter);
 }
 
-function getProviderCooldownMs(consecutiveProviderErrors, {
+function getProviderCooldownMs(consecutiveThrottledErrors, {
   providerCooldownThreshold = TILE_PROVIDER_COOLDOWN_THRESHOLD,
   baseCooldownMs = TILE_PROVIDER_COOLDOWN_BASE_MS,
   maxCooldownMs = TILE_PROVIDER_COOLDOWN_MAX_MS,
   retryAfterMs = 0
 } = {}) {
-  const normalizedConsecutiveErrors = Math.max(0, Number(consecutiveProviderErrors) || 0);
+  const normalizedConsecutiveErrors = Math.max(0, Number(consecutiveThrottledErrors) || 0);
   const cooldownThreshold = Math.max(1, Number(providerCooldownThreshold) || TILE_PROVIDER_COOLDOWN_THRESHOLD);
   const safeRetryAfterMs = Math.max(0, Number(retryAfterMs) || 0);
   let computedCooldownMs = 0;
