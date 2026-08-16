@@ -5169,7 +5169,14 @@ async function scaricaRegioniOffline() {
     if (progressBar) progressBar.style.width = '0%';
 
     const cacheName = OFFLINE_MAP_CACHE_NAME;
-    const coverage = await verificaCoperturaMappaOffline({ preferenze, notify: false });
+    renderOfflineSelectionCoverage(null, { loading: true });
+    let coverage;
+    try {
+        coverage = await analyzeOfflineSelectionCoverage(preferenze);
+        renderOfflineSelectionCoverage(coverage);
+    } catch {
+        renderOfflineSelectionCoverage(null, { errorMessage: 'Impossibile verificare la copertura delle tile.' });
+    }
     if (!coverage) {
         if (progressArea) progressArea.style.display = 'none';
         showToast('Impossibile analizzare le tile richieste prima del download.', 'error');
@@ -5227,14 +5234,15 @@ async function scaricaRegioniOffline() {
 
     if (progressArea) progressArea.style.display = 'none';
     const networkErrors = Math.max(0, errors - quotaErrors);
-    const updatedCoverage = await verificaCoperturaMappaOffline({ preferenze, notify: false });
-    const remainingMissing = updatedCoverage ? updatedCoverage.missing : Math.max(0, missingTotal - (done - errors));
-    const recoveredTiles = Math.max(0, missingTotal - remainingMissing);
+    const updatedCoverage = await analyzeOfflineSelectionCoverage(preferenze).catch(() => null);
+    if (updatedCoverage) renderOfflineSelectionCoverage(updatedCoverage);
+    const remainingMissing = updatedCoverage ? updatedCoverage.missing : null;
+    const recoveredTiles = updatedCoverage ? Math.max(0, missingTotal - updatedCoverage.missing) : null;
     if (abortedByQuota) {
-        showToast(`⚠️ Download interrotto: recuperate ${recoveredTiles}/${missingTotal} tile mancanti (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
+        showToast(`⚠️ Download interrotto: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
     } else if (errors > 0) {
-        showToast(`⚠️ Download completato con ${errors} errori: recuperate ${recoveredTiles}/${missingTotal} tile mancanti, ne restano ${remainingMissing} (${buildOfflineFailureDetail(quotaErrors, networkErrors)}).`, 'error');
-    } else if (remainingMissing > 0) {
+        showToast(`⚠️ Download completato con ${errors} errori: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti, ne restano ${remainingMissing ?? 'n/d'} (${buildOfflineFailureDetail(quotaErrors, networkErrors)}).`, 'error');
+    } else if ((remainingMissing ?? 0) > 0) {
         showToast(`⚠️ Download terminato: recuperate ${recoveredTiles}/${missingTotal} tile mancanti, ma ne restano ${remainingMissing}.`, 'error');
     } else {
         showToast(`✅ Copertura completata: recuperate tutte le ${missingTotal} tile mancanti (${updatedCoverage?.cached ?? coverage.cached}/${total} valide in cache).`, 'success');
