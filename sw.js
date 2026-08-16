@@ -3,6 +3,8 @@ const CACHE_NAME = 'smarttruffle-path-' + '2026-08-16';
 const MAP_OFFLINE_CACHE_NAME = 'smarttruffle-map-offline';
 let legacyAppCacheNames = null;
 let legacyAppCacheNamesPromise = null;
+let lastTileNetworkSignalType = '';
+let lastTileNetworkSignalAt = 0;
 const ASSETS = [
   './',
   './index.html',
@@ -102,6 +104,15 @@ async function getLegacyOsmTileResponse(request) {
   return null;
 }
 
+async function notifyClientsTileNetworkStatus(type) {
+  const now = Date.now();
+  if (lastTileNetworkSignalType === type && (now - lastTileNetworkSignalAt) < 2000) return;
+  lastTileNetworkSignalType = type;
+  lastTileNetworkSignalAt = now;
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  clients.forEach((client) => client.postMessage({ type }));
+}
+
 // Installazione Service Worker e salvataggio in cache
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -175,9 +186,11 @@ self.addEventListener('fetch', (e) => {
           const networkResponse = await fetch(e.request);
           if (networkResponse && (networkResponse.ok || networkResponse.type === 'opaque')) {
             offlineCache.put(e.request, networkResponse.clone()).catch(() => {});
+            notifyClientsTileNetworkStatus('tile-network-ok').catch(() => {});
           }
           return networkResponse;
         } catch {
+          notifyClientsTileNetworkStatus('tile-network-unavailable').catch(() => {});
           return serviceUnavailableResponse();
         }
       })()
