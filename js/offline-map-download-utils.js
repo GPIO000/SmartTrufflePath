@@ -8,6 +8,7 @@ const TILE_PROVIDER_COOLDOWN_THRESHOLD = 6;
 const TILE_PROVIDER_COOLDOWN_BASE_MS = 15000;
 const TILE_PROVIDER_COOLDOWN_MAX_MS = 120000;
 const TILE_ADAPTIVE_BATCH_PAUSE_MAX_MS = 4000;
+const TILE_PROVIDER_THROTTLED_STATUSES = [408, 425, 429, 500, 502, 503, 504];
 
 function isOpenStreetMapTileUrl(url) {
   try {
@@ -87,9 +88,7 @@ function getRetryAfterMs(response, nowMs = Date.now()) {
 
 function isProviderThrottledResponse(response) {
   if (!response) return false;
-  if (response.status === 429) return true;
-  if (response.status >= 400 && getRetryAfterMs(response) !== null) return true;
-  return [408, 425, 500, 502, 503, 504].includes(response.status);
+  return TILE_PROVIDER_THROTTLED_STATUSES.includes(response.status);
 }
 
 function buildTileDownloadFailureResult({ response, error } = {}) {
@@ -244,7 +243,8 @@ async function downloadTileBatchesWithRecovery(levels = [], {
 } = {}) {
   const safeLevels = Array.isArray(levels) ? levels : [];
   const state = {
-    consecutiveProviderErrors: Math.max(0, Number(initialState?.consecutiveProviderErrors) || 0)
+    consecutiveProviderErrors: Math.max(0, Number(initialState?.consecutiveProviderErrors) || 0),
+    consecutiveThrottledErrors: Math.max(0, Number(initialState?.consecutiveThrottledErrors) || 0)
   };
   const totals = {
     done: 0,
@@ -272,6 +272,11 @@ async function downloadTileBatchesWithRecovery(levels = [], {
       } else if (successCount > 0 || summary.providerErrors === 0) {
         state.consecutiveProviderErrors = 0;
       }
+      if (summary.throttledErrors > 0 && successCount === 0) {
+        state.consecutiveThrottledErrors += summary.throttledErrors;
+      } else if (successCount > 0 || summary.throttledErrors === 0) {
+        state.consecutiveThrottledErrors = 0;
+      }
 
       totals.done += batch.length;
       totals.errors += summary.errors;
@@ -287,7 +292,7 @@ async function downloadTileBatchesWithRecovery(levels = [], {
         providerSlowdownThreshold,
         randomFn
       });
-      const cooldownMs = getProviderCooldownMs(state.consecutiveProviderErrors, {
+      const cooldownMs = getProviderCooldownMs(state.consecutiveThrottledErrors, {
         providerCooldownThreshold,
         baseCooldownMs: providerCooldownBaseMs,
         maxCooldownMs: providerCooldownMaxMs,

@@ -325,8 +325,8 @@ describe('downloadTileBatchesWithRecovery', () => {
     expect(result.errors).toBe(6);
     expect(result.providerErrors).toBe(6);
     expect(result.throttledErrors).toBe(3);
-    expect(result.cooldownMs).toBe(15000);
-    expect(result.state).toEqual({ consecutiveProviderErrors: 6 });
+    expect(result.cooldownMs).toBe(12000);
+    expect(result.state).toEqual({ consecutiveProviderErrors: 6, consecutiveThrottledErrors: 3 });
     expect(downloadTileFn).toHaveBeenCalledTimes(6);
     expect(sleepImpl).toHaveBeenCalledTimes(1);
     expect(sleepImpl).toHaveBeenNthCalledWith(1, expect.any(Function), 900);
@@ -350,7 +350,7 @@ describe('downloadTileBatchesWithRecovery', () => {
     });
 
     expect(firstRun.pausedForProvider).toBe(true);
-    expect(firstRun.state).toEqual({ consecutiveProviderErrors: 3 });
+    expect(firstRun.state).toEqual({ consecutiveProviderErrors: 3, consecutiveThrottledErrors: 3 });
 
     const resumedRun = await downloadTileBatchesWithRecovery([
       { zoom: 8, missingUrls: ['g'] }
@@ -366,7 +366,25 @@ describe('downloadTileBatchesWithRecovery', () => {
     expect(resumedRun.pausedForProvider).toBe(false);
     expect(resumedRun.errors).toBe(0);
     expect(resumedRun.done).toBe(1);
-    expect(resumedRun.state).toEqual({ consecutiveProviderErrors: 0 });
+    expect(resumedRun.state).toEqual({ consecutiveProviderErrors: 0, consecutiveThrottledErrors: 0 });
+  });
+
+  it('slows down on plain network errors without entering provider cooldown', async () => {
+    const result = await downloadTileBatchesWithRecovery([
+      { zoom: 8, missingUrls: ['a', 'b', 'c', 'd', 'e', 'f'] }
+    ], {
+      cache: {},
+      downloadTileFn: vi.fn().mockResolvedValue({ ok: false, reason: 'network_or_server' }),
+      batchSize: 3,
+      batchPauseBaseMs: 450,
+      batchPauseJitterMs: 0,
+      providerCooldownThreshold: 3,
+      sleepImpl: vi.fn((cb, _ms) => cb())
+    });
+
+    expect(result.pausedForProvider).toBe(false);
+    expect(result.cooldownMs).toBe(0);
+    expect(result.state).toEqual({ consecutiveProviderErrors: 6, consecutiveThrottledErrors: 0 });
   });
 
   it('keeps quota exhaustion as the only immediate hard stop', async () => {

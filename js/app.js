@@ -5176,7 +5176,8 @@ function buildOfflineRecoveryState(preferenze, status, {
     missingTotal = null,
     recoveredTiles = null,
     nextRetryAt = null,
-    consecutiveProviderErrors = 0
+    consecutiveProviderErrors = 0,
+    consecutiveThrottledErrors = 0
 } = {}) {
     return {
         status,
@@ -5188,6 +5189,7 @@ function buildOfflineRecoveryState(preferenze, status, {
         recoveredTiles,
         nextRetryAt,
         consecutiveProviderErrors: Math.max(0, Number(consecutiveProviderErrors) || 0),
+        consecutiveThrottledErrors: Math.max(0, Number(consecutiveThrottledErrors) || 0),
         updatedAt: Date.now()
     };
 }
@@ -5336,7 +5338,10 @@ async function runOfflineMapRecovery({
 
         const storedRecoveryState = readOfflineRecoveryState();
         const initialState = storedRecoveryState?.preferenceKey === buildOfflineRecoveryPreferenceKey(preferenze)
-            ? { consecutiveProviderErrors: storedRecoveryState.consecutiveProviderErrors }
+            ? {
+                consecutiveProviderErrors: storedRecoveryState.consecutiveProviderErrors,
+                consecutiveThrottledErrors: storedRecoveryState.consecutiveThrottledErrors
+            }
             : undefined;
 
         const result = await downloadTileBatchesWithRecovery(coverage.urlsByZoom, {
@@ -5374,7 +5379,8 @@ async function runOfflineMapRecovery({
                 remainingMissing,
                 missingTotal,
                 recoveredTiles,
-                consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0
+                consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0,
+                consecutiveThrottledErrors: result.state?.consecutiveThrottledErrors || 0
             }));
             showToast(`⚠️ Download interrotto: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti (${buildOfflineFailureDetail(result.quotaErrors, providerErrors)}). Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
             return { status: 'quota_stopped', result, updatedCoverage };
@@ -5394,7 +5400,8 @@ async function runOfflineMapRecovery({
                 missingTotal,
                 recoveredTiles,
                 nextRetryAt: Date.now() + resumeDelayMs,
-                consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0
+                consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0,
+                consecutiveThrottledErrors: result.state?.consecutiveThrottledErrors || 0
             }));
             scheduleOfflineRecoveryResume(preferenze, resumeDelayMs, 'resume');
             showToast(`⏸️ Download in pausa per limitazione del provider: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti, ne restano ${remainingMissing ?? 'n/d'}. Ripresa automatica tra ${formatOfflineDelayMs(resumeDelayMs)}.`, 'info');
@@ -5409,7 +5416,8 @@ async function runOfflineMapRecovery({
                 missingTotal,
                 recoveredTiles,
                 nextRetryAt: Date.now() + resumeDelayMs,
-                consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0
+                consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0,
+                consecutiveThrottledErrors: result.state?.consecutiveThrottledErrors || 0
             }));
             scheduleOfflineRecoveryResume(preferenze, resumeDelayMs, 'resume');
             showToast(`🔄 Download parziale ma riprendibile: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti, ne restano ${remainingMissing ?? 'n/d'} (${buildOfflineFailureDetail(result.quotaErrors, providerErrors)}). Nuovo tentativo automatico tra ${formatOfflineDelayMs(resumeDelayMs)}.`, 'info');
