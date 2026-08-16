@@ -85,8 +85,9 @@ function applyMapConnectivityZoomCap({ notify = false } = {}) {
         ? Math.min(MAP_TILE_LAYER_MAX_ZOOM, offlineMaxZoom)
         : MAP_TILE_LAYER_MAX_ZOOM;
     const minZoomCap = hasOfflineCap ? OFFLINE_MAP_MIN_ZOOM : MAP_TILE_LAYER_MIN_ZOOM;
-    toggleOfflineZoomButtonState(zoomInButton, hasOfflineCap);
-    toggleOfflineZoomButtonState(zoomOutButton, hasOfflineCap);
+    const currentZoom = map.getZoom();
+    toggleOfflineZoomButtonState(zoomInButton, hasOfflineCap && currentZoom >= maxZoomCap);
+    toggleOfflineZoomButtonState(zoomOutButton, hasOfflineCap && currentZoom <= minZoomCap);
     map.setMinZoom(minZoomCap);
     map.setMaxZoom(maxZoomCap);
     if (hasOfflineCap && map.getZoom() > maxZoomCap) {
@@ -621,6 +622,7 @@ setTimeout(() => {
     // ma la cache è assente (es. se l'app parte già connessa dopo una reinstallazione).
     autoRiscaricaRegioniOfflineSeNecessario();
 }, 400);
+map.on('zoomend', () => applyMapConnectivityZoomCap());
 
 let userMarker = null;
 let poiMapMarkers = {}; 
