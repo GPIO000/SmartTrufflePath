@@ -65,7 +65,7 @@ function getAdaptiveFocusZoom(defaultZoom) {
     return defaultZoom;
 }
 
-function applyMapConnectivityZoomCap({ notify = false } = {}) {
+function applyMapConnectivityZoomCap({ notify = false, enforceBounds = true } = {}) {
     if (isApplyingMapConnectivityZoomCap) return;
     isApplyingMapConnectivityZoomCap = true;
     const zoomInButton = document.querySelector('.leaflet-control-zoom-in');
@@ -92,12 +92,12 @@ function applyMapConnectivityZoomCap({ notify = false } = {}) {
     try {
         map.setMinZoom(minZoomCap);
         map.setMaxZoom(maxZoomCap);
-        if (hasOfflineCap && map.getZoom() > maxZoomCap) {
+        if (enforceBounds && hasOfflineCap && map.getZoom() > maxZoomCap) {
             map.setZoom(maxZoomCap);
             if (notify) {
                 showToast(`📉 Zoom ridotto a ${maxZoomCap} per usare le mappe offline disponibili.`, 'info');
             }
-        } else if (hasOfflineCap && map.getZoom() < minZoomCap) {
+        } else if (enforceBounds && hasOfflineCap && map.getZoom() < minZoomCap) {
             map.setZoom(minZoomCap);
             if (notify) {
                 showToast(`📈 Zoom aumentato a ${minZoomCap} per usare le mappe offline disponibili.`, 'info');
@@ -630,7 +630,7 @@ setTimeout(() => {
     autoRiscaricaRegioniOfflineSeNecessario();
 }, 400);
 map.on('zoomend', () => {
-    if (!navigator.onLine) applyMapConnectivityZoomCap();
+    if (!navigator.onLine) applyMapConnectivityZoomCap({ enforceBounds: false });
 });
 
 let userMarker = null;
