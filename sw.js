@@ -26,6 +26,8 @@ function serviceUnavailableResponse() {
   });
 }
 
+import { canonicalizeOsmTileUrl } from './js/sw-utils.js';
+
 function isOsmTileRequestUrl(url) {
   try {
     const parsed = new URL(url);
@@ -159,7 +161,9 @@ self.addEventListener('fetch', (e) => {
       (async () => {
         try {
           const offlineCache = await caches.open(MAP_OFFLINE_CACHE_NAME);
-          const offlineResponse = await offlineCache.match(e.request);
+          const canonicalUrl = canonicalizeOsmTileUrl(e.request.url);
+          const cacheRequest = canonicalUrl !== e.request.url ? new Request(canonicalUrl) : e.request;
+          const offlineResponse = await offlineCache.match(cacheRequest);
           if (offlineResponse) return offlineResponse;
 
           const legacyResponse = await getLegacyOsmTileResponse(e.request);
