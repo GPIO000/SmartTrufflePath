@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   countCachedTileUrls,
+  getMissingTileUrls,
   isOfflineRegionFullyCached,
-  shouldRestoreOfflineMapCache,
   normalizeTileUrls,
+  shouldRestoreOfflineMapCache,
+  summarizeTileCoverage,
 } from '../js/offline-cache-utils.js';
 
 describe('normalizeTileUrls', () => {
@@ -78,5 +80,59 @@ describe('shouldRestoreOfflineMapCache', () => {
 
   it('richiede il re-download se cachedUrls non è un Set', () => {
     expect(shouldRestoreOfflineMapCache(null, ['tile-a'])).toBe(true);
+  });
+});
+
+describe('getMissingTileUrls', () => {
+  it('restituisce solo le tile mancanti', () => {
+    const cachedUrls = new Set(['tile-a', 'tile-c']);
+    expect(getMissingTileUrls(cachedUrls, ['tile-a', 'tile-b', 'tile-c'])).toEqual(['tile-b']);
+  });
+
+  it('deduplica gli URL richiesti', () => {
+    const cachedUrls = new Set(['tile-a']);
+    expect(getMissingTileUrls(cachedUrls, ['tile-a', 'tile-b', 'tile-b'])).toEqual(['tile-b']);
+  });
+
+  it('restituisce tutti gli URL normalizzati se cachedUrls non è un Set', () => {
+    expect(getMissingTileUrls(null, ['tile-a', 'tile-a', 'tile-b'])).toEqual(['tile-a', 'tile-b']);
+  });
+});
+
+describe('summarizeTileCoverage', () => {
+  it('riassume una cache completa', () => {
+    const summary = summarizeTileCoverage(new Set(['tile-a', 'tile-b']), ['tile-a', 'tile-b']);
+    expect(summary).toEqual({
+      tileUrls: ['tile-a', 'tile-b'],
+      missingUrls: [],
+      total: 2,
+      cached: 2,
+      missing: 0,
+      isFullyCached: true,
+    });
+  });
+
+  it('riassume una cache parziale', () => {
+    const summary = summarizeTileCoverage(new Set(['tile-a']), ['tile-a', 'tile-b', 'tile-c']);
+    expect(summary).toEqual({
+      tileUrls: ['tile-a', 'tile-b', 'tile-c'],
+      missingUrls: ['tile-b', 'tile-c'],
+      total: 3,
+      cached: 1,
+      missing: 2,
+      isFullyCached: false,
+    });
+  });
+
+  it('gestisce liste vuote', () => {
+    const summary = summarizeTileCoverage(new Set(['tile-a']), []);
+    expect(summary).toEqual({
+      tileUrls: [],
+      missingUrls: [],
+      total: 0,
+      cached: 0,
+      missing: 0,
+      isFullyCached: false,
+    });
   });
 });

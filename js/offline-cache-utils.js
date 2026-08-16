@@ -27,9 +27,33 @@ function shouldRestoreOfflineMapCache(cachedUrls, preferredTileUrls) {
     return countCachedTileUrls(cachedUrls, normalizedPreferredTileUrls) < normalizedPreferredTileUrls.length;
 }
 
+function getMissingTileUrls(cachedUrls, tileUrls) {
+    const normalizedUrls = normalizeTileUrls(tileUrls);
+    if (!(cachedUrls instanceof Set)) return normalizedUrls;
+    return normalizedUrls.filter((url) => !cachedUrls.has(url));
+}
+
+function summarizeTileCoverage(cachedUrls, tileUrls) {
+    const normalizedUrls = normalizeTileUrls(tileUrls);
+    const missingUrls = getMissingTileUrls(cachedUrls, normalizedUrls);
+    const total = normalizedUrls.length;
+    const missing = missingUrls.length;
+    const cached = Math.max(0, total - missing);
+    return {
+        tileUrls: normalizedUrls,
+        missingUrls,
+        total,
+        cached,
+        missing,
+        isFullyCached: total > 0 && missing === 0
+    };
+}
+
 export {
     normalizeTileUrls,
     countCachedTileUrls,
     isOfflineRegionFullyCached,
-    shouldRestoreOfflineMapCache
+    shouldRestoreOfflineMapCache,
+    getMissingTileUrls,
+    summarizeTileCoverage
 };
