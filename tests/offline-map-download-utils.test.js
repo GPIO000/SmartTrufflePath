@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  buildTileDownloadFailureResult,
+  downloadTileBatchesWithRecovery,
   downloadTileWithRetry,
+  getAdaptiveBatchPauseMs,
+  getProviderCooldownMs,
   isOpaqueTileResponse,
   isOpenStreetMapTileUrl,
+  isProviderThrottledResponse,
   isQuotaExceededError,
   isValidCachedTileResponse,
   isValidDownloadedTileResponse,
@@ -90,6 +95,20 @@ describe('tile response validation', () => {
     };
     expect(isValidCachedTileResponse(response)).toBe(false);
     expect(isValidDownloadedTileResponse(response)).toBe(false);
+  });
+
+  it('recognizes provider throttling responses and retry-after headers', () => {
+    const throttledResponse = {
+      status: 429,
+      headers: new Headers({ 'retry-after': '12' })
+    };
+    expect(isProviderThrottledResponse(throttledResponse)).toBe(true);
+    expect(buildTileDownloadFailureResult({ response: throttledResponse })).toEqual({
+      ok: false,
+      reason: 'provider_throttled',
+      status: 429,
+      retryAfterMs: 12000
+    });
   });
 });
 
@@ -195,7 +214,7 @@ describe('downloadTileWithRetry', () => {
       sleepImpl
     });
 
-    expect(result).toEqual({ ok: false, reason: 'network_or_server' });
+    expect(result).toMatchObject({ ok: false, reason: 'network_or_server' });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     expect(sleepImpl).toHaveBeenCalledTimes(2);
     expect(sleepImpl).toHaveBeenNthCalledWith(1, expect.any(Function), 100);
@@ -208,15 +227,154 @@ describe('summarizeTileDownloadResults', () => {
     const summary = summarizeTileDownloadResults([
       { ok: true },
       { ok: false, reason: 'quota_exceeded' },
+      { ok: false, reason: 'provider_throttled', retryAfterMs: 4000 },
       { ok: false, reason: 'network_or_server' },
       { ok: false, reason: 'unexpected_reason' },
       { ok: false }
     ]);
 
     expect(summary).toEqual({
-      errors: 4,
+      errors: 5,
       quotaErrors: 1,
-      networkErrors: 3
+      networkErrors: 3,
+      providerErrors: 4,
+      throttledErrors: 1,
+      maxRetryAfterMs: 4000
     });
+  });
+});
+
+describe('adaptive provider recovery helpers', () => {
+  it('increases the pause as provider errors accumulate', () => {
+    expect(getAdaptiveBatchPauseMs(0, {
+      baseDelayMs: 450,
+      maxDelayMs: 4000,
+      jitterMs: 0,
+      providerSlowdownThreshold: 2
+    })).toBe(450);
+    expect(getAdaptiveBatchPauseMs(2, {
+      baseDelayMs: 450,
+      maxDelayMs: 4000,
+      jitterMs: 0,
+      providerSlowdownThreshold: 2
+    })).toBe(900);
+    expect(getAdaptiveBatchPauseMs(4, {
+      baseDelayMs: 450,
+      maxDelayMs: 4000,
+      jitterMs: 0,
+      providerSlowdownThreshold: 2
+    })).toBe(1800);
+  });
+
+  it('uses retry-after or cooldown thresholds to pause provider-limited downloads', () => {
+    expect(getProviderCooldownMs(1, {
+      providerCooldownThreshold: 6,
+      baseCooldownMs: 15000,
+      maxCooldownMs: 120000,
+      retryAfterMs: 5000
+    })).toBe(5000);
+    expect(getProviderCooldownMs(6, {
+      providerCooldownThreshold: 6,
+      baseCooldownMs: 15000,
+      maxCooldownMs: 120000
+    })).toBe(15000);
+  });
+});
+
+describe('downloadTileBatchesWithRecovery', () => {
+  it('pauses with a cooldown after repeated provider errors', async () => {
+    const downloadTileFn = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, reason: 'network_or_server' })
+      .mockResolvedValueOnce({ ok: false, reason: 'network_or_server' })
+      .mockResolvedValueOnce({ ok: false, reason: 'network_or_server' })
+      .mockResolvedValueOnce({ ok: false, reason: 'provider_throttled', retryAfterMs: 12000 })
+      .mockResolvedValueOnce({ ok: false, reason: 'provider_throttled', retryAfterMs: 12000 })
+      .mockResolvedValueOnce({ ok: false, reason: 'provider_throttled', retryAfterMs: 12000 });
+    const sleepImpl = vi.fn((cb, _ms) => cb());
+
+    const result = await downloadTileBatchesWithRecovery([
+      { zoom: 8, missingUrls: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }
+    ], {
+      cache: {},
+      downloadTileFn,
+      batchSize: 3,
+      batchPauseBaseMs: 450,
+      batchPauseJitterMs: 0,
+      providerSlowdownThreshold: 2,
+      providerCooldownThreshold: 6,
+      providerCooldownBaseMs: 15000,
+      providerCooldownMaxMs: 120000,
+      sleepImpl
+    });
+
+    expect(result.pausedForProvider).toBe(true);
+    expect(result.abortedByQuota).toBe(false);
+    expect(result.done).toBe(6);
+    expect(result.errors).toBe(6);
+    expect(result.providerErrors).toBe(6);
+    expect(result.throttledErrors).toBe(3);
+    expect(result.cooldownMs).toBe(15000);
+    expect(result.state).toEqual({ consecutiveProviderErrors: 6 });
+    expect(downloadTileFn).toHaveBeenCalledTimes(6);
+    expect(sleepImpl).toHaveBeenCalledTimes(1);
+    expect(sleepImpl).toHaveBeenNthCalledWith(1, expect.any(Function), 900);
+  });
+
+  it('can resume from a persisted provider pause state and reset after success', async () => {
+    const firstRun = await downloadTileBatchesWithRecovery([
+      { zoom: 8, missingUrls: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }
+    ], {
+      cache: {},
+      downloadTileFn: vi.fn().mockImplementation(async (_cache, url) => {
+        if (url === 'g') return { ok: true };
+        return { ok: false, reason: 'provider_throttled', retryAfterMs: 1000 };
+      }),
+      batchSize: 3,
+      batchPauseBaseMs: 0,
+      batchPauseJitterMs: 0,
+      providerCooldownThreshold: 6,
+      providerCooldownBaseMs: 15000,
+      sleepImpl: vi.fn((cb, _ms) => cb())
+    });
+
+    expect(firstRun.pausedForProvider).toBe(true);
+    expect(firstRun.state).toEqual({ consecutiveProviderErrors: 3 });
+
+    const resumedRun = await downloadTileBatchesWithRecovery([
+      { zoom: 8, missingUrls: ['g'] }
+    ], {
+      cache: {},
+      downloadTileFn: vi.fn().mockResolvedValue({ ok: true }),
+      batchSize: 3,
+      batchPauseBaseMs: 0,
+      batchPauseJitterMs: 0,
+      initialState: firstRun.state
+    });
+
+    expect(resumedRun.pausedForProvider).toBe(false);
+    expect(resumedRun.errors).toBe(0);
+    expect(resumedRun.done).toBe(1);
+    expect(resumedRun.state).toEqual({ consecutiveProviderErrors: 0 });
+  });
+
+  it('keeps quota exhaustion as the only immediate hard stop', async () => {
+    const result = await downloadTileBatchesWithRecovery([
+      { zoom: 8, missingUrls: ['a', 'b', 'c', 'd'] }
+    ], {
+      cache: {},
+      downloadTileFn: vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, reason: 'quota_exceeded' })
+        .mockResolvedValueOnce({ ok: false, reason: 'quota_exceeded' })
+        .mockResolvedValueOnce({ ok: true }),
+      batchSize: 3,
+      quotaErrorsToAbort: 2
+    });
+
+    expect(result.abortedByQuota).toBe(true);
+    expect(result.pausedForProvider).toBe(false);
+    expect(result.done).toBe(3);
+    expect(result.quotaErrors).toBe(2);
   });
 });

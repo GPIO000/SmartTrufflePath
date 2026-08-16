@@ -10,7 +10,7 @@ import {
     isOfflineRegionFullyCached,
     summarizeTileCoverage
 } from './offline-cache-utils.js';
-import { downloadTileWithRetry, isValidCachedTileResponse, summarizeTileDownloadResults } from './offline-map-download-utils.js';
+import { downloadTileBatchesWithRecovery, downloadTileWithRetry, isValidCachedTileResponse } from './offline-map-download-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
 
 window.TruffleStorage = TruffleStorage;
@@ -44,8 +44,11 @@ const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-16b`;
 const OFFLINE_MAP_MIN_ZOOM = 8;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
 const OFFLINE_CACHE_STATUS_KEY = 'offline_cache_status';
+const OFFLINE_RECOVERY_STATE_KEY = 'offline_map_recovery_state';
 let isApplyingMapConnectivityZoomCap = false;
 let isTileNetworkUnavailable = false;
+let offlineMapRecoveryResumeTimerId = null;
+let isOfflineMapRecoveryRunning = false;
 
 function isOfflineMapModeActive() {
     return !navigator.onLine || isTileNetworkUnavailable;
@@ -4852,7 +4855,7 @@ async function mostraInfoModulo(moduleName) {
         'clienti': "ℹ️ **Guida - Rubrica Clienti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico, aggiungi nuovi nominativi e gestisci modifiche, note ed eliminazioni.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
         'calendario': "ℹ️ **Guida - Calendario Raccolta (GPS)**\n\nVerifica in base alla tua posizione GPS attuale quali specie di tartufo hanno il periodo di raccolta attualmente aperto o chiuso.",
-        'mappa_offline': "ℹ️ **Guida - Download Mappa Offline**\n\nSeleziona le regioni italiane che ti interessano, premi '💾 Salva Preferenze' per registrarle (anche per svuotarle) e poi usa '📥 Scarica Regioni Selezionate' quando vuoi scaricare la cache. I quadratini della mappa (tile) vengono salvati nella memoria del browser. La mappa funzionerà anche senza connessione internet, finché la cache non viene svuotata dal sistema.\n\n🔄 **Re-download automatico**: l'app ricorda le regioni e il livello di zoom scelti. Se il browser svuota la cache, non appena torni online la mappa viene riscaricata in automatico, senza che tu debba fare nulla.\n\nConsigli:\n• Usa la connessione Wi-Fi per scaricare\n• Zoom 14 è il miglior compromesso tra dettaglio e spazio\n• Puoi eliminare la cache in qualsiasi momento con il tasto apposito"
+        'mappa_offline': "ℹ️ **Guida - Download Mappa Offline**\n\nSeleziona le regioni italiane che ti interessano, premi '💾 Salva Preferenze' per registrarle (anche per svuotarle) e poi usa '📥 Scarica Regioni Selezionate' quando vuoi scaricare la cache. I quadratini della mappa (tile) vengono salvati nella memoria del browser. La mappa funzionerà anche senza connessione internet, finché la cache non viene svuotata dal sistema.\n\n🔄 **Re-download automatico**: l'app ricorda le regioni e il livello di zoom scelti. Se il browser svuota la cache, non appena torni online la mappa viene riscaricata in automatico, senza che tu debba fare nulla. Se il provider rallenta o blocca temporaneamente i download, l'app riduce il ritmo, aspetta e poi riprende da sola dalle tile mancanti.\n\nConsigli:\n• Usa la connessione Wi-Fi per scaricare\n• Zoom 14 è il miglior compromesso tra dettaglio e spazio\n• Puoi eliminare la cache in qualsiasi momento con il tasto apposito"
     };
 
     const messaggio = guideTesti[moduleName] || "ℹ️ Guida non disponibile per questo modulo.";
@@ -4923,16 +4926,9 @@ const OFFLINE_DOWNLOAD_BATCH_SIZE = 3;
 const OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT = 8;
 const OFFLINE_DOWNLOAD_BATCH_PAUSE_MS = 450;
 const OFFLINE_DOWNLOAD_BATCH_PAUSE_JITTER_MS = 250;
-
-function sleepOfflineBatch(ms) {
-    if (!Number.isFinite(ms) || ms <= 0) return Promise.resolve();
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function pauseBetweenOfflineBatches() {
-    const jitter = Math.floor(Math.random() * (OFFLINE_DOWNLOAD_BATCH_PAUSE_JITTER_MS + 1));
-    await sleepOfflineBatch(OFFLINE_DOWNLOAD_BATCH_PAUSE_MS + jitter);
-}
+const OFFLINE_DOWNLOAD_PROVIDER_RESUME_DELAY_MS = 5000;
+const OFFLINE_DOWNLOAD_PROVIDER_COOLDOWN_BASE_MS = 15000;
+const OFFLINE_DOWNLOAD_PROVIDER_COOLDOWN_MAX_MS = 120000;
 
 function buildOfflineTileUrlsByZoom(regionIds, maxZoom) {
     const urlsByZoom = [];
@@ -5140,15 +5136,102 @@ function saveOfflinePreferences(preferenze) {
     localStorage.setItem(OFFLINE_REGIONI_PREFERITE_KEY, JSON.stringify(preferenze));
 }
 
-function buildOfflineFailureDetail(quotaErrors, networkErrors) {
-    if (quotaErrors > 0 && networkErrors > 0) {
-        return `${quotaErrors} da spazio cache esaurito, ${networkErrors} da rete/provider`;
+function buildOfflineRecoveryPreferenceKey(preferenze) {
+    const regioni = Array.isArray(preferenze?.regioni) ? [...preferenze.regioni].sort() : [];
+    const maxZoom = Number.isFinite(Number(preferenze?.maxZoom)) ? Number(preferenze.maxZoom) : OFFLINE_MAP_DEFAULT_MAX_ZOOM;
+    return JSON.stringify({ regioni, maxZoom });
+}
+
+function readOfflineRecoveryState() {
+    return readStorageJSON(OFFLINE_RECOVERY_STATE_KEY, null);
+}
+
+function persistOfflineRecoveryState(state) {
+    try {
+        localStorage.setItem(OFFLINE_RECOVERY_STATE_KEY, JSON.stringify(state));
+    } catch {
+        // localStorage non disponibile o pieno, nessuna persistenza dello stato
+    }
+}
+
+function clearOfflineMapRecoveryResumeTimer() {
+    if (offlineMapRecoveryResumeTimerId !== null) {
+        clearTimeout(offlineMapRecoveryResumeTimerId);
+        offlineMapRecoveryResumeTimerId = null;
+    }
+}
+
+function clearOfflineRecoveryState() {
+    clearOfflineMapRecoveryResumeTimer();
+    try {
+        localStorage.removeItem(OFFLINE_RECOVERY_STATE_KEY);
+    } catch {
+        // localStorage non disponibile, nessuna azione
+    }
+}
+
+function buildOfflineRecoveryState(preferenze, status, {
+    trigger = 'manual',
+    remainingMissing = null,
+    missingTotal = null,
+    recoveredTiles = null,
+    nextRetryAt = null,
+    consecutiveProviderErrors = 0
+} = {}) {
+    return {
+        status,
+        trigger,
+        preferenze,
+        preferenceKey: buildOfflineRecoveryPreferenceKey(preferenze),
+        remainingMissing,
+        missingTotal,
+        recoveredTiles,
+        nextRetryAt,
+        consecutiveProviderErrors: Math.max(0, Number(consecutiveProviderErrors) || 0),
+        updatedAt: Date.now()
+    };
+}
+
+function formatOfflineDelayMs(delayMs) {
+    const totalSeconds = Math.max(1, Math.ceil((Math.max(0, Number(delayMs) || 0)) / 1000));
+    if (totalSeconds < 60) return `${totalSeconds}s`;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return seconds === 0 ? `${minutes} min` : `${minutes} min ${seconds}s`;
+}
+
+function getOfflineRecoveryDelayMs(preferenze) {
+    const state = readOfflineRecoveryState();
+    if (!state || state.preferenceKey !== buildOfflineRecoveryPreferenceKey(preferenze)) return 0;
+    if (!Number.isFinite(Number(state.nextRetryAt))) return 0;
+    return Math.max(0, Number(state.nextRetryAt) - Date.now());
+}
+
+function scheduleOfflineRecoveryResume(preferenze, delayMs, trigger = 'resume') {
+    clearOfflineMapRecoveryResumeTimer();
+    if (!navigator.onLine) return;
+    const safeDelayMs = Math.max(0, Number(delayMs) || 0);
+    offlineMapRecoveryResumeTimerId = setTimeout(() => {
+        offlineMapRecoveryResumeTimerId = null;
+        runOfflineMapRecovery({
+            preferenze,
+            trigger,
+            showProgress: false,
+            startToastMessage: '',
+            waitingToastMessage: ''
+        }).catch(() => {});
+    }, safeDelayMs);
+}
+
+function buildOfflineFailureDetail(quotaErrors, providerErrors) {
+    if (quotaErrors > 0 && providerErrors > 0) {
+        return `${quotaErrors} da spazio cache esaurito, ${providerErrors} da rete/provider`;
     }
     if (quotaErrors > 0) {
         return `${quotaErrors} da spazio cache esaurito`;
     }
-    if (networkErrors > 0) {
-        return `${networkErrors} da rete/provider`;
+    if (providerErrors > 0) {
+        return `${providerErrors} da rete/provider`;
     }
     return 'nessun errore rilevato';
 }
@@ -5156,6 +5239,13 @@ function buildOfflineFailureDetail(quotaErrors, networkErrors) {
 async function salvaPreferenzeMappaOffline() {
     const preferenze = getOfflinePreferencesFromInputs();
     saveOfflinePreferences(preferenze);
+    const recoveryState = readOfflineRecoveryState();
+    if (
+        preferenze.regioni.length === 0
+        || (recoveryState && recoveryState.preferenceKey !== buildOfflineRecoveryPreferenceKey(preferenze))
+    ) {
+        clearOfflineRecoveryState();
+    }
     applyMapConnectivityZoomCap();
     await runAutomaticLocalBackup();
     aggiornaStatoCacheRegioni();
@@ -5166,6 +5256,175 @@ async function salvaPreferenzeMappaOffline() {
     }
 }
 
+async function runOfflineMapRecovery({
+    preferenze,
+    trigger = 'manual',
+    showProgress = false,
+    startToastMessage = '',
+    waitingToastMessage = ''
+} = {}) {
+    if (!Array.isArray(preferenze?.regioni) || preferenze.regioni.length === 0) {
+        if (showProgress) {
+            const progressArea = document.getElementById('offline-progress-area');
+            if (progressArea) progressArea.style.display = 'none';
+        }
+        return null;
+    }
+
+    if (isOfflineMapRecoveryRunning) {
+        if (trigger === 'manual') {
+            showToast('⏳ Recupero mappa offline già in corso.', 'info');
+        }
+        return null;
+    }
+
+    const waitingDelayMs = getOfflineRecoveryDelayMs(preferenze);
+    if (waitingDelayMs > 0 && trigger !== 'resume') {
+        scheduleOfflineRecoveryResume(preferenze, waitingDelayMs, 'resume');
+        if (waitingToastMessage) {
+            showToast(`${waitingToastMessage} Ripresa automatica tra ${formatOfflineDelayMs(waitingDelayMs)}.`, 'info');
+        }
+        return null;
+    }
+
+    isOfflineMapRecoveryRunning = true;
+    clearOfflineMapRecoveryResumeTimer();
+
+    const progressArea = showProgress ? document.getElementById('offline-progress-area') : null;
+    const progressBar = showProgress ? document.getElementById('offline-progress-bar') : null;
+    const progressText = showProgress ? document.getElementById('offline-progress-text') : null;
+    if (progressArea) progressArea.style.display = 'block';
+    if (progressBar) progressBar.style.width = '0%';
+    if (progressText) progressText.textContent = 'Recupero tile mancanti: 0 / 0…';
+
+    try {
+        if (startToastMessage) showToast(startToastMessage, 'info');
+        renderOfflineSelectionCoverage(null, { loading: true });
+        let coverage;
+        try {
+            coverage = await analyzeOfflineSelectionCoverage(preferenze);
+            renderOfflineSelectionCoverage(coverage);
+        } catch {
+            renderOfflineSelectionCoverage(null, { errorMessage: 'Impossibile verificare la copertura delle tile.' });
+        }
+        if (!coverage) {
+            showToast('Impossibile analizzare le tile richieste prima del download.', 'error');
+            return null;
+        }
+
+        const total = coverage.total;
+        const missingTotal = coverage.missing;
+        if (total === 0) {
+            clearOfflineRecoveryState();
+            showToast('Nessuna tile richiesta per la selezione corrente.', 'info');
+            return { status: 'empty' };
+        }
+        if (missingTotal === 0) {
+            clearOfflineRecoveryState();
+            showToast(`✅ Nessuna tile mancante: copertura già completa (${coverage.cached}/${coverage.total}).`, 'success');
+            return { status: 'complete', coverage };
+        }
+        if (progressText) progressText.textContent = `Recupero tile mancanti: 0 / ${missingTotal}…`;
+
+        let cache;
+        try {
+            cache = await caches.open(OFFLINE_MAP_CACHE_NAME);
+        } catch {
+            showToast('Il browser non supporta la cache offline. Usa Chrome o Firefox.', 'error');
+            return null;
+        }
+
+        const storedRecoveryState = readOfflineRecoveryState();
+        const initialState = storedRecoveryState?.preferenceKey === buildOfflineRecoveryPreferenceKey(preferenze)
+            ? { consecutiveProviderErrors: storedRecoveryState.consecutiveProviderErrors }
+            : undefined;
+
+        const result = await downloadTileBatchesWithRecovery(coverage.urlsByZoom, {
+            cache,
+            downloadTileFn: downloadTileWithRetry,
+            batchSize: OFFLINE_DOWNLOAD_BATCH_SIZE,
+            quotaErrorsToAbort: OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT,
+            initialState,
+            batchPauseBaseMs: OFFLINE_DOWNLOAD_BATCH_PAUSE_MS,
+            batchPauseJitterMs: OFFLINE_DOWNLOAD_BATCH_PAUSE_JITTER_MS,
+            providerCooldownBaseMs: OFFLINE_DOWNLOAD_PROVIDER_COOLDOWN_BASE_MS,
+            providerCooldownMaxMs: OFFLINE_DOWNLOAD_PROVIDER_COOLDOWN_MAX_MS,
+            onBatchComplete: ({ level, totals, adaptivePauseMs, state, summary }) => {
+                const pct = Math.round((totals.done / missingTotal) * 100);
+                if (progressBar) progressBar.style.width = pct + '%';
+                if (progressText) {
+                    const slowdownNote = state.consecutiveProviderErrors > 0
+                        ? ` • ritmo ridotto (${formatOfflineDelayMs(adaptivePauseMs)})`
+                        : '';
+                    const throttleNote = summary.throttledErrors > 0 ? ' • server in attesa' : '';
+                    progressText.textContent = `Recupero tile mancanti: ${totals.done} / ${missingTotal} (${pct}%)… z${level.zoom}${slowdownNote}${throttleNote}`;
+                }
+            }
+        });
+
+        const providerErrors = Math.max(0, result.providerErrors);
+        const updatedCoverage = await analyzeOfflineSelectionCoverage(preferenze).catch(() => null);
+        if (updatedCoverage) renderOfflineSelectionCoverage(updatedCoverage);
+        const remainingMissing = updatedCoverage ? updatedCoverage.missing : null;
+        const recoveredTiles = updatedCoverage ? Math.max(0, missingTotal - updatedCoverage.missing) : null;
+
+        if (result.abortedByQuota) {
+            persistOfflineRecoveryState(buildOfflineRecoveryState(preferenze, 'quota_stopped', {
+                trigger,
+                remainingMissing,
+                missingTotal,
+                recoveredTiles,
+                consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0
+            }));
+            showToast(`⚠️ Download interrotto: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti (${buildOfflineFailureDetail(result.quotaErrors, providerErrors)}). Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
+            return { status: 'quota_stopped', result, updatedCoverage };
+        }
+
+        if ((remainingMissing ?? 0) === 0) {
+            clearOfflineRecoveryState();
+            showToast(`✅ Copertura completata: recuperate tutte le ${missingTotal} tile mancanti (${updatedCoverage?.cached ?? coverage.cached}/${total} valide in cache).`, 'success');
+            return { status: 'complete', result, updatedCoverage };
+        }
+
+        if (result.pausedForProvider) {
+            const resumeDelayMs = Math.max(OFFLINE_DOWNLOAD_PROVIDER_RESUME_DELAY_MS, result.cooldownMs || 0);
+            persistOfflineRecoveryState(buildOfflineRecoveryState(preferenze, 'provider_paused', {
+                trigger,
+                remainingMissing,
+                missingTotal,
+                recoveredTiles,
+                nextRetryAt: Date.now() + resumeDelayMs,
+                consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0
+            }));
+            scheduleOfflineRecoveryResume(preferenze, resumeDelayMs, 'resume');
+            showToast(`⏸️ Download in pausa per limitazione del provider: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti, ne restano ${remainingMissing ?? 'n/d'}. Ripresa automatica tra ${formatOfflineDelayMs(resumeDelayMs)}.`, 'info');
+            return { status: 'provider_paused', result, updatedCoverage };
+        }
+
+        if ((remainingMissing ?? 0) > 0) {
+            const resumeDelayMs = OFFLINE_DOWNLOAD_PROVIDER_RESUME_DELAY_MS;
+            persistOfflineRecoveryState(buildOfflineRecoveryState(preferenze, 'resumable', {
+                trigger,
+                remainingMissing,
+                missingTotal,
+                recoveredTiles,
+                nextRetryAt: Date.now() + resumeDelayMs,
+                consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0
+            }));
+            scheduleOfflineRecoveryResume(preferenze, resumeDelayMs, 'resume');
+            showToast(`🔄 Download parziale ma riprendibile: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti, ne restano ${remainingMissing ?? 'n/d'} (${buildOfflineFailureDetail(result.quotaErrors, providerErrors)}). Nuovo tentativo automatico tra ${formatOfflineDelayMs(resumeDelayMs)}.`, 'info');
+            return { status: 'resumable', result, updatedCoverage };
+        }
+
+        clearOfflineRecoveryState();
+        return { status: 'complete', result, updatedCoverage };
+    } finally {
+        if (progressArea) progressArea.style.display = 'none';
+        aggiornaStatoCacheRegioni();
+        isOfflineMapRecoveryRunning = false;
+    }
+}
+
 async function scaricaRegioniOffline() {
     const preferenze = getOfflinePreferencesFromInputs();
     if (preferenze.regioni.length === 0) {
@@ -5173,96 +5432,12 @@ async function scaricaRegioniOffline() {
         return;
     }
     saveOfflinePreferences(preferenze);
-
-    const progressArea = document.getElementById('offline-progress-area');
-    const progressBar = document.getElementById('offline-progress-bar');
-    const progressText = document.getElementById('offline-progress-text');
-    if (progressArea) progressArea.style.display = 'block';
-    if (progressBar) progressBar.style.width = '0%';
-
-    const cacheName = OFFLINE_MAP_CACHE_NAME;
-    renderOfflineSelectionCoverage(null, { loading: true });
-    let coverage;
-    try {
-        coverage = await analyzeOfflineSelectionCoverage(preferenze);
-        renderOfflineSelectionCoverage(coverage);
-    } catch {
-        renderOfflineSelectionCoverage(null, { errorMessage: 'Impossibile verificare la copertura delle tile.' });
-    }
-    if (!coverage) {
-        if (progressArea) progressArea.style.display = 'none';
-        showToast('Impossibile analizzare le tile richieste prima del download.', 'error');
-        return;
-    }
-
-    const total = coverage.total;
-    const missingTotal = coverage.missing;
-    if (total === 0) {
-        if (progressArea) progressArea.style.display = 'none';
-        showToast('Nessuna tile richiesta per la selezione corrente.', 'info');
-        return;
-    }
-    if (missingTotal === 0) {
-        if (progressArea) progressArea.style.display = 'none';
-        showToast(`✅ Nessuna tile mancante: copertura già completa (${coverage.cached}/${coverage.total}).`, 'success');
-        return;
-    }
-
-    let done = 0;
-    let errors = 0;
-    let quotaErrors = 0;
-    let abortedByQuota = false;
-
-    if (progressText) progressText.textContent = `Recupero tile mancanti: 0 / ${missingTotal}…`;
-
-    let cache;
-    try {
-        cache = await caches.open(cacheName);
-    } catch {
-        showToast('Il browser non supporta la cache offline. Usa Chrome o Firefox.', 'error');
-        if (progressArea) progressArea.style.display = 'none';
-        return;
-    }
-
-    for (const level of coverage.urlsByZoom) {
-        if (level.missingUrls.length === 0) continue;
-        for (let i = 0; i < level.missingUrls.length; i += OFFLINE_DOWNLOAD_BATCH_SIZE) {
-            const batch = level.missingUrls.slice(i, i + OFFLINE_DOWNLOAD_BATCH_SIZE);
-            const results = await Promise.all(batch.map((url) => downloadTileWithRetry(cache, url)));
-            const summary = summarizeTileDownloadResults(results);
-            errors += summary.errors;
-            quotaErrors += summary.quotaErrors;
-            done += batch.length;
-            const pct = Math.round((done / missingTotal) * 100);
-            if (progressBar) progressBar.style.width = pct + '%';
-            if (progressText) progressText.textContent = `Recupero tile mancanti: ${done} / ${missingTotal} (${pct}%)… z${level.zoom}`;
-            if (quotaErrors >= OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT) {
-                abortedByQuota = true;
-                break;
-            }
-            if (i + OFFLINE_DOWNLOAD_BATCH_SIZE < level.missingUrls.length) {
-                await pauseBetweenOfflineBatches();
-            }
-        }
-        if (abortedByQuota) break;
-    }
-
-    if (progressArea) progressArea.style.display = 'none';
-    const networkErrors = Math.max(0, errors - quotaErrors);
-    const updatedCoverage = await analyzeOfflineSelectionCoverage(preferenze).catch(() => null);
-    if (updatedCoverage) renderOfflineSelectionCoverage(updatedCoverage);
-    const remainingMissing = updatedCoverage ? updatedCoverage.missing : null;
-    const recoveredTiles = updatedCoverage ? Math.max(0, missingTotal - updatedCoverage.missing) : null;
-    if (abortedByQuota) {
-        showToast(`⚠️ Download interrotto: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
-    } else if (errors > 0) {
-        showToast(`⚠️ Download completato con ${errors} errori: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti, ne restano ${remainingMissing ?? 'n/d'} (${buildOfflineFailureDetail(quotaErrors, networkErrors)}).`, 'error');
-    } else if ((remainingMissing ?? 0) > 0) {
-        showToast(`⚠️ Download terminato: recuperate ${recoveredTiles}/${missingTotal} tile mancanti, ma ne restano ${remainingMissing}.`, 'error');
-    } else {
-        showToast(`✅ Copertura completata: recuperate tutte le ${missingTotal} tile mancanti (${updatedCoverage?.cached ?? coverage.cached}/${total} valide in cache).`, 'success');
-    }
-    aggiornaStatoCacheRegioni();
+    await runOfflineMapRecovery({
+        preferenze,
+        trigger: 'manual',
+        showProgress: true,
+        waitingToastMessage: '⏸️ Download temporaneamente rallentato dal provider.'
+    });
 }
 
 async function aggiornaStatoCacheRegioni() {
@@ -5344,6 +5519,7 @@ async function eliminaCacheMappaOffline() {
     } catch {
         showToast('Errore durante l\'eliminazione della cache.', 'error');
     }
+    clearOfflineRecoveryState();
     // Improvement 5: invalida i conteggi salvati poiché la cache è stata svuotata.
     try { localStorage.removeItem(OFFLINE_CACHE_STATUS_KEY); } catch {
         // localStorage non disponibile, nessuna azione
@@ -5381,57 +5557,38 @@ async function cleanupInvalidCachedTiles() {
 }
 
 // ── Re-download automatico regioni offline al ritorno della connessione ────────
+function riprendiRecuperoMappaOfflineSeInAttesa() {
+    const state = readOfflineRecoveryState();
+    if (!state || !Array.isArray(state.preferenze?.regioni) || state.preferenze.regioni.length === 0) return false;
+    if (!['provider_paused', 'resumable'].includes(state.status)) return false;
+    if (state.preferenceKey !== buildOfflineRecoveryPreferenceKey(getOfflinePreferences())) {
+        clearOfflineRecoveryState();
+        return false;
+    }
+    const nextRetryAt = Number(state.nextRetryAt);
+    const delayMs = Number.isFinite(nextRetryAt) ? Math.max(0, nextRetryAt - Date.now()) : 0;
+    scheduleOfflineRecoveryResume(state.preferenze, delayMs, 'resume');
+    return true;
+}
+
 async function autoRiscaricaRegioniOfflineSeNecessario() {
+    if (riprendiRecuperoMappaOfflineSeInAttesa()) return;
     const pref = getOfflinePreferences();
     if (!Array.isArray(pref.regioni) || pref.regioni.length === 0) return;
     let coverage;
     try {
         coverage = await analyzeOfflineSelectionCoverage(pref);
     } catch {
-        return; // Cache API non disponibile, nessuna azione
-    }
-    if (!coverage || coverage.total === 0 || coverage.missing === 0) return;
-
-    showToast(`🔄 Cache mappa offline incompleta: recupero di ${coverage.missing} tile mancanti in corso…`, 'info');
-
-    let cache;
-    try {
-        cache = await caches.open(OFFLINE_MAP_CACHE_NAME);
-    } catch {
         return;
     }
-
-    let quotaErrors = 0;
-    let errors = 0;
-    for (const level of coverage.urlsByZoom) {
-        if (level.missingUrls.length === 0) continue;
-        for (let i = 0; i < level.missingUrls.length; i += OFFLINE_DOWNLOAD_BATCH_SIZE) {
-            const batch = level.missingUrls.slice(i, i + OFFLINE_DOWNLOAD_BATCH_SIZE);
-            const results = await Promise.all(batch.map((url) => downloadTileWithRetry(cache, url)));
-            const summary = summarizeTileDownloadResults(results);
-            errors += summary.errors;
-            quotaErrors += summary.quotaErrors;
-            if (quotaErrors >= OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT) {
-                const networkErrors = Math.max(0, errors - quotaErrors);
-                showToast(`⚠️ Ripristino automatico interrotto: spazio cache insufficiente (${buildOfflineFailureDetail(quotaErrors, networkErrors)}).`, 'error');
-                return;
-            }
-            if (i + OFFLINE_DOWNLOAD_BATCH_SIZE < level.missingUrls.length) {
-                await pauseBetweenOfflineBatches();
-            }
-        }
-    }
-
-    const updatedCoverage = await analyzeOfflineSelectionCoverage(pref).catch(() => null);
-    const remainingMissing = updatedCoverage ? updatedCoverage.missing : null;
-    if (errors > 0) {
-        const networkErrors = Math.max(0, errors - quotaErrors);
-        showToast(`⚠️ Re-download completato con ${errors} errori (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Tile mancanti residue: ${remainingMissing ?? 'n/d'}.`, 'error');
-    } else if ((remainingMissing ?? 0) > 0) {
-        showToast(`⚠️ Ripristino terminato ma restano ${remainingMissing} tile mancanti.`, 'error');
-    } else {
-        showToast('✅ Mappa offline ripristinata automaticamente: tutte le tile richieste risultano presenti.', 'success');
-    }
+    if (!coverage || coverage.total === 0 || coverage.missing === 0) return;
+    await runOfflineMapRecovery({
+        preferenze: pref,
+        trigger: 'automatic',
+        showProgress: false,
+        startToastMessage: '🔄 Cache mappa offline incompleta: recupero delle tile mancanti in corso…',
+        waitingToastMessage: '⏸️ Recupero automatico mappa offline in attesa del provider.'
+    });
 }
 
 window.addEventListener('online', () => {
