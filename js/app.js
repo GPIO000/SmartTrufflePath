@@ -565,6 +565,8 @@ setTimeout(() => {
 let userMarker = null;
 let poiMapMarkers = {}; 
 let targetNavigation = null;
+const GPS_NAVIGATION_EXPLANATION_SEEN_KEY = 'gps_navigation_explanation_seen';
+const GPS_NAVIGATION_EXPLANATION_TEXT = "La navigazione di SmartTruffle Path usa il GPS per calcolare distanza e direzione geografica del punto rispetto al Nord.\nNon usa il magnetometro / la bussola hardware del telefono, quindi non rileva dove stai guardando con il dispositivo.\n\nCome orientarti con i movimenti:\n1. Seleziona il punto di destinazione dall'elenco.\n2. Inizia a camminare per qualche metro in una direzione qualsiasi.\n3. Guarda la freccia: se punta davanti a te, stai andando nella direzione giusta. Se punta a destra o sinistra, ruotati fino a farla puntare dritto davanti.\n4. Continua ad avanzare: la distanza diminuisce? Stai andando verso il punto. Aumenta? Stai allontanandoti — gira di 180°.\n5. Più ti avvicini, più la freccia è precisa. Negli ultimi metri affidati agli occhi e alla mappa.";
 const legacyCarCoordinates = readStorageJSON('car_coords', null);
 
 function parseLegacyDateToTimestamp(dateText) {
@@ -845,8 +847,9 @@ async function savePoiPosition() {
         showToast("📍 Punto salvato!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
-function navigateToPoi(index) {
+async function navigateToPoi(index) {
     if (poiList[index]) {
+        await showGpsNavigationExplanationIfNeeded(poiList[index].note);
         targetNavigation = `poi_${index}`;
         map.setView([poiList[index].lat, poiList[index].lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
@@ -945,7 +948,20 @@ function openModule(moduleName, editMode = false) {
     let contentHTML = '';
     switch(moduleName) {
         case 'poilist':
-            let poiHtml = '<h2>Elenco Punti & Tartufaie</h2><p>I tuoi punti di ricerca salvati con note:</p>';
+            let poiHtml = `<h2>Elenco Punti & Tartufaie</h2><p>I tuoi punti di ricerca salvati con note:</p>
+                <div class="module-card card-gap">
+                    <strong class="text-accent">ℹ️ Come funziona la navigazione</strong>
+                    <p class="text-muted small-text" style="margin-top:8px;">La bussola dell'app calcola via GPS la direzione geografica del punto rispetto al Nord e la distanza.</p>
+                    <p class="text-subtle small-text" style="margin-top:6px;">Non usa il magnetometro / la bussola hardware del telefono, quindi non indica dove stai guardando: per orientarti usa i tuoi movimenti.</p>
+                    <p class="text-subtle small-text" style="margin-top:6px;"><strong>Come orientarti:</strong></p>
+                    <ol class="text-subtle small-text" style="margin:4px 0 0 16px; padding:0; line-height:1.7;">
+                        <li>Seleziona il punto dall'elenco.</li>
+                        <li>Cammina qualche metro in una direzione qualsiasi.</li>
+                        <li>Se la freccia punta davanti a te, stai andando bene. Se punta di lato, ruotati finché non ti punta dritto davanti.</li>
+                        <li>La distanza diminuisce? Stai avanzando. Aumenta? Gira di 180°.</li>
+                        <li>Negli ultimi metri affidati alla mappa e agli occhi.</li>
+                    </ol>
+                </div>`;
             if (poiList.length === 0) {
                 poiHtml += '<div class="module-card"><p>Nessun punto salvato. Usa i tasti "Segna Auto" o "Segna Punto" sulla mappa.</p></div>';
             } else {
@@ -4723,7 +4739,7 @@ function importaCalendariJSON(event) {
 }
 async function mostraInfoModulo(moduleName) {
     const guideTesti = {
-        'poilist': "ℹ️ **Guida - Elenco Punti & Tartufaie**\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con le relative coordinate e note. Puoi impostare la navigazione sulla bussola, condividere la posizione o eliminare i punti non più utili.",
+        'poilist': "ℹ️ Guida - Elenco Punti & Tartufaie\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con coordinate e note. Il tasto '🧭 Vai' imposta una navigazione basata su GPS: l'app calcola la distanza e la direzione geografica del punto rispetto al Nord.\n\nQuesta navigazione non usa il magnetometro / la bussola hardware del telefono, quindi non indica dove stai guardando con il dispositivo. Per orientarti devi confrontare la mappa con i tuoi spostamenti reali.\n\nPuoi anche condividere la posizione o eliminare i punti non più utili.",
         'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS, rileva il nome del mittente quando presente nel testo e salva il punto nell'elenco con l'icona appropriata (📩 condiviso, 🚨 SOS).",
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
@@ -5098,3 +5114,11 @@ window.addEventListener('online', () => {
 window.addEventListener('offline', () => {
     clampMapZoomForOffline();
 });
+async function showGpsNavigationExplanationIfNeeded(destinationLabel) {
+    if (localStorage.getItem(GPS_NAVIGATION_EXPLANATION_SEEN_KEY) === 'true') return;
+    try {
+        await appAlert(`🧭 Destinazione: ${destinationLabel}\n\n${GPS_NAVIGATION_EXPLANATION_TEXT}`);
+    } finally {
+        localStorage.setItem(GPS_NAVIGATION_EXPLANATION_SEEN_KEY, 'true');
+    }
+}
