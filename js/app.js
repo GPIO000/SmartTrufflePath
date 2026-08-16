@@ -566,7 +566,7 @@ let userMarker = null;
 let poiMapMarkers = {}; 
 let targetNavigation = null;
 const GPS_NAVIGATION_EXPLANATION_SEEN_KEY = 'gps_navigation_explanation_seen';
-const GPS_NAVIGATION_EXPLANATION_TEXT = "La navigazione di SmartTruffle Path usa il GPS per calcolare distanza e direzione geografica del punto rispetto al Nord.\nNon usa il magnetometro / la bussola hardware del telefono, quindi non rileva dove stai guardando con il dispositivo.\n\nPer orientarti, confronta la mappa con i tuoi spostamenti reali.";
+const GPS_NAVIGATION_EXPLANATION_TEXT = "La navigazione di SmartTruffle Path usa il GPS per calcolare distanza e direzione geografica del punto rispetto al Nord.\nNon usa il magnetometro / la bussola hardware del telefono, quindi non rileva dove stai guardando con il dispositivo.\n\nCome orientarti con i movimenti:\n1. Seleziona il punto di destinazione dall'elenco.\n2. Inizia a camminare per qualche metro in una direzione qualsiasi.\n3. Guarda la freccia: se punta davanti a te, stai andando nella direzione giusta. Se punta a destra o sinistra, ruotati fino a farla puntare dritto davanti.\n4. Continua ad avanzare: la distanza diminuisce? Stai andando verso il punto. Aumenta? Stai allontanandoti — gira di 180°.\n5. Più ti avvicini, più la freccia è precisa. Negli ultimi metri affidati agli occhi e alla mappa.";
 const legacyCarCoordinates = readStorageJSON('car_coords', null);
 
 function parseLegacyDateToTimestamp(dateText) {
@@ -952,7 +952,15 @@ function openModule(moduleName, editMode = false) {
                 <div class="module-card card-gap">
                     <strong class="text-accent">ℹ️ Come funziona la navigazione</strong>
                     <p class="text-muted small-text" style="margin-top:8px;">La bussola dell'app calcola via GPS la direzione geografica del punto rispetto al Nord e la distanza.</p>
-                    <p class="text-subtle small-text" style="margin-top:6px;">Non usa il magnetometro / la bussola hardware del telefono, quindi non indica dove stai guardando: per orientarti devi confrontare la mappa con i tuoi spostamenti reali.</p>
+                    <p class="text-subtle small-text" style="margin-top:6px;">Non usa il magnetometro / la bussola hardware del telefono, quindi non indica dove stai guardando: per orientarti usa i tuoi movimenti.</p>
+                    <p class="text-subtle small-text" style="margin-top:6px;"><strong>Come orientarti:</strong></p>
+                    <ol class="text-subtle small-text" style="margin:4px 0 0 16px; padding:0; line-height:1.7;">
+                        <li>Seleziona il punto dall'elenco.</li>
+                        <li>Cammina qualche metro in una direzione qualsiasi.</li>
+                        <li>Se la freccia punta davanti a te, stai andando bene. Se punta di lato, ruotati finché non ti punta dritto davanti.</li>
+                        <li>La distanza diminuisce? Stai avanzando. Aumenta? Gira di 180°.</li>
+                        <li>Negli ultimi metri affidati alla mappa e agli occhi.</li>
+                    </ol>
                 </div>`;
             if (poiList.length === 0) {
                 poiHtml += '<div class="module-card"><p>Nessun punto salvato. Usa i tasti "Segna Auto" o "Segna Punto" sulla mappa.</p></div>';
