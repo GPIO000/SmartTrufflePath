@@ -110,6 +110,17 @@ describe('tile response validation', () => {
       retryAfterMs: 12000
     });
   });
+
+  it('does not treat successful or forbidden responses as provider throttling', () => {
+    expect(isProviderThrottledResponse({
+      status: 200,
+      headers: new Headers({ 'retry-after': '12' })
+    })).toBe(false);
+    expect(isProviderThrottledResponse({
+      status: 403,
+      headers: new Headers()
+    })).toBe(false);
+  });
 });
 
 describe('downloadTileWithRetry', () => {

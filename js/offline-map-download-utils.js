@@ -88,8 +88,8 @@ function getRetryAfterMs(response, nowMs = Date.now()) {
 function isProviderThrottledResponse(response) {
   if (!response) return false;
   if (response.status === 429) return true;
-  if (getRetryAfterMs(response) !== null) return true;
-  return [403, 408, 425, 500, 502, 503, 504].includes(response.status);
+  if (response.status >= 400 && getRetryAfterMs(response) !== null) return true;
+  return [408, 425, 500, 502, 503, 504].includes(response.status);
 }
 
 function buildTileDownloadFailureResult({ response, error } = {}) {
