@@ -84,11 +84,13 @@ async function migrateLegacyOsmTilesToOfflineCache() {
     const requests = await legacyCache.keys();
     await Promise.all(requests.map(async (request) => {
       if (!isOsmTileRequestUrl(request.url)) return;
-      const existing = await offlineCache.match(request);
+      const canonicalUrl = canonicalizeOsmTileUrl(request.url);
+      const canonicalRequest = canonicalUrl !== request.url ? new Request(canonicalUrl) : request;
+      const existing = await offlineCache.match(canonicalRequest);
       if (existing) return;
       const response = await legacyCache.match(request);
       if (response) {
-        await offlineCache.put(request, response.clone());
+        await offlineCache.put(canonicalRequest, response.clone());
       }
     }));
   }));
@@ -185,13 +187,13 @@ self.addEventListener('fetch', (e) => {
 
           const legacyResponse = await getLegacyOsmTileResponse(e.request);
           if (legacyResponse) {
-            offlineCache.put(e.request, legacyResponse.clone()).catch(() => {});
+            offlineCache.put(cacheRequest, legacyResponse.clone()).catch(() => {});
             return legacyResponse;
           }
 
           const networkResponse = await fetch(e.request);
           if (networkResponse && (networkResponse.ok || networkResponse.type === 'opaque')) {
-            offlineCache.put(e.request, networkResponse.clone()).catch(() => {});
+            offlineCache.put(cacheRequest, networkResponse.clone()).catch(() => {});
             notifyClientsTileNetworkStatus('tile-network-ok').catch(() => {});
           }
           return networkResponse;

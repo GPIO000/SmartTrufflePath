@@ -36,7 +36,7 @@ const MAP_TILE_LAYER_MAX_ZOOM = 19;
 const MAP_TILE_LAYER_MIN_ZOOM = 0;
 const map = L.map('map', { zoomControl: false }).setView([41.8719, 12.5674], 6);
 L.control.zoom({ position: 'topright' }).addTo(map);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: MAP_TILE_LAYER_MAX_ZOOM, attribution: '© OpenStreetMap' }).addTo(map);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: MAP_TILE_LAYER_MAX_ZOOM, attribution: '© OpenStreetMap' }).addTo(map);
 const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
 const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
