@@ -198,7 +198,7 @@ self.addEventListener('fetch', (e) => {
           const corsRequest = new Request(canonicalUrl, { mode: 'cors', cache: 'no-store' });
           const networkResponse = await fetch(corsRequest);
           if (networkResponse && networkResponse.ok) {
-            offlineCache.put(cacheRequest, networkResponse.clone()).catch(() => {});
+            offlineCache.put(corsRequest, networkResponse.clone()).catch(() => {});
             notifyClientsTileNetworkStatus('tile-network-ok').catch(() => {});
           }
           return networkResponse;
