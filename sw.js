@@ -1,5 +1,5 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-16c';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-16d';
 const MAP_OFFLINE_CACHE_NAME = 'smarttruffle-map-offline';
 let legacyAppCacheNames = null;
 let legacyAppCacheNamesPromise = null;
@@ -86,7 +86,7 @@ async function migrateLegacyOsmTilesToOfflineCache() {
       if (!isOsmTileRequestUrl(request.url)) return;
       const canonicalUrl = canonicalizeOsmTileUrl(request.url);
       const canonicalRequest = canonicalUrl !== request.url ? new Request(canonicalUrl) : request;
-      const existing = await offlineCache.match(canonicalRequest);
+      const existing = await offlineCache.match(canonicalRequest, { ignoreVary: true });
       if (existing) return;
       const response = await legacyCache.match(request);
       if (response) {
@@ -100,7 +100,7 @@ async function getLegacyOsmTileResponse(request) {
   const legacyAppCaches = await loadLegacyAppCacheNames();
   for (const cacheName of legacyAppCaches) {
     const legacyCache = await caches.open(cacheName);
-    const cachedResponse = await legacyCache.match(request);
+    const cachedResponse = await legacyCache.match(request, { ignoreVary: true });
     if (cachedResponse) return cachedResponse;
   }
   return null;
@@ -182,7 +182,7 @@ self.addEventListener('fetch', (e) => {
           const offlineCache = await caches.open(MAP_OFFLINE_CACHE_NAME);
           const canonicalUrl = canonicalizeOsmTileUrl(e.request.url);
           const cacheRequest = canonicalUrl !== e.request.url ? new Request(canonicalUrl) : e.request;
-          const offlineResponse = await offlineCache.match(cacheRequest);
+          const offlineResponse = await offlineCache.match(cacheRequest, { ignoreVary: true });
           if (offlineResponse) return offlineResponse;
 
           const legacyResponse = await getLegacyOsmTileResponse(e.request);
