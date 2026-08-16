@@ -58,7 +58,7 @@ function getOfflinePreferredMaxZoom() {
 function getAdaptiveFocusZoom(defaultZoom) {
     const offlineMaxZoom = getOfflinePreferredMaxZoom();
     if (!navigator.onLine && Number.isFinite(offlineMaxZoom)) {
-        return offlineMaxZoom;
+        return Math.min(defaultZoom, offlineMaxZoom);
     }
     return defaultZoom;
 }
