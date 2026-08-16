@@ -4919,8 +4919,20 @@ function normalizeOsmTileUrl(url) {
     return url;
 }
 
-const OFFLINE_DOWNLOAD_BATCH_SIZE = 6;
+const OFFLINE_DOWNLOAD_BATCH_SIZE = 3;
 const OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT = 8;
+const OFFLINE_DOWNLOAD_BATCH_PAUSE_MS = 450;
+const OFFLINE_DOWNLOAD_BATCH_PAUSE_JITTER_MS = 250;
+
+function sleepOfflineBatch(ms) {
+    if (!Number.isFinite(ms) || ms <= 0) return Promise.resolve();
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function pauseBetweenOfflineBatches() {
+    const jitter = Math.floor(Math.random() * (OFFLINE_DOWNLOAD_BATCH_PAUSE_JITTER_MS + 1));
+    await sleepOfflineBatch(OFFLINE_DOWNLOAD_BATCH_PAUSE_MS + jitter);
+}
 
 function buildOfflineTileUrlsByZoom(regionIds, maxZoom) {
     const urlsByZoom = [];
@@ -5228,6 +5240,9 @@ async function scaricaRegioniOffline() {
                 abortedByQuota = true;
                 break;
             }
+            if (i + OFFLINE_DOWNLOAD_BATCH_SIZE < level.missingUrls.length) {
+                await pauseBetweenOfflineBatches();
+            }
         }
         if (abortedByQuota) break;
     }
@@ -5400,6 +5415,9 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
                 const networkErrors = Math.max(0, errors - quotaErrors);
                 showToast(`⚠️ Ripristino automatico interrotto: spazio cache insufficiente (${buildOfflineFailureDetail(quotaErrors, networkErrors)}).`, 'error');
                 return;
+            }
+            if (i + OFFLINE_DOWNLOAD_BATCH_SIZE < level.missingUrls.length) {
+                await pauseBetweenOfflineBatches();
             }
         }
     }
