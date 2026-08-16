@@ -168,11 +168,11 @@ function summarizeTileDownloadResults(results = []) {
     if (result?.reason === 'quota_exceeded') {
       summary.quotaErrors++;
     } else if (result?.reason === 'provider_throttled') {
-      summary.providerErrors++;
+      summary.nonQuotaErrors++;
       summary.throttledErrors++;
       summary.maxRetryAfterMs = Math.max(summary.maxRetryAfterMs, result?.retryAfterMs || 0);
     } else {
-      summary.providerErrors++;
+      summary.nonQuotaErrors++;
       summary.networkErrors++;
     }
     return summary;
@@ -180,7 +180,7 @@ function summarizeTileDownloadResults(results = []) {
     errors: 0,
     quotaErrors: 0,
     networkErrors: 0,
-    providerErrors: 0,
+    nonQuotaErrors: 0,
     throttledErrors: 0,
     maxRetryAfterMs: 0
   });
@@ -251,7 +251,7 @@ async function downloadTileBatchesWithRecovery(levels = [], {
     errors: 0,
     quotaErrors: 0,
     networkErrors: 0,
-    providerErrors: 0,
+    nonQuotaErrors: 0,
     throttledErrors: 0,
     pausedForProvider: false,
     abortedByQuota: false,
@@ -267,14 +267,18 @@ async function downloadTileBatchesWithRecovery(levels = [], {
       const results = await Promise.all(batch.map((url) => downloadTileFn(cache, url, downloadOptions)));
       const summary = summarizeTileDownloadResults(results);
       const successCount = Math.max(0, batch.length - summary.errors);
-      if (summary.providerErrors > 0 && successCount === 0) {
-        state.consecutiveProviderErrors += summary.providerErrors;
-      } else if (successCount > 0 || summary.providerErrors === 0) {
+      if (summary.nonQuotaErrors > 0 && successCount === 0) {
+        state.consecutiveProviderErrors += summary.nonQuotaErrors;
+      } else if (summary.nonQuotaErrors > 0) {
+        state.consecutiveProviderErrors = summary.nonQuotaErrors;
+      } else {
         state.consecutiveProviderErrors = 0;
       }
       if (summary.throttledErrors > 0 && successCount === 0) {
         state.consecutiveThrottledErrors += summary.throttledErrors;
-      } else if (successCount > 0 || summary.throttledErrors === 0) {
+      } else if (summary.throttledErrors > 0) {
+        state.consecutiveThrottledErrors = summary.throttledErrors;
+      } else {
         state.consecutiveThrottledErrors = 0;
       }
 
@@ -282,7 +286,7 @@ async function downloadTileBatchesWithRecovery(levels = [], {
       totals.errors += summary.errors;
       totals.quotaErrors += summary.quotaErrors;
       totals.networkErrors += summary.networkErrors;
-      totals.providerErrors += summary.providerErrors;
+      totals.nonQuotaErrors += summary.nonQuotaErrors;
       totals.throttledErrors += summary.throttledErrors;
 
       const adaptivePauseMs = getAdaptiveBatchPauseMs(state.consecutiveProviderErrors, {

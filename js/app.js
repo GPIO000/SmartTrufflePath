@@ -5225,15 +5225,15 @@ function scheduleOfflineRecoveryResume(preferenze, delayMs, trigger = 'resume') 
     }, safeDelayMs);
 }
 
-function buildOfflineFailureDetail(quotaErrors, providerErrors) {
-    if (quotaErrors > 0 && providerErrors > 0) {
-        return `${quotaErrors} da spazio cache esaurito, ${providerErrors} da rete/provider`;
+function buildOfflineFailureDetail(quotaErrors, nonQuotaErrors) {
+    if (quotaErrors > 0 && nonQuotaErrors > 0) {
+        return `${quotaErrors} da spazio cache esaurito, ${nonQuotaErrors} da rete/provider`;
     }
     if (quotaErrors > 0) {
         return `${quotaErrors} da spazio cache esaurito`;
     }
-    if (providerErrors > 0) {
-        return `${providerErrors} da rete/provider`;
+    if (nonQuotaErrors > 0) {
+        return `${nonQuotaErrors} da rete/provider`;
     }
     return 'nessun errore rilevato';
 }
@@ -5367,7 +5367,7 @@ async function runOfflineMapRecovery({
             }
         });
 
-        const providerErrors = Math.max(0, result.providerErrors);
+        const nonQuotaErrors = Math.max(0, result.nonQuotaErrors);
         const updatedCoverage = await analyzeOfflineSelectionCoverage(preferenze).catch(() => null);
         if (updatedCoverage) renderOfflineSelectionCoverage(updatedCoverage);
         const remainingMissing = updatedCoverage ? updatedCoverage.missing : null;
@@ -5382,7 +5382,7 @@ async function runOfflineMapRecovery({
                 consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0,
                 consecutiveThrottledErrors: result.state?.consecutiveThrottledErrors || 0
             }));
-            showToast(`⚠️ Download interrotto: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti (${buildOfflineFailureDetail(result.quotaErrors, providerErrors)}). Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
+            showToast(`⚠️ Download interrotto: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti (${buildOfflineFailureDetail(result.quotaErrors, nonQuotaErrors)}). Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
             return { status: 'quota_stopped', result, updatedCoverage };
         }
 
@@ -5420,7 +5420,7 @@ async function runOfflineMapRecovery({
                 consecutiveThrottledErrors: result.state?.consecutiveThrottledErrors || 0
             }));
             scheduleOfflineRecoveryResume(preferenze, resumeDelayMs, 'resume');
-            showToast(`🔄 Download parziale ma riprendibile: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti, ne restano ${remainingMissing ?? 'n/d'} (${buildOfflineFailureDetail(result.quotaErrors, providerErrors)}). Nuovo tentativo automatico tra ${formatOfflineDelayMs(resumeDelayMs)}.`, 'info');
+            showToast(`🔄 Download parziale ma riprendibile: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti, ne restano ${remainingMissing ?? 'n/d'} (${buildOfflineFailureDetail(result.quotaErrors, nonQuotaErrors)}). Nuovo tentativo automatico tra ${formatOfflineDelayMs(resumeDelayMs)}.`, 'info');
             return { status: 'resumable', result, updatedCoverage };
         }
 
@@ -5444,6 +5444,7 @@ async function scaricaRegioniOffline() {
         preferenze,
         trigger: 'manual',
         showProgress: true,
+        startToastMessage: '📥 Download mappa offline in corso…',
         waitingToastMessage: '⏸️ Download temporaneamente rallentato dal provider.'
     });
 }

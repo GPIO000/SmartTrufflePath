@@ -248,7 +248,7 @@ describe('summarizeTileDownloadResults', () => {
       errors: 5,
       quotaErrors: 1,
       networkErrors: 3,
-      providerErrors: 4,
+      nonQuotaErrors: 4,
       throttledErrors: 1,
       maxRetryAfterMs: 4000
     });
@@ -323,7 +323,7 @@ describe('downloadTileBatchesWithRecovery', () => {
     expect(result.abortedByQuota).toBe(false);
     expect(result.done).toBe(6);
     expect(result.errors).toBe(6);
-    expect(result.providerErrors).toBe(6);
+    expect(result.nonQuotaErrors).toBe(6);
     expect(result.throttledErrors).toBe(3);
     expect(result.cooldownMs).toBe(12000);
     expect(result.state).toEqual({ consecutiveProviderErrors: 6, consecutiveThrottledErrors: 3 });
