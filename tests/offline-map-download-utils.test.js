@@ -99,7 +99,7 @@ describe('downloadTileWithRetry', () => {
       type: 'cors',
       status: 200,
       ok: true,
-      headers: new Headers({ 'content-length': '2048' }),
+      headers: new Headers({ 'content-length': '2048', 'content-type': 'image/png' }),
       clone: vi.fn().mockReturnValue(corsClone)
     };
     const cache = {
@@ -151,7 +151,7 @@ describe('downloadTileWithRetry', () => {
       type: 'cors',
       status: 200,
       ok: true,
-      headers: new Headers({ 'content-length': '2048' }),
+      headers: new Headers({ 'content-length': '2048', 'content-type': 'image/png' }),
       clone: vi.fn().mockReturnValue({ ok: true })
     };
     const cache = {
