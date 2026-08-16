@@ -45,6 +45,11 @@ const OFFLINE_MAP_MIN_ZOOM = 8;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
 const OFFLINE_CACHE_STATUS_KEY = 'offline_cache_status';
 let isApplyingMapConnectivityZoomCap = false;
+let isTileNetworkUnavailable = false;
+
+function isOfflineMapModeActive() {
+    return !navigator.onLine || isTileNetworkUnavailable;
+}
 
 function getOfflinePreferences() {
     return readStorageJSON(OFFLINE_REGIONI_PREFERITE_KEY, { regioni: [], maxZoom: OFFLINE_MAP_DEFAULT_MAX_ZOOM });
@@ -60,7 +65,7 @@ function getOfflinePreferredMaxZoom() {
 
 function getAdaptiveFocusZoom(defaultZoom) {
     const offlineMaxZoom = getOfflinePreferredMaxZoom();
-    if (!navigator.onLine && Number.isFinite(offlineMaxZoom)) {
+    if (isOfflineMapModeActive() && Number.isFinite(offlineMaxZoom)) {
         return Math.min(defaultZoom, offlineMaxZoom);
     }
     return defaultZoom;
@@ -85,7 +90,7 @@ function applyMapConnectivityZoomCap({ notify = false, enforceBounds = true } = 
     };
 
     const offlineMaxZoom = getOfflinePreferredMaxZoom();
-    const hasOfflineCap = !navigator.onLine && Number.isFinite(offlineMaxZoom);
+    const hasOfflineCap = isOfflineMapModeActive() && Number.isFinite(offlineMaxZoom);
     const maxZoomCap = hasOfflineCap
         ? Math.min(MAP_TILE_LAYER_MAX_ZOOM, offlineMaxZoom)
         : MAP_TILE_LAYER_MAX_ZOOM;
@@ -633,7 +638,7 @@ setTimeout(() => {
     setTimeout(() => cleanupInvalidCachedTiles().catch(() => {}), 5000);
 }, 400);
 map.on('zoomend', () => {
-    if (!navigator.onLine) applyMapConnectivityZoomCap({ enforceBounds: false });
+    if (isOfflineMapModeActive()) applyMapConnectivityZoomCap({ enforceBounds: false });
 });
 
 let userMarker = null;
@@ -5291,6 +5296,24 @@ window.addEventListener('online', () => {
 window.addEventListener('offline', () => {
     clampMapZoomForOffline();
 });
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        const messageType = event?.data?.type;
+        if (messageType === 'tile-network-unavailable') {
+            if (!isTileNetworkUnavailable) {
+                isTileNetworkUnavailable = true;
+                clampMapZoomForOffline();
+            }
+            return;
+        }
+        if (messageType === 'tile-network-ok') {
+            if (isTileNetworkUnavailable && navigator.onLine) {
+                isTileNetworkUnavailable = false;
+                applyMapConnectivityZoomCap();
+            }
+        }
+    });
+}
 async function showGpsNavigationExplanationIfNeeded(destinationLabel) {
     if (localStorage.getItem(GPS_NAVIGATION_EXPLANATION_SEEN_KEY) === 'true') return;
     try {
