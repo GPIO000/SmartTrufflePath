@@ -8,7 +8,7 @@ import {
 import {
     countCachedTileUrls,
     isOfflineRegionFullyCached,
-    shouldRestoreOfflineMapCache
+    summarizeTileCoverage
 } from './offline-cache-utils.js';
 import { downloadTileWithRetry, isValidCachedTileResponse, summarizeTileDownloadResults } from './offline-map-download-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
@@ -548,6 +548,7 @@ const ACTION_HANDLERS = {
         closeActiveModule();
     },
     scaricaRegioniOffline: () => scaricaRegioniOffline(),
+    verificaCoperturaMappaOffline: () => verificaCoperturaMappaOffline(),
     salvaPreferenzeMappaOffline: () => salvaPreferenzeMappaOffline(),
     eliminaCacheMappaOffline: () => eliminaCacheMappaOffline(),
     selezionaTutteRegioni: () => {
@@ -2398,8 +2399,15 @@ function openModule(moduleName, editMode = false) {
                             <div id="offline-progress-bar" style="height:100%; width:0%; background:#22c55e; border-radius:6px; transition:width 0.3s;"></div>
                         </div>
                     </div>
+                    <button class="overlay-btn btn-neutral" style="width:100%; margin-bottom:10px;" ${actionAttrs('verificaCoperturaMappaOffline')}>🔎 Verifica Tile Necessarie</button>
                     <button class="overlay-btn btn-primary" style="width:100%; margin-bottom:10px;" ${actionAttrs('scaricaRegioniOffline')}>📥 Scarica Regioni Selezionate</button>
                     <button class="overlay-btn btn-danger" style="width:100%;" ${actionAttrs('eliminaCacheMappaOffline')}>🗑️ Elimina Tutta la Cache Mappa</button>
+                </div>
+                <div class="module-card" style="margin-bottom:14px;">
+                    <p style="font-size:0.85rem; color:#f6f1e6; font-weight:bold; margin:0 0 8px 0;">🔎 Copertura richiesta</p>
+                    <div id="offline-selection-coverage" style="font-size:0.82rem; color:#b8b0a0;">
+                        <p style="margin:0; color:#6b7280; font-size:0.8rem;">Seleziona regioni e zoom, poi usa “🔎 Verifica Tile Necessarie”.</p>
+                    </div>
                 </div>
                 <div class="module-card" style="margin-bottom:14px;">
                     <p style="font-size:0.85rem; color:#f6f1e6; font-weight:bold; margin:0 0 8px 0;">📦 Stato cache per regione</p>
@@ -5025,6 +5033,97 @@ function getOfflinePreferencesFromInputs() {
     return { regioni, maxZoom };
 }
 
+function buildOfflineSelectionCoverage(preferenze, cachedUrls) {
+    const normalizedPreferences = {
+        regioni: Array.isArray(preferenze?.regioni) ? preferenze.regioni : [],
+        maxZoom: typeof preferenze?.maxZoom === 'number' ? preferenze.maxZoom : OFFLINE_MAP_DEFAULT_MAX_ZOOM
+    };
+    const urlsByZoom = buildOfflineTileUrlsByZoom(normalizedPreferences.regioni, normalizedPreferences.maxZoom)
+        .map((level) => {
+            const coverage = summarizeTileCoverage(cachedUrls, level.urls);
+            return { zoom: level.zoom, ...coverage };
+        });
+    const allUrls = urlsByZoom.flatMap((level) => level.tileUrls);
+    return {
+        preferenze: normalizedPreferences,
+        urlsByZoom,
+        ...summarizeTileCoverage(cachedUrls, allUrls)
+    };
+}
+
+async function analyzeOfflineSelectionCoverage(preferenze) {
+    const cachedUrls = await getOfflineMapCachedUrlsSet({ includeLegacy: true, validateSize: true });
+    return buildOfflineSelectionCoverage(preferenze, cachedUrls);
+}
+
+function renderOfflineSelectionCoverage(coverage, { errorMessage = '', loading = false } = {}) {
+    const coverageEl = document.getElementById('offline-selection-coverage');
+    if (!coverageEl) return;
+    if (loading) {
+        coverageEl.innerHTML = '<p style="margin:0; color:#6b7280; font-size:0.8rem;">Verifica copertura in corso…</p>';
+        return;
+    }
+    if (errorMessage) {
+        coverageEl.innerHTML = `<p style="margin:0; color:#ef4444; font-size:0.8rem;">⚠️ ${escapeHtml(errorMessage)}</p>`;
+        return;
+    }
+    if (!coverage || coverage.preferenze.regioni.length === 0) {
+        coverageEl.innerHTML = '<p style="margin:0; color:#6b7280; font-size:0.8rem;">Seleziona almeno una regione per verificare le tile richieste.</p>';
+        return;
+    }
+    if (coverage.total === 0) {
+        coverageEl.innerHTML = '<p style="margin:0; color:#6b7280; font-size:0.8rem;">Nessuna tile richiesta per la selezione corrente.</p>';
+        return;
+    }
+
+    const badge = coverage.isFullyCached
+        ? '<span style="color:#22c55e; font-size:0.78rem; font-weight:bold;">✅ Copertura completa</span>'
+        : coverage.cached > 0
+            ? '<span style="color:#f59e0b; font-size:0.78rem; font-weight:bold;">🟨 Copertura parziale</span>'
+            : '<span style="color:#ef4444; font-size:0.78rem; font-weight:bold;">⬜ Nessuna tile valida in cache</span>';
+    const missingByZoom = coverage.urlsByZoom
+        .filter((level) => level.missing > 0)
+        .map((level) => `z${level.zoom}: ${level.missing}`)
+        .join(' • ');
+    const zoomRange = `${OFFLINE_MAP_MIN_ZOOM}–${coverage.preferenze.maxZoom}`;
+
+    coverageEl.innerHTML = `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+            <span style="color:#ddd6c8;">Regioni selezionate: ${coverage.preferenze.regioni.length}</span>
+            ${badge}
+        </div>
+        <p style="margin:0 0 6px 0; color:#ddd6c8;">Tile attese per zoom ${zoomRange}: <strong>${coverage.total}</strong></p>
+        <p style="margin:0 0 6px 0; color:#22c55e;">Tile valide in cache: <strong>${coverage.cached}</strong></p>
+        <p style="margin:0 0 6px 0; color:${coverage.missing > 0 ? '#f59e0b' : '#22c55e'};">Tile mancanti: <strong>${coverage.missing}</strong></p>
+        ${missingByZoom ? `<p style="margin:0; color:#b8b0a0; font-size:0.78rem;">Mancanti per zoom: ${escapeHtml(missingByZoom)}</p>` : '<p style="margin:0; color:#6b7280; font-size:0.78rem;">Tutte le tile richieste risultano presenti e valide.</p>'}
+    `;
+}
+
+async function verificaCoperturaMappaOffline({ preferenze = getOfflinePreferencesFromInputs(), notify = true } = {}) {
+    if (!Array.isArray(preferenze.regioni) || preferenze.regioni.length === 0) {
+        renderOfflineSelectionCoverage(null);
+        if (notify) showToast('Seleziona almeno una regione prima di verificare la copertura.', 'info');
+        return null;
+    }
+    renderOfflineSelectionCoverage(null, { loading: true });
+    try {
+        const coverage = await analyzeOfflineSelectionCoverage(preferenze);
+        renderOfflineSelectionCoverage(coverage);
+        if (notify) {
+            if (coverage.missing === 0) {
+                showToast(`✅ Copertura completa: ${coverage.cached} tile valide già presenti in cache.`, 'success');
+            } else {
+                showToast(`ℹ️ Copertura parziale: mancano ${coverage.missing} tile su ${coverage.total}.`, 'info');
+            }
+        }
+        return coverage;
+    } catch {
+        renderOfflineSelectionCoverage(null, { errorMessage: 'Impossibile verificare la copertura delle tile.' });
+        if (notify) showToast('Impossibile verificare la copertura delle tile.', 'error');
+        return null;
+    }
+}
+
 function saveOfflinePreferences(preferenze) {
     localStorage.setItem(OFFLINE_REGIONI_PREFERITE_KEY, JSON.stringify(preferenze));
 }
@@ -5067,17 +5166,35 @@ async function scaricaRegioniOffline() {
     const progressBar = document.getElementById('offline-progress-bar');
     const progressText = document.getElementById('offline-progress-text');
     if (progressArea) progressArea.style.display = 'block';
+    if (progressBar) progressBar.style.width = '0%';
 
     const cacheName = OFFLINE_MAP_CACHE_NAME;
+    const coverage = await verificaCoperturaMappaOffline({ preferenze, notify: false });
+    if (!coverage) {
+        if (progressArea) progressArea.style.display = 'none';
+        showToast('Impossibile analizzare le tile richieste prima del download.', 'error');
+        return;
+    }
 
-    const urlsByZoom = buildOfflineTileUrlsByZoom(preferenze.regioni, preferenze.maxZoom);
-    const total = urlsByZoom.reduce((sum, item) => sum + item.urls.length, 0);
+    const total = coverage.total;
+    const missingTotal = coverage.missing;
+    if (total === 0) {
+        if (progressArea) progressArea.style.display = 'none';
+        showToast('Nessuna tile richiesta per la selezione corrente.', 'info');
+        return;
+    }
+    if (missingTotal === 0) {
+        if (progressArea) progressArea.style.display = 'none';
+        showToast(`✅ Nessuna tile mancante: copertura già completa (${coverage.cached}/${coverage.total}).`, 'success');
+        return;
+    }
+
     let done = 0;
     let errors = 0;
     let quotaErrors = 0;
     let abortedByQuota = false;
 
-    if (progressText) progressText.textContent = `Download in corso: 0 / ${total} tile…`;
+    if (progressText) progressText.textContent = `Recupero tile mancanti: 0 / ${missingTotal}…`;
 
     let cache;
     try {
@@ -5088,17 +5205,18 @@ async function scaricaRegioniOffline() {
         return;
     }
 
-    for (const level of urlsByZoom) {
-        for (let i = 0; i < level.urls.length; i += OFFLINE_DOWNLOAD_BATCH_SIZE) {
-            const batch = level.urls.slice(i, i + OFFLINE_DOWNLOAD_BATCH_SIZE);
+    for (const level of coverage.urlsByZoom) {
+        if (level.missingUrls.length === 0) continue;
+        for (let i = 0; i < level.missingUrls.length; i += OFFLINE_DOWNLOAD_BATCH_SIZE) {
+            const batch = level.missingUrls.slice(i, i + OFFLINE_DOWNLOAD_BATCH_SIZE);
             const results = await Promise.all(batch.map((url) => downloadTileWithRetry(cache, url)));
             const summary = summarizeTileDownloadResults(results);
             errors += summary.errors;
             quotaErrors += summary.quotaErrors;
             done += batch.length;
-            const pct = Math.round((done / total) * 100);
+            const pct = Math.round((done / missingTotal) * 100);
             if (progressBar) progressBar.style.width = pct + '%';
-            if (progressText) progressText.textContent = `Download in corso: ${done} / ${total} tile (${pct}%)… z${level.zoom}`;
+            if (progressText) progressText.textContent = `Recupero tile mancanti: ${done} / ${missingTotal} (${pct}%)… z${level.zoom}`;
             if (quotaErrors >= OFFLINE_STORAGE_QUOTA_ERRORS_TO_ABORT) {
                 abortedByQuota = true;
                 break;
@@ -5109,12 +5227,17 @@ async function scaricaRegioniOffline() {
 
     if (progressArea) progressArea.style.display = 'none';
     const networkErrors = Math.max(0, errors - quotaErrors);
+    const updatedCoverage = await verificaCoperturaMappaOffline({ preferenze, notify: false });
+    const remainingMissing = updatedCoverage ? updatedCoverage.missing : Math.max(0, missingTotal - (done - errors));
+    const recoveredTiles = Math.max(0, missingTotal - remainingMissing);
     if (abortedByQuota) {
-        showToast(`⚠️ Download interrotto: spazio cache esaurito dopo ${done} tile (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
+        showToast(`⚠️ Download interrotto: recuperate ${recoveredTiles}/${missingTotal} tile mancanti (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Riduci lo zoom massimo (11–12) o scarica meno regioni.`, 'error');
     } else if (errors > 0) {
-        showToast(`⚠️ Download completato con ${errors} errori su ${total} tile (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Riprova in caso di mappa incompleta.`, 'error');
+        showToast(`⚠️ Download completato con ${errors} errori: recuperate ${recoveredTiles}/${missingTotal} tile mancanti, ne restano ${remainingMissing} (${buildOfflineFailureDetail(quotaErrors, networkErrors)}).`, 'error');
+    } else if (remainingMissing > 0) {
+        showToast(`⚠️ Download terminato: recuperate ${recoveredTiles}/${missingTotal} tile mancanti, ma ne restano ${remainingMissing}.`, 'error');
     } else {
-        showToast(`✅ Download completato! ${total} tile salvati per uso offline.`, 'success');
+        showToast(`✅ Copertura completata: recuperate tutte le ${missingTotal} tile mancanti (${updatedCoverage?.cached ?? coverage.cached}/${total} valide in cache).`, 'success');
     }
     aggiornaStatoCacheRegioni();
 }
@@ -5238,23 +5361,15 @@ async function cleanupInvalidCachedTiles() {
 async function autoRiscaricaRegioniOfflineSeNecessario() {
     const pref = getOfflinePreferences();
     if (!Array.isArray(pref.regioni) || pref.regioni.length === 0) return;
-    const maxZoom = typeof pref.maxZoom === 'number' ? pref.maxZoom : OFFLINE_MAP_DEFAULT_MAX_ZOOM;
-
-    const urlsByZoom = buildOfflineTileUrlsByZoom(pref.regioni, maxZoom);
-    const allUrls = urlsByZoom.flatMap((item) => item.urls);
-    if (allUrls.length === 0) return;
-
-    let deveRiscaricare = false;
+    let coverage;
     try {
-        const cachedUrls = await getOfflineMapCachedUrlsSet({ includeLegacy: true });
-        deveRiscaricare = shouldRestoreOfflineMapCache(cachedUrls, allUrls);
+        coverage = await analyzeOfflineSelectionCoverage(pref);
     } catch {
         return; // Cache API non disponibile, nessuna azione
     }
+    if (!coverage || coverage.total === 0 || coverage.missing === 0) return;
 
-    if (!deveRiscaricare) return;
-
-    showToast('🔄 Cache mappa offline assente o incompleta. Ripristino in corso…', 'info');
+    showToast(`🔄 Cache mappa offline incompleta: recupero di ${coverage.missing} tile mancanti in corso…`, 'info');
 
     let cache;
     try {
@@ -5265,9 +5380,10 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 
     let quotaErrors = 0;
     let errors = 0;
-    for (const level of urlsByZoom) {
-        for (let i = 0; i < level.urls.length; i += OFFLINE_DOWNLOAD_BATCH_SIZE) {
-            const batch = level.urls.slice(i, i + OFFLINE_DOWNLOAD_BATCH_SIZE);
+    for (const level of coverage.urlsByZoom) {
+        if (level.missingUrls.length === 0) continue;
+        for (let i = 0; i < level.missingUrls.length; i += OFFLINE_DOWNLOAD_BATCH_SIZE) {
+            const batch = level.missingUrls.slice(i, i + OFFLINE_DOWNLOAD_BATCH_SIZE);
             const results = await Promise.all(batch.map((url) => downloadTileWithRetry(cache, url)));
             const summary = summarizeTileDownloadResults(results);
             errors += summary.errors;
@@ -5280,11 +5396,15 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
         }
     }
 
+    const updatedCoverage = await analyzeOfflineSelectionCoverage(pref).catch(() => null);
+    const remainingMissing = updatedCoverage ? updatedCoverage.missing : null;
     if (errors > 0) {
         const networkErrors = Math.max(0, errors - quotaErrors);
-        showToast(`⚠️ Re-download completato con ${errors} errori (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Riprova manualmente se la mappa è incompleta.`, 'error');
+        showToast(`⚠️ Re-download completato con ${errors} errori (${buildOfflineFailureDetail(quotaErrors, networkErrors)}). Tile mancanti residue: ${remainingMissing ?? 'n/d'}.`, 'error');
+    } else if ((remainingMissing ?? 0) > 0) {
+        showToast(`⚠️ Ripristino terminato ma restano ${remainingMissing} tile mancanti.`, 'error');
     } else {
-        showToast('✅ Mappa offline ripristinata automaticamente.', 'success');
+        showToast('✅ Mappa offline ripristinata automaticamente: tutte le tile richieste risultano presenti.', 'success');
     }
 }
 
