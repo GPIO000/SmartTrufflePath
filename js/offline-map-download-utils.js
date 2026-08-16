@@ -8,7 +8,7 @@ const TILE_PROVIDER_COOLDOWN_THRESHOLD = 6;
 const TILE_PROVIDER_COOLDOWN_BASE_MS = 15000;
 const TILE_PROVIDER_COOLDOWN_MAX_MS = 120000;
 const TILE_ADAPTIVE_BATCH_PAUSE_MAX_MS = 4000;
-const TILE_PROVIDER_THROTTLED_STATUSES = [408, 425, 429, 500, 502, 503, 504];
+const TILE_PROVIDER_THROTTLED_STATUSES = [408, 425, 429];
 
 function isOpenStreetMapTileUrl(url) {
   try {
@@ -267,18 +267,14 @@ async function downloadTileBatchesWithRecovery(levels = [], {
       const results = await Promise.all(batch.map((url) => downloadTileFn(cache, url, downloadOptions)));
       const summary = summarizeTileDownloadResults(results);
       const successCount = Math.max(0, batch.length - summary.errors);
-      if (summary.nonQuotaErrors > 0 && successCount === 0) {
+      if (summary.nonQuotaErrors > 0) {
         state.consecutiveProviderErrors += summary.nonQuotaErrors;
-      } else if (summary.nonQuotaErrors > 0) {
-        state.consecutiveProviderErrors = summary.nonQuotaErrors;
-      } else {
+      } else if (successCount === batch.length) {
         state.consecutiveProviderErrors = 0;
       }
-      if (summary.throttledErrors > 0 && successCount === 0) {
+      if (summary.throttledErrors > 0) {
         state.consecutiveThrottledErrors += summary.throttledErrors;
-      } else if (summary.throttledErrors > 0) {
-        state.consecutiveThrottledErrors = summary.throttledErrors;
-      } else {
+      } else if (successCount === batch.length) {
         state.consecutiveThrottledErrors = 0;
       }
 

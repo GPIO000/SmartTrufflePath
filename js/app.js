@@ -5386,7 +5386,26 @@ async function runOfflineMapRecovery({
             return { status: 'quota_stopped', result, updatedCoverage };
         }
 
-        if ((remainingMissing ?? 0) === 0) {
+        if (!updatedCoverage) {
+            const resumeDelayMs = result.pausedForProvider
+                ? Math.max(OFFLINE_DOWNLOAD_PROVIDER_RESUME_DELAY_MS, result.cooldownMs || 0)
+                : OFFLINE_DOWNLOAD_PROVIDER_RESUME_DELAY_MS;
+            const recoveryStatus = result.pausedForProvider ? 'provider_paused' : 'resumable';
+            persistOfflineRecoveryState(buildOfflineRecoveryState(preferenze, recoveryStatus, {
+                trigger,
+                remainingMissing,
+                missingTotal,
+                recoveredTiles,
+                nextRetryAt: Date.now() + resumeDelayMs,
+                consecutiveProviderErrors: result.state?.consecutiveProviderErrors || 0,
+                consecutiveThrottledErrors: result.state?.consecutiveThrottledErrors || 0
+            }));
+            scheduleOfflineRecoveryResume(preferenze, resumeDelayMs, 'resume');
+            showToast(`⚠️ Verifica finale non disponibile: recuperate ${recoveredTiles ?? 'n/d'}/${missingTotal} tile mancanti. Nuovo tentativo automatico tra ${formatOfflineDelayMs(resumeDelayMs)}.`, 'info');
+            return { status: recoveryStatus, result, updatedCoverage: null };
+        }
+
+        if (remainingMissing === 0) {
             clearOfflineRecoveryState();
             showToast(`✅ Copertura completata: recuperate tutte le ${missingTotal} tile mancanti (${updatedCoverage?.cached ?? coverage.cached}/${total} valide in cache).`, 'success');
             return { status: 'complete', result, updatedCoverage };

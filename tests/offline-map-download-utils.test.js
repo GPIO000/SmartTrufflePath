@@ -387,6 +387,29 @@ describe('downloadTileBatchesWithRecovery', () => {
     expect(result.state).toEqual({ consecutiveProviderErrors: 6, consecutiveThrottledErrors: 0 });
   });
 
+  it('keeps accumulating partial network failures across mixed batches', async () => {
+    const result = await downloadTileBatchesWithRecovery([
+      { zoom: 8, missingUrls: ['a', 'b', 'c', 'd', 'e', 'f'] }
+    ], {
+      cache: {},
+      downloadTileFn: vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({ ok: false, reason: 'network_or_server' })
+        .mockResolvedValueOnce({ ok: false, reason: 'network_or_server' })
+        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({ ok: false, reason: 'network_or_server' })
+        .mockResolvedValueOnce({ ok: false, reason: 'network_or_server' }),
+      batchSize: 3,
+      batchPauseBaseMs: 450,
+      batchPauseJitterMs: 0,
+      sleepImpl: vi.fn((cb, _ms) => cb())
+    });
+
+    expect(result.pausedForProvider).toBe(false);
+    expect(result.state).toEqual({ consecutiveProviderErrors: 4, consecutiveThrottledErrors: 0 });
+  });
+
   it('keeps quota exhaustion as the only immediate hard stop', async () => {
     const result = await downloadTileBatchesWithRecovery([
       { zoom: 8, missingUrls: ['a', 'b', 'c', 'd'] }
