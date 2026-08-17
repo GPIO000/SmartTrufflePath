@@ -45,6 +45,9 @@ const OFFLINE_MAP_MIN_ZOOM = 6;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
 const OFFLINE_CACHE_STATUS_KEY = 'offline_cache_status';
 const OFFLINE_RECOVERY_STATE_KEY = 'offline_map_recovery_state';
+const OFFLINE_STATUS_COLOR_OK = '#22c55e';
+const OFFLINE_STATUS_COLOR_WARNING = '#f59e0b';
+const OFFLINE_STATUS_COLOR_ERROR = '#ef4444';
 let isApplyingMapConnectivityZoomCap = false;
 let isTileNetworkUnavailable = false;
 let offlineMapRecoveryResumeTimerId = null;
@@ -139,7 +142,7 @@ async function updateOfflineMapRuntimeStatusIndicator() {
     };
 
     if (!('serviceWorker' in navigator)) {
-        renderStatus('❌ Offline non disponibile: browser senza Service Worker.', '#ef4444');
+        renderStatus('❌ Offline non disponibile: browser senza Service Worker.', OFFLINE_STATUS_COLOR_ERROR);
         return;
     }
 
@@ -153,18 +156,18 @@ async function updateOfflineMapRuntimeStatusIndicator() {
     }
     if (requestId !== offlineMapStatusRenderRequestId) return;
 
-    const networkText = navigator.onLine ? 'Online' : 'Offline';
     if (!hasController) {
-        renderStatus(`⚠️ Offline non attivo: ricarica/riapri l’app per attivare il Service Worker. Stato rete: ${networkText}.`, '#f59e0b');
+        renderStatus('⚠️ Offline non attivo: ricarica/riapri l’app per attivare il Service Worker.', OFFLINE_STATUS_COLOR_WARNING);
         return;
     }
 
+    const networkText = navigator.onLine ? 'Online' : 'Offline';
     if (cachedTileCount > 0) {
-        renderStatus(`✅ Mappe offline attive. Tile disponibili in cache: ${cachedTileCount}. Stato rete: ${networkText}.`, '#22c55e');
+        renderStatus(`✅ Mappe offline attive. Tile disponibili in cache: ${cachedTileCount}. Stato rete: ${networkText}.`, OFFLINE_STATUS_COLOR_OK);
         return;
     }
 
-    renderStatus(`⚠️ Service Worker attivo ma nessuna tile in cache: scarica almeno una regione per usare la mappa offline. Stato rete: ${networkText}.`, '#f59e0b');
+    renderStatus(`⚠️ Service Worker attivo ma nessuna tile in cache: scarica almeno una regione per usare la mappa offline. Stato rete: ${networkText}.`, OFFLINE_STATUS_COLOR_WARNING);
 }
 
 // ── Regioni italiane per download mappa offline ───────────────────────────────
