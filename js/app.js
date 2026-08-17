@@ -5641,6 +5641,7 @@ if ('serviceWorker' in navigator) {
             if (isTileNetworkUnavailable && navigator.onLine) {
                 isTileNetworkUnavailable = false;
                 applyMapConnectivityZoomCap();
+                autoRiscaricaRegioniOfflineSeNecessario();
             }
         }
     });
