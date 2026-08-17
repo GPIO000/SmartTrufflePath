@@ -721,9 +721,13 @@ setTimeout(() => {
     autoRiscaricaRegioniOfflineSeNecessario();
     // Improvement 4: rimuove in background le tile corrotte o troncate presenti in cache.
     setTimeout(() => cleanupInvalidCachedTiles().catch(() => {}), 5000);
+    const zoomEl = document.getElementById('zoom-level-indicator');
+    if (zoomEl) zoomEl.textContent = `Z ${map.getZoom()}`;
 }, 400);
 map.on('zoomend', () => {
     if (isOfflineMapModeActive()) applyMapConnectivityZoomCap({ enforceBounds: false });
+    const zoomEl = document.getElementById('zoom-level-indicator');
+    if (zoomEl) zoomEl.textContent = `Z ${map.getZoom()}`;
 });
 
 let userMarker = null;
