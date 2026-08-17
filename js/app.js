@@ -65,6 +65,7 @@ let isApplyingMapConnectivityZoomCap = false;
 let isTileNetworkUnavailable = false;
 let offlineMapRecoveryResumeTimerId = null;
 let isOfflineMapRecoveryRunning = false;
+let offlineMapRecoveryProgressState = null;
 let offlineMapStatusRenderRequestId = 0;
 
 function isOfflineMapModeActive() {
@@ -2528,6 +2529,7 @@ function openModule(moduleName, editMode = false) {
     if (moduleName === 'mappa_offline') {
         setTimeout(aggiornaStatoCacheRegioni, 0);
         setTimeout(updateOfflineMapRuntimeStatusIndicator, 0);
+        setTimeout(syncOfflineMapRecoveryProgressUI, 0);
     }
 }
 
@@ -5282,6 +5284,35 @@ function buildOfflineRecoveryState(preferenze, status, {
     };
 }
 
+function syncOfflineMapRecoveryProgressUI() {
+    const progressArea = document.getElementById('offline-progress-area');
+    const progressBar = document.getElementById('offline-progress-bar');
+    const progressText = document.getElementById('offline-progress-text');
+    if (!progressArea || !progressBar || !progressText) return;
+
+    if (!offlineMapRecoveryProgressState) {
+        progressArea.style.display = 'none';
+        progressBar.style.width = '0%';
+        progressText.textContent = 'Download in corso…';
+        return;
+    }
+
+    const width = Math.max(0, Math.min(100, Number(offlineMapRecoveryProgressState.percent) || 0));
+    progressArea.style.display = 'block';
+    progressBar.style.width = `${width}%`;
+    progressText.textContent = offlineMapRecoveryProgressState.text || 'Download in corso…';
+}
+
+function updateOfflineMapRecoveryProgressState({ percent = 0, text = 'Download in corso…' } = {}) {
+    offlineMapRecoveryProgressState = { percent, text };
+    syncOfflineMapRecoveryProgressUI();
+}
+
+function clearOfflineMapRecoveryProgressState() {
+    offlineMapRecoveryProgressState = null;
+    syncOfflineMapRecoveryProgressUI();
+}
+
 function formatOfflineDelayMs(delayMs) {
     const totalSeconds = Math.max(1, Math.ceil((Math.max(0, Number(delayMs) || 0)) / 1000));
     if (totalSeconds < 60) return `${totalSeconds}s`;
@@ -5354,10 +5385,7 @@ async function runOfflineMapRecovery({
     waitingToastMessage = ''
 } = {}) {
     if (!Array.isArray(preferenze?.regioni) || preferenze.regioni.length === 0) {
-        if (showProgress) {
-            const progressArea = document.getElementById('offline-progress-area');
-            if (progressArea) progressArea.style.display = 'none';
-        }
+        clearOfflineMapRecoveryProgressState();
         return null;
     }
 
@@ -5379,13 +5407,7 @@ async function runOfflineMapRecovery({
 
     isOfflineMapRecoveryRunning = true;
     clearOfflineMapRecoveryResumeTimer();
-
-    const progressArea = showProgress ? document.getElementById('offline-progress-area') : null;
-    const progressBar = showProgress ? document.getElementById('offline-progress-bar') : null;
-    const progressText = showProgress ? document.getElementById('offline-progress-text') : null;
-    if (progressArea) progressArea.style.display = 'block';
-    if (progressBar) progressBar.style.width = '0%';
-    if (progressText) progressText.textContent = 'Recupero tile mancanti: 0 / 0…';
+    if (showProgress) updateOfflineMapRecoveryProgressState({ percent: 0, text: 'Recupero tile mancanti: 0 / 0…' });
 
     try {
         if (startToastMessage) showToast(startToastMessage, 'info');
@@ -5414,7 +5436,7 @@ async function runOfflineMapRecovery({
             showToast(`✅ Nessuna tile mancante: copertura già completa (${coverage.cached}/${coverage.total}).`, 'success');
             return { status: 'complete', coverage };
         }
-        if (progressText) progressText.textContent = `Recupero tile mancanti: 0 / ${missingTotal}…`;
+        if (showProgress) updateOfflineMapRecoveryProgressState({ percent: 0, text: `Recupero tile mancanti: 0 / ${missingTotal}…` });
 
         let cache;
         try {
@@ -5444,13 +5466,15 @@ async function runOfflineMapRecovery({
             providerCooldownMaxMs: OFFLINE_DOWNLOAD_PROVIDER_COOLDOWN_MAX_MS,
             onBatchComplete: ({ level, totals, adaptivePauseMs, state, summary }) => {
                 const pct = Math.round((totals.done / missingTotal) * 100);
-                if (progressBar) progressBar.style.width = pct + '%';
-                if (progressText) {
+                if (showProgress) {
                     const slowdownNote = state.consecutiveProviderErrors > 0
                         ? ` • ritmo ridotto (${formatOfflineDelayMs(adaptivePauseMs)})`
                         : '';
                     const throttleNote = summary.throttledErrors > 0 ? ' • server in attesa' : '';
-                    progressText.textContent = `Recupero tile mancanti: ${totals.done} / ${missingTotal} (${pct}%)… z${level.zoom}${slowdownNote}${throttleNote}`;
+                    updateOfflineMapRecoveryProgressState({
+                        percent: pct,
+                        text: `Recupero tile mancanti: ${totals.done} / ${missingTotal} (${pct}%)… z${level.zoom}${slowdownNote}${throttleNote}`
+                    });
                 }
             }
         });
@@ -5534,7 +5558,7 @@ async function runOfflineMapRecovery({
         clearOfflineRecoveryState();
         return { status: 'complete', result, updatedCoverage };
     } finally {
-        if (progressArea) progressArea.style.display = 'none';
+        clearOfflineMapRecoveryProgressState();
         aggiornaStatoCacheRegioni();
         updateOfflineMapRuntimeStatusIndicator();
         isOfflineMapRecoveryRunning = false;
