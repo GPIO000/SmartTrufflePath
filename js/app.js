@@ -95,7 +95,7 @@ function updateZoomIndicator() {
     const zoomEl = document.getElementById('zoom-level-indicator');
     if (!zoomEl) return;
     const connectivitySymbol = isOfflineMapModeActive() ? '📵' : '📡';
-    zoomEl.textContent = `Z ${map.getZoom()} ${connectivitySymbol}`;
+    zoomEl.textContent = `🗺️🔍${map.getZoom()} ${connectivitySymbol}`;
 }
 
 function applyMapConnectivityZoomCap({ notify = false, enforceBounds = true } = {}) {
