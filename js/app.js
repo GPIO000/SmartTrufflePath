@@ -91,6 +91,13 @@ function getAdaptiveFocusZoom(defaultZoom) {
     return defaultZoom;
 }
 
+function updateZoomIndicator() {
+    const zoomEl = document.getElementById('zoom-level-indicator');
+    if (!zoomEl) return;
+    const connectivitySymbol = isOfflineMapModeActive() ? '📵' : '📡';
+    zoomEl.textContent = `Z ${map.getZoom()} ${connectivitySymbol}`;
+}
+
 function applyMapConnectivityZoomCap({ notify = false, enforceBounds = true } = {}) {
     if (isApplyingMapConnectivityZoomCap) return;
     isApplyingMapConnectivityZoomCap = true;
@@ -721,9 +728,11 @@ setTimeout(() => {
     autoRiscaricaRegioniOfflineSeNecessario();
     // Improvement 4: rimuove in background le tile corrotte o troncate presenti in cache.
     setTimeout(() => cleanupInvalidCachedTiles().catch(() => {}), 5000);
+    updateZoomIndicator();
 }, 400);
 map.on('zoomend', () => {
     if (isOfflineMapModeActive()) applyMapConnectivityZoomCap({ enforceBounds: false });
+    updateZoomIndicator();
 });
 
 let userMarker = null;
@@ -886,7 +895,7 @@ if (navigator.geolocation) {
         reverseGeocodePosition(lat, lng);
         if (!userMarker) {
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>Sei qui</b>").openPopup();
-            map.setView([lat, lng], getAdaptiveFocusZoom(16));
+            map.setView([lat, lng], getAdaptiveFocusZoom(18));
             renderAllPoiMarkers();
         } else { userMarker.setLatLng([lat, lng]); }
         updateCompass(lat, lng);
@@ -4134,7 +4143,7 @@ function toggleDrawer() {
 }
 
 function centerOnUser() {
-    if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(16)); userMarker.openPopup(); }
+    if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18)); userMarker.openPopup(); }
     else { showToast("Posizione GPS non disponibile.", 'error'); }
 }
 
@@ -5740,12 +5749,14 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 window.addEventListener('online', () => {
     applyMapConnectivityZoomCap();
     updateOfflineMapRuntimeStatusIndicator();
+    updateZoomIndicator();
     autoRiscaricaRegioniOfflineSeNecessario();
 });
 
 window.addEventListener('offline', () => {
     clampMapZoomForOffline();
     updateOfflineMapRuntimeStatusIndicator();
+    updateZoomIndicator();
 });
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -5758,6 +5769,7 @@ if ('serviceWorker' in navigator) {
                 isTileNetworkUnavailable = true;
                 clampMapZoomForOffline();
                 updateOfflineMapRuntimeStatusIndicator();
+                updateZoomIndicator();
             }
             return;
         }
@@ -5766,6 +5778,7 @@ if ('serviceWorker' in navigator) {
                 isTileNetworkUnavailable = false;
                 applyMapConnectivityZoomCap();
                 updateOfflineMapRuntimeStatusIndicator();
+                updateZoomIndicator();
                 autoRiscaricaRegioniOfflineSeNecessario();
             }
         }

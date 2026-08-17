@@ -207,6 +207,25 @@ textarea:focus-visible {
     background: linear-gradient(180deg, #bb5d50, #9f473b);
 }
 
+#zoom-level-indicator {
+    position: absolute;
+    top: 80px;
+    right: 12px;
+    z-index: 999;
+    background: rgba(21, 29, 21, 0.82);
+    border: 1px solid rgba(198, 171, 117, 0.18);
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 0.03em;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(10px);
+    pointer-events: none;
+    user-select: none;
+}
+
 #app-drawer {
     position: fixed;
     top: 0;
