@@ -93,7 +93,9 @@ function getAdaptiveFocusZoom(defaultZoom) {
 
 function updateZoomIndicator() {
     const zoomEl = document.getElementById('zoom-level-indicator');
-    if (zoomEl) zoomEl.textContent = `Z ${map.getZoom()}`;
+    if (!zoomEl) return;
+    const onlineSymbol = isOfflineMapModeActive() ? '🔴' : '🟢';
+    zoomEl.textContent = `Z ${map.getZoom()} ${onlineSymbol}`;
 }
 
 function applyMapConnectivityZoomCap({ notify = false, enforceBounds = true } = {}) {
@@ -5747,12 +5749,14 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 window.addEventListener('online', () => {
     applyMapConnectivityZoomCap();
     updateOfflineMapRuntimeStatusIndicator();
+    updateZoomIndicator();
     autoRiscaricaRegioniOfflineSeNecessario();
 });
 
 window.addEventListener('offline', () => {
     clampMapZoomForOffline();
     updateOfflineMapRuntimeStatusIndicator();
+    updateZoomIndicator();
 });
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -5765,6 +5769,7 @@ if ('serviceWorker' in navigator) {
                 isTileNetworkUnavailable = true;
                 clampMapZoomForOffline();
                 updateOfflineMapRuntimeStatusIndicator();
+                updateZoomIndicator();
             }
             return;
         }
@@ -5773,6 +5778,7 @@ if ('serviceWorker' in navigator) {
                 isTileNetworkUnavailable = false;
                 applyMapConnectivityZoomCap();
                 updateOfflineMapRuntimeStatusIndicator();
+                updateZoomIndicator();
                 autoRiscaricaRegioniOfflineSeNecessario();
             }
         }
