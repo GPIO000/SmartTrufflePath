@@ -27,7 +27,7 @@ async function registerAppServiceWorker() {
         return registration;
     } catch (error) {
         lastServiceWorkerRegistrationError = error;
-        console.log('Registrazione Service Worker fallita:', error);
+        console.error('Registrazione Service Worker fallita:', error);
         return null;
     }
 }
@@ -189,7 +189,7 @@ async function updateOfflineMapRuntimeStatusIndicator() {
         const registrationState = registration.installing?.state
             || registration.waiting?.state
             || registration.active?.state
-            || 'registered';
+            || 'unknown';
         if (registrationState === 'installing' || registrationState === 'activating') {
             renderStatus('⚠️ Service Worker in attivazione: attendi qualche secondo e riapri questa schermata.', OFFLINE_STATUS_COLOR_WARNING);
             return;
