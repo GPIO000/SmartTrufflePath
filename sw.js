@@ -1,11 +1,14 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-17b';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-17c';
 const MAP_OFFLINE_CACHE_NAME = 'smarttruffle-map-offline';
 let legacyAppCacheNames = null;
 let legacyAppCacheNamesPromise = null;
 let lastTileNetworkSignalType = '';
 let lastTileNetworkSignalAt = 0;
-const ASSETS = [
+
+// Asset locali: il precaching blocca l'installazione se uno di questi fallisce.
+// I file locali devono sempre essere presenti, quindi è corretto fallire in caso di errore.
+const LOCAL_ASSETS = [
   './',
   './index.html',
   './css/style.css',
@@ -18,7 +21,12 @@ const ASSETS = [
   './js/backup-utils.js',
   './js/offline-cache-utils.js',
   './js/offline-map-download-utils.js',
-  './js/sw-utils.js',
+  './js/sw-utils.js'
+];
+
+// Asset CDN esterni: vengono aggiunti alla cache in modalità best-effort.
+// Un eventuale fallimento non blocca l'installazione del Service Worker.
+const EXTERNAL_ASSETS = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
@@ -32,7 +40,29 @@ function serviceUnavailableResponse() {
   });
 }
 
-import { canonicalizeOsmTileUrl } from './js/sw-utils.js';
+/**
+ * Normalizza un URL OSM con sottodominio (a/b/c.tile.openstreetmap.org)
+ * nella forma canonica senza sottodominio (tile.openstreetmap.org).
+ * Utile per trovare tile in cache indipendentemente dal sottodominio
+ * usato da Leaflet al momento della richiesta.
+ * Funzione inlined da js/sw-utils.js per evitare l'uso di import ES Module
+ * nel Service Worker, garantendo compatibilità massima con tutti i browser.
+ *
+ * @param {string} url
+ * @returns {string}
+ */
+function canonicalizeOsmTileUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (/^[abc]\.tile\.openstreetmap\.org$/.test(parsed.hostname)) {
+      parsed.hostname = 'tile.openstreetmap.org';
+      return parsed.toString();
+    }
+  } catch {
+    // URL non valida, restituisce invariata
+  }
+  return url;
+}
 
 function isOsmTileRequestUrl(url) {
   try {
@@ -129,10 +159,16 @@ async function notifyClientsTileNetworkStatus(type) {
 // skipWaiting() forza l'attivazione immediata anche se altri tab usano il vecchio SW.
 // clients.claim() viene chiamato nell'evento activate per prendere controllo subito
 // di tutti i tab aperti, senza attendere un ricaricamento della pagina.
+// Gli asset locali vengono aggiunti in modo bloccante (addAll è atomico): se uno fallisce
+// l'installazione viene interrotta, il che è corretto perché i file locali devono essere presenti.
+// Le CDN esterne vengono aggiunte in modo non-bloccante (best-effort): un eventuale fallimento
+// di rete o CDN non impedisce l'installazione del Service Worker.
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS).then(() => self.skipWaiting());
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await cache.addAll(LOCAL_ASSETS);
+      await Promise.allSettled(EXTERNAL_ASSETS.map((url) => cache.add(url).catch(() => {})));
+      return self.skipWaiting();
     })
   );
 });
