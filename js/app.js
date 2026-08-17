@@ -129,9 +129,17 @@ async function updateOfflineMapRuntimeStatusIndicator() {
     const statusEl = document.getElementById('offline-runtime-status');
     if (!statusEl) return;
     const requestId = ++offlineMapStatusRenderRequestId;
+    const renderStatus = (text, color) => {
+        const messageEl = document.createElement('p');
+        messageEl.style.margin = '0';
+        messageEl.style.color = color;
+        messageEl.style.fontSize = '0.8rem';
+        messageEl.textContent = text;
+        statusEl.replaceChildren(messageEl);
+    };
 
     if (!('serviceWorker' in navigator)) {
-        statusEl.innerHTML = '<p style="margin:0; color:#ef4444; font-size:0.8rem;">❌ Offline non disponibile: browser senza Service Worker.</p>';
+        renderStatus('❌ Offline non disponibile: browser senza Service Worker.', '#ef4444');
         return;
     }
 
@@ -147,16 +155,16 @@ async function updateOfflineMapRuntimeStatusIndicator() {
 
     const networkText = navigator.onLine ? 'Online' : 'Offline';
     if (!hasController) {
-        statusEl.innerHTML = `<p style="margin:0; color:#f59e0b; font-size:0.8rem;">⚠️ Offline non attivo: ricarica/riapri l’app per attivare il Service Worker. Stato rete: ${networkText}.</p>`;
+        renderStatus(`⚠️ Offline non attivo: ricarica/riapri l’app per attivare il Service Worker. Stato rete: ${networkText}.`, '#f59e0b');
         return;
     }
 
     if (cachedTileCount > 0) {
-        statusEl.innerHTML = `<p style="margin:0; color:#22c55e; font-size:0.8rem;">✅ Mappe offline attive. Tile disponibili in cache: ${cachedTileCount}. Stato rete: ${networkText}.</p>`;
+        renderStatus(`✅ Mappe offline attive. Tile disponibili in cache: ${cachedTileCount}. Stato rete: ${networkText}.`, '#22c55e');
         return;
     }
 
-    statusEl.innerHTML = `<p style="margin:0; color:#f59e0b; font-size:0.8rem;">⚠️ Service Worker attivo ma nessuna tile in cache: scarica almeno una regione per usare la mappa offline. Stato rete: ${networkText}.</p>`;
+    renderStatus(`⚠️ Service Worker attivo ma nessuna tile in cache: scarica almeno una regione per usare la mappa offline. Stato rete: ${networkText}.`, '#f59e0b');
 }
 
 // ── Regioni italiane per download mappa offline ───────────────────────────────
