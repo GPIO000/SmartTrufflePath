@@ -4982,7 +4982,7 @@ async function getOfflineMapCachedUrlsSet({ includeLegacy = false, validateSize 
             await Promise.all(batch.map(async (req) => {
                 if (!isOsmTileUrl(req.url)) return;
                 try {
-                    const response = await cache.match(req);
+                    const response = await cache.match(req, { ignoreVary: true });
                     if (isValidCachedTileResponse(response)) {
                         cachedUrls.add(normalizeOsmTileUrl(req.url));
                     }
@@ -5573,7 +5573,7 @@ async function cleanupInvalidCachedTiles() {
         await Promise.all(batch.map(async (req) => {
             if (!isOsmTileUrl(req.url)) return;
             try {
-                const response = await cache.match(req);
+                const response = await cache.match(req, { ignoreVary: true });
                 if (!isValidCachedTileResponse(response)) {
                     await cache.delete(req).catch(() => {});
                 }
