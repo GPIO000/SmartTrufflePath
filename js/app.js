@@ -91,6 +91,11 @@ function getAdaptiveFocusZoom(defaultZoom) {
     return defaultZoom;
 }
 
+function updateZoomIndicator() {
+    const zoomEl = document.getElementById('zoom-level-indicator');
+    if (zoomEl) zoomEl.textContent = `Z ${map.getZoom()}`;
+}
+
 function applyMapConnectivityZoomCap({ notify = false, enforceBounds = true } = {}) {
     if (isApplyingMapConnectivityZoomCap) return;
     isApplyingMapConnectivityZoomCap = true;
@@ -721,13 +726,11 @@ setTimeout(() => {
     autoRiscaricaRegioniOfflineSeNecessario();
     // Improvement 4: rimuove in background le tile corrotte o troncate presenti in cache.
     setTimeout(() => cleanupInvalidCachedTiles().catch(() => {}), 5000);
-    const zoomEl = document.getElementById('zoom-level-indicator');
-    if (zoomEl) zoomEl.textContent = `Z ${map.getZoom()}`;
+    updateZoomIndicator();
 }, 400);
 map.on('zoomend', () => {
     if (isOfflineMapModeActive()) applyMapConnectivityZoomCap({ enforceBounds: false });
-    const zoomEl = document.getElementById('zoom-level-indicator');
-    if (zoomEl) zoomEl.textContent = `Z ${map.getZoom()}`;
+    updateZoomIndicator();
 });
 
 let userMarker = null;
