@@ -1,5 +1,5 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-16d';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-17a';
 const MAP_OFFLINE_CACHE_NAME = 'smarttruffle-map-offline';
 let legacyAppCacheNames = null;
 let legacyAppCacheNamesPromise = null;
@@ -151,10 +151,8 @@ self.addEventListener('activate', (e) => {
           legacyAppCacheNamesPromise = null;
         });
       })
-    )
+    ).then(() => self.clients.claim())
   );
-  // Prende il controllo immediato delle pagine aperte
-  self.clients.claim();
 });
 
 // Intercettazione richieste con strategia Cache-First e fallback di rete
@@ -204,7 +202,10 @@ self.addEventListener('fetch', (e) => {
           if (networkResponse && networkResponse.ok) {
             offlineCache.put(corsRequest, networkResponse.clone()).catch(() => {});
             notifyClientsTileNetworkStatus('tile-network-ok').catch(() => {});
+          } else {
+            notifyClientsTileNetworkStatus('tile-network-unavailable').catch(() => {});
           }
+          if (!networkResponse) return serviceUnavailableResponse();
           return networkResponse;
         } catch {
           notifyClientsTileNetworkStatus('tile-network-unavailable').catch(() => {});
