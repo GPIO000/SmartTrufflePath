@@ -357,7 +357,7 @@ async function downloadTileWithRetry(cache, url, {
 } = {}) {
   let lastFailure = null;
   try {
-    const cached = await cache.match(url);
+    const cached = await cache.match(url, { ignoreVary: true });
     if (isValidCachedTileResponse(cached, minValidSize)) {
       return { ok: true };
     }
