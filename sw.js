@@ -167,7 +167,7 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       await cache.addAll(LOCAL_ASSETS);
-      await Promise.allSettled(EXTERNAL_ASSETS.map((url) => cache.add(url).catch(() => {})));
+      await Promise.allSettled(EXTERNAL_ASSETS.map((url) => cache.add(url)));
       return self.skipWaiting();
     })
   );
