@@ -15,20 +15,33 @@ import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendi
 
 window.TruffleStorage = TruffleStorage;
 
+const SERVICE_WORKER_SCOPE = new URL('./', window.location.href).pathname;
+const SERVICE_WORKER_URL = `${SERVICE_WORKER_SCOPE}sw.js`;
+let lastServiceWorkerRegistrationError = null;
+
+async function registerAppServiceWorker() {
+    try {
+        const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, { scope: SERVICE_WORKER_SCOPE });
+        lastServiceWorkerRegistrationError = null;
+        console.log('Service Worker registered:', registration.scope);
+        return registration;
+    } catch (error) {
+        lastServiceWorkerRegistrationError = error;
+        console.error('Service Worker registration failed:', error);
+        return null;
+    }
+}
+
+if ('serviceWorker' in navigator) {
+    void registerAppServiceWorker();
+}
+
 try {
     if (window.TruffleStorage && typeof window.TruffleStorage.init === 'function') {
         await window.TruffleStorage.init();
     }
 } catch (error) {
     console.warn('Inizializzazione storage avanzato non riuscita.', error);
-}
-
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then((reg) => console.log('Service Worker registrato con successo:', reg.scope))
-            .catch((err) => console.log('Registrazione Service Worker fallita:', err));
-    });
 }
 
 // Inizializzazione Mappa corretta (ordine invertito per evitare ReferenceError)
@@ -146,6 +159,13 @@ async function updateOfflineMapRuntimeStatusIndicator() {
         return;
     }
 
+    let registration = null;
+    try {
+        registration = await navigator.serviceWorker.getRegistration();
+    } catch {
+        registration = null;
+    }
+
     const hasController = !!navigator.serviceWorker.controller;
     let cachedTileCount = 0;
     try {
@@ -156,8 +176,23 @@ async function updateOfflineMapRuntimeStatusIndicator() {
     }
     if (requestId !== offlineMapStatusRenderRequestId) return;
 
+    if (!registration) {
+        if (lastServiceWorkerRegistrationError?.message) {
+            renderStatus(`❌ Service Worker non registrato: ${lastServiceWorkerRegistrationError.message}.`, OFFLINE_STATUS_COLOR_ERROR);
+            return;
+        }
+        renderStatus("⚠️ Service Worker non ancora registrato: ricarica l’app con connessione attiva per abilitare l’offline.", OFFLINE_STATUS_COLOR_WARNING);
+        return;
+    }
+
     if (!hasController) {
-        renderStatus('⚠️ Offline non attivo: ricarica/riapri l’app per attivare il Service Worker.', OFFLINE_STATUS_COLOR_WARNING);
+        const isServiceWorkerPending = registration.installing?.state === 'installing'
+            || registration.waiting?.state === 'installed';
+        if (isServiceWorkerPending) {
+            renderStatus('⚠️ Service Worker in preparazione: attendi qualche secondo e poi riapri questa schermata.', OFFLINE_STATUS_COLOR_WARNING);
+            return;
+        }
+        renderStatus("⚠️ Service Worker pronto ma non ancora collegato a questa schermata: ricarica/riapri l’app una volta per attivare l’offline.", OFFLINE_STATUS_COLOR_WARNING);
         return;
     }
 
@@ -5523,8 +5558,16 @@ async function scaricaRegioniOffline() {
     // Se il Service Worker non controlla ancora questa pagina (es. primo avvio dopo
     // installazione o aggiornamento), le tile in cache non vengono intercettate finché
     // la pagina non viene ricaricata. In questo caso avvisiamo l'utente.
-    if ('serviceWorker' in navigator && !navigator.serviceWorker.controller) {
-        showToast('🔄 Ricarica l\'app per attivare la mappa offline (tieni premuto il tasto Aggiorna o chiudi e riapri l\'app).', 'info');
+    if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration().catch(() => null);
+        if (!navigator.serviceWorker.controller) {
+            showToast(
+                registration
+                    ? '🔄 Ricarica l\'app per collegare il Service Worker alla mappa offline (tieni premuto il tasto Aggiorna o chiudi e riapri l\'app).'
+                    : '⚠️ Il Service Worker non risulta registrato: ricarica l\'app con connessione attiva e riprova.',
+                registration ? 'info' : 'error'
+            );
+        }
     }
 }
 
