@@ -53,7 +53,7 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: MAP_TIL
 const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
 const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-17c`;
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-17g`;
 const OFFLINE_MAP_MIN_ZOOM = 6;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
 const OFFLINE_CACHE_STATUS_KEY = 'offline_cache_status';
