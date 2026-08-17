@@ -886,7 +886,7 @@ if (navigator.geolocation) {
         reverseGeocodePosition(lat, lng);
         if (!userMarker) {
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>Sei qui</b>").openPopup();
-            map.setView([lat, lng], getAdaptiveFocusZoom(16));
+            map.setView([lat, lng], getAdaptiveFocusZoom(18));
             renderAllPoiMarkers();
         } else { userMarker.setLatLng([lat, lng]); }
         updateCompass(lat, lng);
@@ -4134,7 +4134,7 @@ function toggleDrawer() {
 }
 
 function centerOnUser() {
-    if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(16)); userMarker.openPopup(); }
+    if (userMarker) { const pos = userMarker.getLatLng(); map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18)); userMarker.openPopup(); }
     else { showToast("Posizione GPS non disponibile.", 'error'); }
 }
 
