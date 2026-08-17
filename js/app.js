@@ -181,7 +181,7 @@ async function updateOfflineMapRuntimeStatusIndicator() {
             renderStatus(`❌ Service Worker non registrato: ${lastServiceWorkerRegistrationError.message}.`, OFFLINE_STATUS_COLOR_ERROR);
             return;
         }
-        renderStatus('⚠️ Service Worker non ancora registrato: ricarica l’app con connessione attiva per abilitare l’offline.', OFFLINE_STATUS_COLOR_WARNING);
+        renderStatus("⚠️ Service Worker non ancora registrato: ricarica l’app con connessione attiva per abilitare l’offline.", OFFLINE_STATUS_COLOR_WARNING);
         return;
     }
 
@@ -194,7 +194,7 @@ async function updateOfflineMapRuntimeStatusIndicator() {
             renderStatus('⚠️ Service Worker in attivazione: attendi qualche secondo e riapri questa schermata.', OFFLINE_STATUS_COLOR_WARNING);
             return;
         }
-        renderStatus('⚠️ Service Worker pronto ma non ancora collegato a questa schermata: ricarica/riapri l’app una volta per attivare l’offline.', OFFLINE_STATUS_COLOR_WARNING);
+        renderStatus("⚠️ Service Worker pronto ma non ancora collegato a questa schermata: ricarica/riapri l’app una volta per attivare l’offline.", OFFLINE_STATUS_COLOR_WARNING);
         return;
     }
 
