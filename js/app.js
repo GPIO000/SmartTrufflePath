@@ -358,7 +358,7 @@ function appChooseSendMethod(message) {
     });
 }
 
-function appChooseCallMethod(message) {
+function appChooseCallMethod(message, hasTel, hasCell) {
     return new Promise((resolve) => {
         const dialog = document.getElementById('app-dialog');
         const msg = document.getElementById('app-dialog-message');
@@ -366,26 +366,34 @@ function appChooseCallMethod(message) {
         const cancelBtn = document.getElementById('app-dialog-cancel');
         const altBtn = document.getElementById('app-dialog-alt');
         const okBtn = document.getElementById('app-dialog-ok');
-        if (!dialog || !altBtn) { resolve(null); return; }
+        if (!dialog) { resolve(null); return; }
         msg.textContent = message;
         inputField.style.display = 'none';
         cancelBtn.style.display = '';
         cancelBtn.textContent = 'Annulla';
-        altBtn.style.display = '';
-        altBtn.textContent = '📞 Chiamata Telefonica';
-        okBtn.textContent = '💬 WhatsApp';
+        if (hasTel && hasCell) {
+            altBtn.style.display = '';
+            altBtn.textContent = '📞 Fisso';
+            okBtn.textContent = '📱 Cellulare';
+        } else if (hasTel) {
+            altBtn.style.display = 'none';
+            okBtn.textContent = '📞 Chiama Fisso';
+        } else {
+            altBtn.style.display = 'none';
+            okBtn.textContent = '📱 Chiama Cellulare';
+        }
         const cleanup = () => {
             dialog.close();
-            okBtn.removeEventListener('click', onWhatsApp);
-            altBtn.removeEventListener('click', onTel);
+            okBtn.removeEventListener('click', onOk);
+            altBtn.removeEventListener('click', onAlt);
             cancelBtn.removeEventListener('click', onCancel);
             altBtn.style.display = 'none';
         };
-        const onWhatsApp = () => { cleanup(); resolve('whatsapp'); };
-        const onTel = () => { cleanup(); resolve('tel'); };
+        const onOk = () => { cleanup(); resolve(hasTel && hasCell ? 'cell' : hasTel ? 'tel' : 'cell'); };
+        const onAlt = () => { cleanup(); resolve('tel'); };
         const onCancel = () => { cleanup(); resolve(null); };
-        okBtn.addEventListener('click', onWhatsApp);
-        altBtn.addEventListener('click', onTel);
+        okBtn.addEventListener('click', onOk);
+        altBtn.addEventListener('click', onAlt);
         cancelBtn.addEventListener('click', onCancel);
         dialog.showModal();
     });
@@ -4234,14 +4242,14 @@ async function callVetClinicByIndex(index) {
     const vetClinics = readStorageJSON('vet_clinics_list', []);
     const clinic = vetClinics[index];
     if (!clinic) return;
-    const method = await appChooseCallMethod('Come vuoi chiamare?');
+    const hasTel = Boolean(clinic.tel);
+    const hasCell = Boolean(clinic.cell);
+    if (!hasTel && !hasCell) { showToast("Nessun numero disponibile.", 'error'); return; }
+    const method = await appChooseCallMethod('Quale numero vuoi chiamare?', hasTel, hasCell);
     if (method === 'tel') {
-        const number = clinic.tel || clinic.cell;
-        if (!number) { showToast("Nessun numero disponibile.", 'error'); return; }
-        window.location.href = `tel:${sanitizePhoneHref(number)}`;
-    } else if (method === 'whatsapp') {
-        if (!clinic.cell) { showToast("Nessun numero di cellulare disponibile per WhatsApp.", 'error'); return; }
-        window.location.href = `whatsapp://send?phone=${encodeURIComponent(sanitizePhoneHref(clinic.cell))}`;
+        window.location.href = `tel:${sanitizePhoneHref(clinic.tel)}`;
+    } else if (method === 'cell') {
+        window.location.href = `tel:${sanitizePhoneHref(clinic.cell)}`;
     }
 }
 
