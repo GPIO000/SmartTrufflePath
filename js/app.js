@@ -2528,6 +2528,12 @@ function openModule(moduleName, editMode = false) {
     if (moduleName === 'mappa_offline') {
         setTimeout(aggiornaStatoCacheRegioni, 0);
         setTimeout(updateOfflineMapRuntimeStatusIndicator, 0);
+        if (isOfflineMapRecoveryRunning) {
+            setTimeout(() => {
+                const progressArea = document.getElementById('offline-progress-area');
+                if (progressArea) progressArea.style.display = 'block';
+            }, 0);
+        }
     }
 }
 
@@ -5380,12 +5386,18 @@ async function runOfflineMapRecovery({
     isOfflineMapRecoveryRunning = true;
     clearOfflineMapRecoveryResumeTimer();
 
-    const progressArea = showProgress ? document.getElementById('offline-progress-area') : null;
-    const progressBar = showProgress ? document.getElementById('offline-progress-bar') : null;
-    const progressText = showProgress ? document.getElementById('offline-progress-text') : null;
-    if (progressArea) progressArea.style.display = 'block';
-    if (progressBar) progressBar.style.width = '0%';
-    if (progressText) progressText.textContent = 'Recupero tile mancanti: 0 / 0…';
+    function getProgressArea() { return document.getElementById('offline-progress-area'); }
+    function getProgressBar() { return document.getElementById('offline-progress-bar'); }
+    function getProgressText() { return document.getElementById('offline-progress-text'); }
+
+    if (showProgress) {
+        const progressArea = getProgressArea();
+        if (progressArea) progressArea.style.display = 'block';
+        const progressBar = getProgressBar();
+        if (progressBar) progressBar.style.width = '0%';
+        const progressText = getProgressText();
+        if (progressText) progressText.textContent = 'Recupero tile mancanti: 0 / 0…';
+    }
 
     try {
         if (startToastMessage) showToast(startToastMessage, 'info');
@@ -5414,7 +5426,10 @@ async function runOfflineMapRecovery({
             showToast(`✅ Nessuna tile mancante: copertura già completa (${coverage.cached}/${coverage.total}).`, 'success');
             return { status: 'complete', coverage };
         }
-        if (progressText) progressText.textContent = `Recupero tile mancanti: 0 / ${missingTotal}…`;
+        if (showProgress) {
+            const progressText = getProgressText();
+            if (progressText) progressText.textContent = `Recupero tile mancanti: 0 / ${missingTotal}…`;
+        }
 
         let cache;
         try {
@@ -5443,14 +5458,19 @@ async function runOfflineMapRecovery({
             providerCooldownBaseMs: OFFLINE_DOWNLOAD_PROVIDER_COOLDOWN_BASE_MS,
             providerCooldownMaxMs: OFFLINE_DOWNLOAD_PROVIDER_COOLDOWN_MAX_MS,
             onBatchComplete: ({ level, totals, adaptivePauseMs, state, summary }) => {
+                if (!showProgress) return;
                 const pct = Math.round((totals.done / missingTotal) * 100);
-                if (progressBar) progressBar.style.width = pct + '%';
-                if (progressText) {
+                const liveProgressArea = getProgressArea();
+                const liveProgressBar = getProgressBar();
+                const liveProgressText = getProgressText();
+                if (liveProgressArea) liveProgressArea.style.display = 'block';
+                if (liveProgressBar) liveProgressBar.style.width = pct + '%';
+                if (liveProgressText) {
                     const slowdownNote = state.consecutiveProviderErrors > 0
                         ? ` • ritmo ridotto (${formatOfflineDelayMs(adaptivePauseMs)})`
                         : '';
                     const throttleNote = summary.throttledErrors > 0 ? ' • server in attesa' : '';
-                    progressText.textContent = `Recupero tile mancanti: ${totals.done} / ${missingTotal} (${pct}%)… z${level.zoom}${slowdownNote}${throttleNote}`;
+                    liveProgressText.textContent = `Recupero tile mancanti: ${totals.done} / ${missingTotal} (${pct}%)… z${level.zoom}${slowdownNote}${throttleNote}`;
                 }
             }
         });
@@ -5534,6 +5554,7 @@ async function runOfflineMapRecovery({
         clearOfflineRecoveryState();
         return { status: 'complete', result, updatedCoverage };
     } finally {
+        const progressArea = getProgressArea();
         if (progressArea) progressArea.style.display = 'none';
         aggiornaStatoCacheRegioni();
         updateOfflineMapRuntimeStatusIndicator();
