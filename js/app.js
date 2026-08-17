@@ -49,6 +49,7 @@ let isApplyingMapConnectivityZoomCap = false;
 let isTileNetworkUnavailable = false;
 let offlineMapRecoveryResumeTimerId = null;
 let isOfflineMapRecoveryRunning = false;
+let offlineMapStatusRenderRequestId = 0;
 
 function isOfflineMapModeActive() {
     return !navigator.onLine || isTileNetworkUnavailable;
@@ -122,6 +123,40 @@ function applyMapConnectivityZoomCap({ notify = false, enforceBounds = true } = 
 
 function clampMapZoomForOffline() {
     applyMapConnectivityZoomCap({ notify: true });
+}
+
+async function updateOfflineMapRuntimeStatusIndicator() {
+    const statusEl = document.getElementById('offline-runtime-status');
+    if (!statusEl) return;
+    const requestId = ++offlineMapStatusRenderRequestId;
+
+    if (!('serviceWorker' in navigator)) {
+        statusEl.innerHTML = '<p style="margin:0; color:#ef4444; font-size:0.8rem;">❌ Offline non disponibile: browser senza Service Worker.</p>';
+        return;
+    }
+
+    const hasController = !!navigator.serviceWorker.controller;
+    let cachedTileCount = 0;
+    try {
+        const cachedUrls = await getOfflineMapCachedUrlsSet({ includeLegacy: true, validateSize: false });
+        cachedTileCount = cachedUrls.size;
+    } catch {
+        cachedTileCount = 0;
+    }
+    if (requestId !== offlineMapStatusRenderRequestId) return;
+
+    const networkText = navigator.onLine ? 'Online' : 'Offline';
+    if (!hasController) {
+        statusEl.innerHTML = `<p style="margin:0; color:#f59e0b; font-size:0.8rem;">⚠️ Offline non attivo: ricarica/riapri l’app per attivare il Service Worker. Stato rete: ${networkText}.</p>`;
+        return;
+    }
+
+    if (cachedTileCount > 0) {
+        statusEl.innerHTML = `<p style="margin:0; color:#22c55e; font-size:0.8rem;">✅ Mappe offline attive. Tile disponibili in cache: ${cachedTileCount}. Stato rete: ${networkText}.</p>`;
+        return;
+    }
+
+    statusEl.innerHTML = `<p style="margin:0; color:#f59e0b; font-size:0.8rem;">⚠️ Service Worker attivo ma nessuna tile in cache: scarica almeno una regione per usare la mappa offline. Stato rete: ${networkText}.</p>`;
 }
 
 // ── Regioni italiane per download mappa offline ───────────────────────────────
@@ -2413,6 +2448,12 @@ function openModule(moduleName, editMode = false) {
                     </div>
                 </div>
                 <div class="module-card" style="margin-bottom:14px;">
+                    <p style="font-size:0.85rem; color:#f6f1e6; font-weight:bold; margin:0 0 8px 0;">📶 Stato offline mappa</p>
+                    <div id="offline-runtime-status" style="font-size:0.82rem; color:#b8b0a0;">
+                        <p style="margin:0; color:#6b7280; font-size:0.8rem;">Verifica in corso…</p>
+                    </div>
+                </div>
+                <div class="module-card" style="margin-bottom:14px;">
                     <p style="font-size:0.85rem; color:#f6f1e6; font-weight:bold; margin:0 0 8px 0;">📦 Stato cache per regione</p>
                     <div id="offline-cache-status" style="font-size:0.82rem; color:#b8b0a0;">
                         <p style="margin:0; color:#6b7280; font-size:0.8rem;">Verifica in corso…</p>
@@ -2440,6 +2481,7 @@ function openModule(moduleName, editMode = false) {
     }
     if (moduleName === 'mappa_offline') {
         setTimeout(aggiornaStatoCacheRegioni, 0);
+        setTimeout(updateOfflineMapRuntimeStatusIndicator, 0);
     }
 }
 
@@ -5448,6 +5490,7 @@ async function runOfflineMapRecovery({
     } finally {
         if (progressArea) progressArea.style.display = 'none';
         aggiornaStatoCacheRegioni();
+        updateOfflineMapRuntimeStatusIndicator();
         isOfflineMapRecoveryRunning = false;
     }
 }
@@ -5559,6 +5602,7 @@ async function eliminaCacheMappaOffline() {
         // localStorage non disponibile, nessuna azione
     }
     aggiornaStatoCacheRegioni();
+    updateOfflineMapRuntimeStatusIndicator();
 }
 
 // ── Pulizia tile invalide (Improvement 4) ──────────────────────────────────────
@@ -5627,19 +5671,25 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 
 window.addEventListener('online', () => {
     applyMapConnectivityZoomCap();
+    updateOfflineMapRuntimeStatusIndicator();
     autoRiscaricaRegioniOfflineSeNecessario();
 });
 
 window.addEventListener('offline', () => {
     clampMapZoomForOffline();
+    updateOfflineMapRuntimeStatusIndicator();
 });
 if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        updateOfflineMapRuntimeStatusIndicator();
+    });
     navigator.serviceWorker.addEventListener('message', (event) => {
         const messageType = event?.data?.type;
         if (messageType === 'tile-network-unavailable') {
             if (!isTileNetworkUnavailable) {
                 isTileNetworkUnavailable = true;
                 clampMapZoomForOffline();
+                updateOfflineMapRuntimeStatusIndicator();
             }
             return;
         }
@@ -5647,6 +5697,7 @@ if ('serviceWorker' in navigator) {
             if (isTileNetworkUnavailable && navigator.onLine) {
                 isTileNetworkUnavailable = false;
                 applyMapConnectivityZoomCap();
+                updateOfflineMapRuntimeStatusIndicator();
                 autoRiscaricaRegioniOfflineSeNecessario();
             }
         }
