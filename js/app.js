@@ -53,7 +53,7 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: MAP_TIL
 const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
 const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-17c`;
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-17g`;
 const OFFLINE_MAP_MIN_ZOOM = 6;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
 const OFFLINE_CACHE_STATUS_KEY = 'offline_cache_status';
@@ -358,6 +358,39 @@ function appChooseSendMethod(message) {
     });
 }
 
+function appChooseCallMethod(message) {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('app-dialog');
+        const msg = document.getElementById('app-dialog-message');
+        const inputField = document.getElementById('app-dialog-input');
+        const cancelBtn = document.getElementById('app-dialog-cancel');
+        const altBtn = document.getElementById('app-dialog-alt');
+        const okBtn = document.getElementById('app-dialog-ok');
+        if (!dialog || !altBtn) { resolve(null); return; }
+        msg.textContent = message;
+        inputField.style.display = 'none';
+        cancelBtn.style.display = '';
+        cancelBtn.textContent = 'Annulla';
+        altBtn.style.display = '';
+        altBtn.textContent = '📞 Chiamata Telefonica';
+        okBtn.textContent = '💬 WhatsApp';
+        const cleanup = () => {
+            dialog.close();
+            okBtn.removeEventListener('click', onWhatsApp);
+            altBtn.removeEventListener('click', onTel);
+            cancelBtn.removeEventListener('click', onCancel);
+            altBtn.style.display = 'none';
+        };
+        const onWhatsApp = () => { cleanup(); resolve('whatsapp'); };
+        const onTel = () => { cleanup(); resolve('tel'); };
+        const onCancel = () => { cleanup(); resolve(null); };
+        okBtn.addEventListener('click', onWhatsApp);
+        altBtn.addEventListener('click', onTel);
+        cancelBtn.addEventListener('click', onCancel);
+        dialog.showModal();
+    });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 function cloneFallbackValue(value) {
@@ -576,6 +609,8 @@ const ACTION_HANDLERS = {
     forceLocalBackupNow: () => forceLocalBackupNow(),
     ripristinaBackupDaFile: (event) => ripristinaBackupDaFile(event),
     saveVetClinic: () => saveVetClinic(),
+    callVetClinicByIndex: (_event, index) => callVetClinicByIndex(index),
+    whatsappVetClinicByIndex: (_event, index) => whatsappVetClinicByIndex(index),
     shareLocationToVetByIndex: (_event, index) => shareLocationToVetByIndex(index),
     deleteVetClinic: (_event, index) => deleteVetClinic(index),
     salvaNotaClienteDaInput: (_event, index) => salvaNotaClienteDaInput(index),
@@ -2151,14 +2186,18 @@ function openModule(moduleName, editMode = false) {
         case 'vet-emergency':
             const vetClinics = getRenderableStorageJSON('vet_clinics_list', []);
             let clinicHtml = `
-                <h2>Pronto Soccorso & Cliniche Veterinarie H24</h2>
+                <h2>Soccorso Veterinario & Cliniche Veterinarie</h2>
                 <p>Gestisci i numeri d'emergenza dei veterinari:</p>
                 <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
                     <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Clinica H24</h3>
                     <label>Nome Clinica o Medico:</label>
                     <input type="text" id="vc-nome" class="mod-input" placeholder="Es. Clinica Centrale">
+                    <label>Indirizzo:</label>
+                    <input type="text" id="vc-indirizzo" class="mod-input" placeholder="Es. Via Roma 1, Campobasso">
                     <label>Numero di Telefono:</label>
                     <input type="tel" id="vc-tel" class="mod-input" placeholder="Es. 0874123456">
+                    <label>Numero di Cellulare:</label>
+                    <input type="tel" id="vc-cell" class="mod-input" placeholder="Es. 3931234567">
                     <label>Note:</label>
                     <input type="text" id="vc-note" class="mod-input" placeholder="Es. Aperto festivi e notturno">
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveVetClinic')}>Salva Contatto Emergenza</button>
@@ -2169,14 +2208,16 @@ function openModule(moduleName, editMode = false) {
                 clinicHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">I tuoi contatti salvati:</h3>`;
                 vetClinics.forEach((clinic, idx) => {
                     const safeClinic = sanitizeRenderable(clinic);
-                    const telHref = sanitizePhoneHref(clinic.tel);
                     clinicHtml += `
                         <div class="module-card" style="border-left: 4px solid #dc2626; margin-bottom: 12px;">
                             <strong style="color:#f6f1e6; font-size:1rem;">🏥 ${safeClinic.nome}</strong>
-                            <p style="font-size:0.85rem; color:#4d8a98; margin: 4px 0;">📞 ${safeClinic.tel}</p>
+                            ${safeClinic.indirizzo ? `<p style="font-size:0.8rem; color:#b8b0a0; margin: 2px 0;">📍 ${safeClinic.indirizzo}</p>` : ''}
+                            ${safeClinic.tel ? `<p style="font-size:0.85rem; color:#4d8a98; margin: 2px 0;">📞 ${safeClinic.tel}</p>` : ''}
+                            ${safeClinic.cell ? `<p style="font-size:0.85rem; color:#4d8a98; margin: 2px 0;">📱 ${safeClinic.cell}</p>` : ''}
                             <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 ${safeClinic.note || 'Nessuna nota'}</p>
                             <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                                <a href="tel:${telHref}" class="overlay-btn btn-danger" style="text-decoration:none; text-align:center; display:inline-block; padding:8px 12px;">📞 Chiama</a>
+                                <button class="overlay-btn btn-danger" style="padding:8px 12px;" ${actionAttrs('callVetClinicByIndex', [idx])}>📞 Chiama</button>
+                                ${safeClinic.cell ? `<button class="overlay-btn" style="padding:8px 12px; background:#25d366;" ${actionAttrs('whatsappVetClinicByIndex', [idx])}>💬 WhatsApp</button>` : ''}
                                 <button class="overlay-btn btn-info" style="padding:8px 12px;" ${actionAttrs('shareLocationToVetByIndex', [idx])}>📍 Invia GPS</button>
                                 <button class="overlay-btn btn-neutral" style="padding:8px 12px;" ${actionAttrs('deleteVetClinic', [idx])}>🗑️ Elimina</button>
                             </div>
@@ -4149,11 +4190,13 @@ function centerOnUser() {
 
 function saveVetClinic() {
     const nome = document.getElementById('vc-nome').value.trim();
+    const indirizzo = document.getElementById('vc-indirizzo').value.trim();
     const tel = document.getElementById('vc-tel').value.trim();
+    const cell = document.getElementById('vc-cell').value.trim();
     const note = document.getElementById('vc-note').value.trim();
-    if (!nome || !tel) { showToast("Inserisci nome e telefono.", 'error'); return; }
+    if (!nome || (!tel && !cell)) { showToast("Inserisci nome e almeno un numero.", 'error'); return; }
     let vetClinics = readStorageJSON('vet_clinics_list', []);
-    vetClinics.push({ nome, tel, note });
+    vetClinics.push({ nome, indirizzo, tel, cell, note });
     localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
     showToast("Clinica salvata!", 'success'); openModule('vet-emergency');
 }
@@ -4182,8 +4225,31 @@ async function shareLocationToVet(telNumber) {
 function shareLocationToVetByIndex(index) {
     const vetClinics = readStorageJSON('vet_clinics_list', []);
     const clinic = vetClinics[index];
-    if (!clinic || !clinic.tel) return;
-    shareLocationToVet(sanitizePhoneHref(clinic.tel));
+    const contactNumber = clinic && (clinic.cell || clinic.tel);
+    if (!contactNumber) { showToast("Nessun numero disponibile.", 'error'); return; }
+    shareLocationToVet(sanitizePhoneHref(contactNumber));
+}
+
+async function callVetClinicByIndex(index) {
+    const vetClinics = readStorageJSON('vet_clinics_list', []);
+    const clinic = vetClinics[index];
+    if (!clinic) return;
+    const method = await appChooseCallMethod('Come vuoi chiamare?');
+    if (method === 'tel') {
+        const number = clinic.tel || clinic.cell;
+        if (!number) { showToast("Nessun numero disponibile.", 'error'); return; }
+        window.location.href = `tel:${sanitizePhoneHref(number)}`;
+    } else if (method === 'whatsapp') {
+        if (!clinic.cell) { showToast("Nessun numero di cellulare disponibile per WhatsApp.", 'error'); return; }
+        window.location.href = `whatsapp://send?phone=${encodeURIComponent(sanitizePhoneHref(clinic.cell))}`;
+    }
+}
+
+function whatsappVetClinicByIndex(index) {
+    const vetClinics = readStorageJSON('vet_clinics_list', []);
+    const clinic = vetClinics[index];
+    if (!clinic || !clinic.cell) { showToast("Nessun numero di cellulare disponibile.", 'error'); return; }
+    window.location.href = `whatsapp://send?phone=${encodeURIComponent(sanitizePhoneHref(clinic.cell))}`;
 }
 
 function saveVetHistoryItem() {
