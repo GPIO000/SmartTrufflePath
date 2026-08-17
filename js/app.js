@@ -94,8 +94,8 @@ function getAdaptiveFocusZoom(defaultZoom) {
 function updateZoomIndicator() {
     const zoomEl = document.getElementById('zoom-level-indicator');
     if (!zoomEl) return;
-    const onlineSymbol = isOfflineMapModeActive() ? '🔴' : '🟢';
-    zoomEl.textContent = `Z ${map.getZoom()} ${onlineSymbol}`;
+    const connectivitySymbol = isOfflineMapModeActive() ? '📵' : '📡';
+    zoomEl.textContent = `Z ${map.getZoom()} ${connectivitySymbol}`;
 }
 
 function applyMapConnectivityZoomCap({ notify = false, enforceBounds = true } = {}) {

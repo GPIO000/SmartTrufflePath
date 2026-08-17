@@ -10,6 +10,7 @@ SmartTruffle Path è una web app **mobile-first e PWA** per supportare il tartuf
   - Salvataggio punti tartufaia (POI) con note
   - Navigazione verso auto o POI con distanza e direzione geografica calcolate via GPS
   - La navigazione non usa il magnetometro / la bussola hardware del telefono: aiuta a orientarsi confrontando mappa e spostamenti reali
+  - Indicatore di connettività internet sull'indicatore di zoom: 📡 connesso, 📵 offline o rete tile non disponibile
   - Condivisione POI (share nativo/WhatsApp)
   - SOS rapido via SMS con coordinate
 
