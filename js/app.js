@@ -23,11 +23,11 @@ async function registerAppServiceWorker() {
     try {
         const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, { scope: SERVICE_WORKER_SCOPE });
         lastServiceWorkerRegistrationError = null;
-        console.log('Service Worker registrato con successo:', registration.scope);
+        console.log('Service Worker registered:', registration.scope);
         return registration;
     } catch (error) {
         lastServiceWorkerRegistrationError = error;
-        console.error('Registrazione Service Worker fallita:', error);
+        console.error('Service Worker registration failed:', error);
         return null;
     }
 }
@@ -186,8 +186,9 @@ async function updateOfflineMapRuntimeStatusIndicator() {
     }
 
     if (!hasController) {
-        const transientRegistrationState = registration.installing?.state || registration.waiting?.state || 'unknown';
-        if (transientRegistrationState === 'installing' || transientRegistrationState === 'activating') {
+        const isServiceWorkerActivating = registration.installing?.state === 'installing'
+            || registration.active?.state === 'activating';
+        if (isServiceWorkerActivating) {
             renderStatus('⚠️ Service Worker in attivazione: attendi qualche secondo e riapri questa schermata.', OFFLINE_STATUS_COLOR_WARNING);
             return;
         }
