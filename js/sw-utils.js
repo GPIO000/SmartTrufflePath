@@ -4,6 +4,10 @@
  * Utile per trovare tile in cache indipendentemente dal sottodominio
  * usato da Leaflet al momento della richiesta.
  *
+ * NOTA: questa funzione è anche inlined direttamente in sw.js per evitare
+ * l'uso di import ES Module nel Service Worker, garantendo compatibilità
+ * massima con tutti i browser. Mantenere le due copie sincronizzate.
+ *
  * @param {string} url
  * @returns {string}
  */
