@@ -186,10 +186,10 @@ async function updateOfflineMapRuntimeStatusIndicator() {
     }
 
     if (!hasController) {
-        const isServiceWorkerActivating = registration.installing?.state === 'installing'
-            || registration.active?.state === 'activating';
-        if (isServiceWorkerActivating) {
-            renderStatus('⚠️ Service Worker in attivazione: attendi qualche secondo e riapri questa schermata.', OFFLINE_STATUS_COLOR_WARNING);
+        const isServiceWorkerPending = registration.installing?.state === 'installing'
+            || registration.waiting?.state === 'installed';
+        if (isServiceWorkerPending) {
+            renderStatus('⚠️ Service Worker in preparazione: attendi qualche secondo e poi riapri questa schermata.', OFFLINE_STATUS_COLOR_WARNING);
             return;
         }
         renderStatus("⚠️ Service Worker pronto ma non ancora collegato a questa schermata: ricarica/riapri l’app una volta per attivare l’offline.", OFFLINE_STATUS_COLOR_WARNING);
