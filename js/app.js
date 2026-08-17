@@ -15,8 +15,8 @@ import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendi
 
 window.TruffleStorage = TruffleStorage;
 
-const SERVICE_WORKER_URL = new URL('../sw.js', import.meta.url).href;
-const SERVICE_WORKER_SCOPE = new URL('../', import.meta.url).pathname;
+const SERVICE_WORKER_SCOPE = new URL('./', window.location.href).pathname;
+const SERVICE_WORKER_URL = `${SERVICE_WORKER_SCOPE}sw.js`;
 let lastServiceWorkerRegistrationError = null;
 
 async function registerAppServiceWorker() {
