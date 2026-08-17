@@ -186,11 +186,8 @@ async function updateOfflineMapRuntimeStatusIndicator() {
     }
 
     if (!hasController) {
-        const registrationState = registration.installing?.state
-            || registration.waiting?.state
-            || registration.active?.state
-            || 'unknown';
-        if (registrationState === 'installing' || registrationState === 'activating') {
+        const transientRegistrationState = registration.installing?.state || registration.waiting?.state || 'unknown';
+        if (transientRegistrationState === 'installing' || transientRegistrationState === 'activating') {
             renderStatus('⚠️ Service Worker in attivazione: attendi qualche secondo e riapri questa schermata.', OFFLINE_STATUS_COLOR_WARNING);
             return;
         }
