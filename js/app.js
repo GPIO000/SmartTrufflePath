@@ -5293,7 +5293,6 @@ function syncOfflineMapRecoveryProgressUI() {
     if (!offlineMapRecoveryProgressState) {
         progressArea.style.display = 'none';
         progressBar.style.width = '0%';
-        progressText.textContent = 'Download in corso…';
         return;
     }
 
@@ -5385,7 +5384,7 @@ async function runOfflineMapRecovery({
     waitingToastMessage = ''
 } = {}) {
     if (!Array.isArray(preferenze?.regioni) || preferenze.regioni.length === 0) {
-        clearOfflineMapRecoveryProgressState();
+        if (!isOfflineMapRecoveryRunning) clearOfflineMapRecoveryProgressState();
         return null;
     }
 
