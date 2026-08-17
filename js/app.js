@@ -40,8 +40,8 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: MAP_TIL
 const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
 const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-17a`;
-const OFFLINE_MAP_MIN_ZOOM = 8;
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-17b`;
+const OFFLINE_MAP_MIN_ZOOM = 6;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
 const OFFLINE_CACHE_STATUS_KEY = 'offline_cache_status';
 const OFFLINE_RECOVERY_STATE_KEY = 'offline_map_recovery_state';
@@ -5466,6 +5466,12 @@ async function scaricaRegioniOffline() {
         startToastMessage: '📥 Download mappa offline in corso…',
         waitingToastMessage: '⏸️ Download temporaneamente rallentato dal provider.'
     });
+    // Se il Service Worker non controlla ancora questa pagina (es. primo avvio dopo
+    // installazione o aggiornamento), le tile in cache non vengono intercettate finché
+    // la pagina non viene ricaricata. In questo caso avvisiamo l'utente.
+    if ('serviceWorker' in navigator && !navigator.serviceWorker.controller) {
+        showToast('🔄 Ricarica l\'app per attivare la mappa offline (tieni premuto il tasto Aggiorna o chiudi e riapri l\'app).', 'info');
+    }
 }
 
 async function aggiornaStatoCacheRegioni() {

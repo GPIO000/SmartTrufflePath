@@ -1,5 +1,5 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-17a';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-17b';
 const MAP_OFFLINE_CACHE_NAME = 'smarttruffle-map-offline';
 let legacyAppCacheNames = null;
 let legacyAppCacheNamesPromise = null;
@@ -125,7 +125,10 @@ async function notifyClientsTileNetworkStatus(type) {
   }
 }
 
-// Installazione Service Worker e salvataggio in cache
+// Installazione Service Worker e salvataggio in cache.
+// skipWaiting() forza l'attivazione immediata anche se altri tab usano il vecchio SW.
+// clients.claim() viene chiamato nell'evento activate per prendere controllo subito
+// di tutti i tab aperti, senza attendere un ricaricamento della pagina.
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
