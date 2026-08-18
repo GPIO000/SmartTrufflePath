@@ -379,6 +379,11 @@ function appSelect(message, options = [], defaultValue = '') {
             return;
         }
 
+        if (!Array.isArray(options) || options.length === 0) {
+            resolve(null);
+            return;
+        }
+
         msg.textContent = message;
         const previousInputDisplay = inputField.style.display;
         inputField.style.display = 'none';
@@ -414,9 +419,10 @@ function appSelect(message, options = [], defaultValue = '') {
             cleanup();
             resolve(value);
         };
-        const onOk = () => { const val = selectField.value; settle(val); dialog.close(); };
-        const onCancel = () => { settle(null); dialog.close(); };
-        const onDialogClose = () => { settle(null); };
+        let pendingValue = null;
+        const onOk = () => { pendingValue = selectField.value; dialog.close(); };
+        const onCancel = () => { pendingValue = null; dialog.close(); };
+        const onDialogClose = () => { settle(pendingValue); };
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
         dialog.addEventListener('close', onDialogClose);
