@@ -428,6 +428,7 @@ function readStorageJSON(key, fallbackValue) {
 
 let editingDogIndex = null;
 let editingArchivioDocumentoIndex = null;
+let editingPoiIndex = null;
 
 function formatDogAge(birthDate) {
     if (!birthDate) return 'Non disponibile';
@@ -586,6 +587,9 @@ const ACTION_HANDLERS = {
     navigateToPoi: (_event, index) => navigateToPoi(index),
     sharePoi: (_event, index) => sharePoi(index),
     deletePoi: (_event, index) => deletePoi(index),
+    editPoi: (_event, index) => editPoi(index),
+    savePoiEdit: (_event, index) => savePoiEdit(index),
+    cancelPoiEdit: () => { editingPoiIndex = null; openModule('poilist'); },
     importSharedPoint: () => importSharedPoint(),
     viewStoredDocument: (_event, storageKey, title, moduleName) => viewStoredDocument(storageKey, title, moduleName),
     clearData: (_event, storageKey, moduleName) => clearData(storageKey, moduleName),
@@ -663,6 +667,7 @@ const ACTION_HANDLERS = {
         }
     },
     refreshRegistroGiornaliero: () => openModule('registro_giornaliero'),
+    refreshSpese: () => openModule('spese'),
     registerRicevutaSafe: async () => {
         try {
             await registraVenditaConPrezzoKg();
@@ -1091,6 +1096,30 @@ async function deletePoi(index) {
         openModule('poilist');
     }
 }
+function editPoi(index) {
+    editingPoiIndex = index;
+    openModule('poilist');
+}
+function savePoiEdit(index) {
+    const noteEl = document.getElementById(`poi-edit-note-${index}`);
+    const latEl = document.getElementById(`poi-edit-lat-${index}`);
+    const lngEl = document.getElementById(`poi-edit-lng-${index}`);
+    if (!noteEl || !latEl || !lngEl) return;
+    const note = noteEl.value.trim();
+    const lat = parseFloat(latEl.value);
+    const lng = parseFloat(lngEl.value);
+    if (!note) { showToast("La nota non può essere vuota.", 'error'); return; }
+    if (isNaN(lat) || isNaN(lng)) { showToast("Coordinate non valide.", 'error'); return; }
+    poiList[index].note = note;
+    poiList[index].lat = lat;
+    poiList[index].lng = lng;
+    poiList = normalizePoiList(poiList);
+    localStorage.setItem('poi_list', JSON.stringify(poiList));
+    renderAllPoiMarkers();
+    editingPoiIndex = null;
+    showToast("📍 Punto aggiornato!", 'success');
+    openModule('poilist');
+}
 function extractCoordsFromMessage(text) {
     // Try Google Maps URL: ?q=lat,lng
     let m = text.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
@@ -1157,6 +1186,7 @@ function openModule(moduleName, editMode = false) {
     if (drawer && drawer.classList.contains('drawer-open')) toggleDrawer();
     if (moduleName !== 'canidiary') editingDogIndex = null;
     if (moduleName !== 'archivio_documenti') editingArchivioDocumentoIndex = null;
+    if (moduleName !== 'poilist') editingPoiIndex = null;
     let activeView = document.getElementById('active-module-view');
     if (!activeView) {
         activeView = document.createElement('div');
@@ -1190,7 +1220,24 @@ function openModule(moduleName, editMode = false) {
                     const isShared = poi.type === 'shared';
                     const poiIcon = isAuto ? '🚗' : isSos ? '🚨' : isShared ? '📩' : '📍';
                     const fromLine = safePoi.from ? `<p class="text-muted small-text" style="margin:2px 0;">Da: ${safePoi.from}</p>` : '';
-                    poiHtml += `
+                    const isEditing = editingPoiIndex === idx;
+                    if (isEditing) {
+                        poiHtml += `
+                        <div class="module-card card-gap" style="border-left:4px solid #2563eb;">
+                            <strong class="text-accent">✏️ Modifica Punto</strong>
+                            <label style="margin-top:8px;">Nota:</label>
+                            <input type="text" id="poi-edit-note-${idx}" class="mod-input" value="${safePoi.note}">
+                            <label>Latitudine:</label>
+                            <input type="number" step="0.000001" id="poi-edit-lat-${idx}" class="mod-input" value="${poi.lat}">
+                            <label>Longitudine:</label>
+                            <input type="number" step="0.000001" id="poi-edit-lng-${idx}" class="mod-input" value="${poi.lng}">
+                            <div class="btn-row" style="margin-top:10px;">
+                                <button class="overlay-btn btn-primary" ${actionAttrs('savePoiEdit', [idx])}>💾 Salva</button>
+                                <button class="overlay-btn btn-neutral" ${actionAttrs('cancelPoiEdit')}>✕ Annulla</button>
+                            </div>
+                        </div>`;
+                    } else {
+                        poiHtml += `
                         <div class="module-card card-gap">
                             <strong class="text-accent">${poiIcon} ${safePoi.note}</strong>
                             <p class="text-muted small-text" style="margin:4px 0;">Data: ${safePoi.date}</p>
@@ -1199,9 +1246,11 @@ function openModule(moduleName, editMode = false) {
                             <div class="btn-row">
                                 <button class="overlay-btn btn-success" ${actionAttrs('navigateToPoi', [idx])}>🧭 Vai</button>
                                 <button class="overlay-btn btn-info" ${actionAttrs('sharePoi', [idx])}>📤 Condividi</button>
+                                <button class="overlay-btn" style="background:#4b5563;" ${actionAttrs('editPoi', [idx])}>✏️ Modifica</button>
                                 <button class="overlay-btn btn-danger" ${actionAttrs('deletePoi', [idx])}>🗑️ Elimina</button>
                             </div>
                         </div>`;
+                    }
                 });
             }
             contentHTML = poiHtml;
@@ -1964,6 +2013,7 @@ function openModule(moduleName, editMode = false) {
                         <div style="flex:1;"><label style="font-size:0.75rem;">Anno:</label><select id="filtro-anno" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniAnniHtml}</select></div>
                         <div style="flex:2;"><label style="font-size:0.75rem;">Specie:</label><select id="filtro-specie" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniSpecieHtml}</select></div>
                     </div>
+                    <button ${actionAttrs('printPage')} style="margin-top:10px; width:100%; background:#4b5563; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem;">🖨️ Stampa / Salva PDF</button>
                 </div>`;
             let datiFiltrati = storicoRaccolta.filter(item => {
                 const annoItem = item.data ? item.data.slice(0,4) : '';
@@ -1988,10 +2038,21 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = registroHtml;
             break;
-        case 'spese':
+        case 'spese': {
             const speseList = getRenderableStorageJSON('spese_list', []);
-            let totaleSpeseAnno = 0;
             const annoCorrenteSpese = new Date().getFullYear();
+            const elFiltroAnnoSpese = document.getElementById('filtro-anno-spese');
+            const filtroAnnoSpese = elFiltroAnnoSpese ? elFiltroAnnoSpese.value : String(annoCorrenteSpese);
+
+            let anniDisponibiliSpese = [...new Set(speseList.map(item => item.data ? item.data.slice(0,4) : ''))].filter(Boolean).sort().reverse();
+            if (anniDisponibiliSpese.length === 0) anniDisponibiliSpese = [String(annoCorrenteSpese)];
+            let opzioniAnniSpeseHtml = `<option value="tutti">Tutti gli anni</option>`;
+            anniDisponibiliSpese.forEach(a => { opzioniAnniSpeseHtml += `<option value="${a}" ${filtroAnnoSpese === a ? 'selected' : ''}>${a}</option>`; });
+
+            const speseFiltrate = speseList
+                .map((item, idx) => ({ item, originalIndex: idx }))
+                .filter(({ item }) => filtroAnnoSpese === 'tutti' || (item.data && item.data.slice(0,4) === filtroAnnoSpese));
+            let totaleSpeseAnno = speseFiltrate.reduce((acc, { item }) => acc + (parseFloat(item.importo) || 0), 0);
 
             let speseHtml = `
                 <h2>Gestione Spese Tartufaio</h2>
@@ -2014,20 +2075,26 @@ function openModule(moduleName, editMode = false) {
                     <label>Note / Descrizione:</label>
                     <input type="text" id="spese-note" class="mod-input" placeholder="Es. Benzina per uscita bosco">
                     <button class="overlay-btn" style="margin-top:10px; width:100%; background:#2563eb;" ${actionAttrs('saveSpesa')}>Salva Spesa</button>
+                </div>
+                <div class="module-card" style="margin-bottom: 15px; background: #121610; border: 1px solid rgba(255,255,255,0.07);">
+                    <h3 style="font-size:0.85rem; color:#4d8a98; margin-bottom:8px;">🔍 Filtro Anno</h3>
+                    <div style="display:flex; gap:10px; align-items:flex-end;">
+                        <div style="flex:1;"><label style="font-size:0.75rem;">Anno:</label><select id="filtro-anno-spese" class="mod-input" ${eventActionAttrs('change', 'refreshSpese')}>${opzioniAnniSpeseHtml}</select></div>
+                        <button ${actionAttrs('printPage')} style="background:#4b5563; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem; white-space:nowrap;">🖨️ Stampa / PDF</button>
+                    </div>
                 </div>`;
 
-            if (speseList.length === 0) {
-                speseHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessuna spesa registrata.</p></div>`;
+            if (speseFiltrate.length === 0) {
+                speseHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessuna spesa registrata${filtroAnnoSpese !== 'tutti' ? ` per il ${filtroAnnoSpese}` : ''}.</p></div>`;
             } else {
-                speseHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Elenco Spese Registrate:</h3>`;
-                
-                speseList.slice().reverse().forEach((item, index) => {
-                    const originalIndex = speseList.length - 1 - index;
-                    const dataSpesa = item.data ? new Date(item.data) : null;
-                    if (dataSpesa && dataSpesa.getFullYear() === annoCorrenteSpese) {
-                        totaleSpeseAnno += parseFloat(item.importo) || 0;
-                    }
+                speseHtml += `
+                    <div class="module-card" style="background: #121610; border: 1px solid rgba(255,255,255,0.07); margin-bottom: 15px; text-align: center;">
+                        <p style="font-size: 0.8rem; color: #b8b0a0; text-transform: uppercase;">Totale Spese${filtroAnnoSpese !== 'tutti' ? ` ${filtroAnnoSpese}` : ''}</p>
+                        <p style="font-size: 1.4rem; color: #f59e0b; font-weight: bold; margin: 4px 0 0 0;">€ ${totaleSpeseAnno.toFixed(2)}</p>
+                    </div>`;
+                speseHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Elenco Spese${filtroAnnoSpese !== 'tutti' ? ` ${filtroAnnoSpese}` : ''} (${speseFiltrate.length}):</h3>`;
 
+                speseFiltrate.slice().reverse().forEach(({ item, originalIndex }) => {
                     speseHtml += `
                         <div class="module-card" style="border-left: 4px solid #f59e0b; margin-bottom: 12px;">
                             <strong style="color:#f6f1e6; font-size:0.95rem;">💶 € ${parseFloat(item.importo).toFixed(2)}</strong>
@@ -2037,15 +2104,10 @@ function openModule(moduleName, editMode = false) {
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteSpesa', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
-
-                speseHtml = `
-                    <div class="module-card" style="background: #121610; border: 1px solid rgba(255,255,255,0.07); margin-bottom: 15px; text-align: center;">
-                        <p style="font-size: 0.8rem; color: #b8b0a0; text-transform: uppercase;">Totale Spese Anno Corrente (${annoCorrenteSpese})</p>
-                        <p style="font-size: 1.4rem; color: #f59e0b; font-weight: bold; margin: 4px 0 0 0;">€ ${totaleSpeseAnno.toFixed(2)}</p>
-                    </div>` + speseHtml;
             }
             contentHTML = speseHtml;
             break;
+        }
         case 'bilancio':
             const venditeSalvateBilancio = readStorageJSON('storico_vendite', []);
             const speseSalvateBilancio = readStorageJSON('spese_list', []);
@@ -2596,6 +2658,7 @@ function openModule(moduleName, editMode = false) {
 function closeActiveModule() {
     editingDogIndex = null;
     editingArchivioDocumentoIndex = null;
+    editingPoiIndex = null;
     const activeView = document.getElementById('active-module-view');
     if (activeView) activeView.style.display = 'none';
 }
