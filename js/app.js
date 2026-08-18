@@ -17,11 +17,46 @@ window.TruffleStorage = TruffleStorage;
 
 const SERVICE_WORKER_SCOPE = new URL('./', window.location.href).pathname;
 const SERVICE_WORKER_URL = `${SERVICE_WORKER_SCOPE}sw.js`;
+const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-18b`;
 let lastServiceWorkerRegistrationError = null;
+let shouldReloadOnNextServiceWorkerControllerChange = false;
+
+function monitorInstallingServiceWorker(worker) {
+    if (!worker || typeof worker.addEventListener !== 'function') return;
+    worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            shouldReloadOnNextServiceWorkerControllerChange = true;
+        }
+    });
+}
+
+async function forceAppServiceWorkerUpdateCheck() {
+    if (!('serviceWorker' in navigator)) return null;
+    try {
+        const registration = await navigator.serviceWorker.getRegistration(SERVICE_WORKER_SCOPE);
+        if (!registration) return null;
+        await registration.update();
+        return registration;
+    } catch (error) {
+        console.warn('Service Worker update check failed:', error);
+        return null;
+    }
+}
 
 async function registerAppServiceWorker() {
     try {
-        const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, { scope: SERVICE_WORKER_SCOPE });
+        const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
+            scope: SERVICE_WORKER_SCOPE,
+            updateViaCache: 'none'
+        });
+        monitorInstallingServiceWorker(registration.installing);
+        registration.addEventListener('updatefound', () => {
+            monitorInstallingServiceWorker(registration.installing);
+        });
+        void registration.update().catch((error) => {
+            console.warn('Initial Service Worker update check failed:', error);
+        });
         lastServiceWorkerRegistrationError = null;
         console.log('Service Worker registered:', registration.scope);
         return registration;
@@ -34,6 +69,14 @@ async function registerAppServiceWorker() {
 
 if ('serviceWorker' in navigator) {
     void registerAppServiceWorker();
+    window.addEventListener('focus', () => {
+        void forceAppServiceWorkerUpdateCheck();
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            void forceAppServiceWorkerUpdateCheck();
+        }
+    });
 }
 
 try {
@@ -52,8 +95,6 @@ L.control.zoom({ position: 'topright' }).addTo(map);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: MAP_TILE_LAYER_MAX_ZOOM, attribution: '© OpenStreetMap' }).addTo(map);
 const OFFLINE_REGIONI_PREFERITE_KEY = 'offline_regioni_preferite';
 const OFFLINE_MAP_CACHE_NAME = 'smarttruffle-map-offline';
-const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-17g`;
 const OFFLINE_MAP_MIN_ZOOM = 6;
 const OFFLINE_MAP_DEFAULT_MAX_ZOOM = 13;
 const OFFLINE_CACHE_STATUS_KEY = 'offline_cache_status';
@@ -5980,6 +6021,11 @@ window.addEventListener('offline', () => {
 });
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (shouldReloadOnNextServiceWorkerControllerChange) {
+            shouldReloadOnNextServiceWorkerControllerChange = false;
+            window.location.reload();
+            return;
+        }
         updateOfflineMapRuntimeStatusIndicator();
     });
     navigator.serviceWorker.addEventListener('message', (event) => {
