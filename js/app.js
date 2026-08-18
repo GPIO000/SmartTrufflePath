@@ -368,6 +368,10 @@ function appPrompt(message, defaultValue = '') {
 
 function appSelect(message, options = [], defaultValue = '') {
     return new Promise((resolve) => {
+        if (!Array.isArray(options) || options.length === 0) {
+            resolve(null);
+            return;
+        }
         const dialog = document.getElementById('app-dialog');
         const msg = document.getElementById('app-dialog-message');
         const inputField = document.getElementById('app-dialog-input');
@@ -376,11 +380,6 @@ function appSelect(message, options = [], defaultValue = '') {
         if (!dialog) {
             const fallbackMessage = `${message}\n${options.join(' ')}`;
             resolve(window.prompt(fallbackMessage, defaultValue));
-            return;
-        }
-
-        if (!Array.isArray(options) || options.length === 0) {
-            resolve(null);
             return;
         }
 
