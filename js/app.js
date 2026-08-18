@@ -2049,8 +2049,10 @@ function openModule(moduleName, editMode = false) {
             let opzioniAnniSpeseHtml = `<option value="tutti">Tutti gli anni</option>`;
             anniDisponibiliSpese.forEach(a => { opzioniAnniSpeseHtml += `<option value="${a}" ${filtroAnnoSpese === a ? 'selected' : ''}>${a}</option>`; });
 
-            const speseFiltrate = speseList.filter(item => filtroAnnoSpese === 'tutti' || (item.data && item.data.slice(0,4) === filtroAnnoSpese));
-            let totaleSpeseAnno = speseFiltrate.reduce((acc, item) => acc + (parseFloat(item.importo) || 0), 0);
+            const speseFiltrate = speseList
+                .map((item, idx) => ({ item, originalIndex: idx }))
+                .filter(({ item }) => filtroAnnoSpese === 'tutti' || (item.data && item.data.slice(0,4) === filtroAnnoSpese));
+            let totaleSpeseAnno = speseFiltrate.reduce((acc, { item }) => acc + (parseFloat(item.importo) || 0), 0);
 
             let speseHtml = `
                 <h2>Gestione Spese Tartufaio</h2>
@@ -2092,8 +2094,7 @@ function openModule(moduleName, editMode = false) {
                     </div>`;
                 speseHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Elenco Spese${filtroAnnoSpese !== 'tutti' ? ` ${filtroAnnoSpese}` : ''} (${speseFiltrate.length}):</h3>`;
 
-                speseFiltrate.slice().reverse().forEach((item) => {
-                    const originalIndex = speseList.indexOf(item);
+                speseFiltrate.slice().reverse().forEach(({ item, originalIndex }) => {
                     speseHtml += `
                         <div class="module-card" style="border-left: 4px solid #f59e0b; margin-bottom: 12px;">
                             <strong style="color:#f6f1e6; font-size:0.95rem;">💶 € ${parseFloat(item.importo).toFixed(2)}</strong>
