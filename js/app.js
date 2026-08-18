@@ -4428,7 +4428,9 @@ async function ripristinaBackupDaFile(event) {
 }
 
 async function runAutomaticLocalBackup() {
-    if (!getAutomaticBackupDestinationLabel()) return;
+    const hasDestinationLabel = Boolean(getAutomaticBackupDestinationLabel());
+    const hasStoredHandle = hasDestinationLabel ? true : Boolean(await _loadBackupDirHandle());
+    if (!hasDestinationLabel && !hasStoredHandle) return;
     const backupData = buildCompleteBackupData();
     const fingerprint = JSON.stringify(backupData);
     if (fingerprint === lastAutomaticBackupFingerprint) return;
