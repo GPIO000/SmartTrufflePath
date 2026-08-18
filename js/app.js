@@ -966,14 +966,14 @@ function renderAllPoiMarkers() {
             icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">🚗</div>', iconAnchor: [14, 14] });
             popupTitle = '🚗 Auto';
         } else if (isSos) {
-            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">🚨</div>', iconAnchor: [14, 14] });
-            popupTitle = '🚨 SOS';
+            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">🆘</div>', iconAnchor: [14, 14] });
+            popupTitle = '🆘 SOS';
         } else if (isShared) {
             icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">📩</div>', iconAnchor: [14, 14] });
             popupTitle = '📩 Punto Condiviso';
         } else {
-            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">📍</div>', iconAnchor: [14, 14] });
-            popupTitle = '📍 Tartufo / Punto';
+            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">🥔</div>', iconAnchor: [14, 14] });
+            popupTitle = '🥔 Tartufo / Punto';
         }
         const fromInfo = poi.from ? `<br><small>Da: ${escapeHtml(safePoi.from || '')}</small>` : '';
         const marker = L.marker([poi.lat, poi.lng], { icon }).addTo(map)
@@ -1007,7 +1007,7 @@ function updateCompass(currentLat, currentLng) {
     let target = null, label = '';
     if (typeof targetNavigation === 'string' && targetNavigation.startsWith('poi_')) {
         const index = parseInt(targetNavigation.split('_')[1]);
-        if (poiList[index]) { target = poiList[index]; label = `📍 ${poiList[index].note || 'Punto'}`; }
+        if (poiList[index]) { target = poiList[index]; label = `🥔 ${poiList[index].note || 'Punto'}`; }
     }
     if (target) {
         const res = calculateDistanceAndBearing(currentLat, currentLng, target.lat, target.lng);
@@ -1065,7 +1065,7 @@ async function savePoiPosition() {
         targetNavigation = `poi_${newIndex}`;
         map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
-        showToast("📍 Punto salvato!", 'success');
+        showToast("🥔 Punto salvato!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
 async function navigateToPoi(index) {
@@ -1117,20 +1117,38 @@ function savePoiEdit(index) {
     localStorage.setItem('poi_list', JSON.stringify(poiList));
     renderAllPoiMarkers();
     editingPoiIndex = null;
-    showToast("📍 Punto aggiornato!", 'success');
+    showToast("🥔 Punto aggiornato!", 'success');
     openModule('poilist');
 }
 function extractCoordsFromMessage(text) {
-    // Try Google Maps URL: ?q=lat,lng
-    let m = text.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    let m;
+    // Try Google Maps URL: ?q=lat,lng or @lat,lng
+    m = text.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
     if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-    // Try "Lat: X, Lng: Y" or "Lat: X Lng: Y"
-    m = text.match(/lat[:\s]+(-?\d+\.?\d*)[,\s]+ln?g[:\s]+(-?\d+\.?\d*)/i);
+    m = text.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
     if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-    // Try decimal comma format like "41,0290515, 14,6805400"
+    // Try "Lat: X, Lng: Y" or "Lat: X Lng: Y" (with dot or comma decimals)
+    m = text.match(/lat(?:itudine)?[:\s]+(-?\d+[.,]\d*)[,\s]+l(?:on|ng|ong)(?:itudine)?[:\s]+(-?\d+[.,]\d*)/i);
+    if (m) return { lat: parseFloat(m[1].replace(',', '.')), lng: parseFloat(m[2].replace(',', '.')) };
+    // Try "N 43° 12.345' E 11° 34.567'" or "43°12'34.5"N 11°34'56.7"E" (DMS)
+    const dmsToDecimal = (deg, min, sec, dir) => {
+        let d = parseFloat(deg) + parseFloat(min || 0) / 60 + parseFloat(sec || 0) / 3600;
+        if (/[SW]/i.test(dir)) d = -d;
+        return d;
+    };
+    // DMS with symbols: 43°12'34.5"N 11°34'56.7"E (seconds required)
+    m = text.match(/(\d{1,3})[°º]\s*(\d{1,2})['′]\s*(\d{1,2}(?:[.,]\d+)?)["""″]\s*([NS])[,\s]+(\d{1,3})[°º]\s*(\d{1,2})['′]\s*(\d{1,2}(?:[.,]\d+)?)["""″]\s*([EWO])/i);
+    if (m) return { lat: dmsToDecimal(m[1], m[2], m[3], m[4]), lng: dmsToDecimal(m[5], m[6], m[7], m[8]) };
+    // Degrees and decimal minutes: 43°12.345'N 11°34.567'E
+    m = text.match(/(\d{1,3})[°º]\s*(\d{1,2}(?:[.,]\d+)?)[′']?\s*([NS])[,\s]+(\d{1,3})[°º]\s*(\d{1,2}(?:[.,]\d+)?)[′']?\s*([EWO])/i);
+    if (m) return { lat: dmsToDecimal(m[1], m[2].replace(',', '.'), 0, m[3]), lng: dmsToDecimal(m[4], m[5].replace(',', '.'), 0, m[6]) };
+    // N 43 12.345 E 11 34.567 (no symbols)
+    m = text.match(/([NS])\s*(\d{1,3})[°º\s]\s*(\d{1,2}(?:[.,]\d+)?)[,\s]+([EWO])\s*(\d{1,3})[°º\s]\s*(\d{1,2}(?:[.,]\d+)?)/i);
+    if (m) return { lat: dmsToDecimal(m[2], m[3].replace(',', '.'), 0, m[1]), lng: dmsToDecimal(m[5], m[6].replace(',', '.'), 0, m[4]) };
+    // Decimal comma format like "41,0290515, 14,6805400"
     m = text.match(/(-?\d{1,3},\d{4,})\s*[,;]\s*(-?\d{1,3},\d{4,})/);
     if (m) return { lat: parseFloat(m[1].replace(/,/g, '.')), lng: parseFloat(m[2].replace(/,/g, '.')) };
-    // Try GPS coordinate pairs like "43.1234, 11.5678" or "43.1234,11.5678"
+    // GPS coordinate pairs like "43.1234, 11.5678" or "43.1234,11.5678"
     m = text.match(/(-?\d{1,3}\.\d{4,})[,\s]+(-?\d{1,3}\.\d{4,})/);
     if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
     return null;
@@ -1157,13 +1175,20 @@ function importSharedPoint() {
     const isSOS = /sos|emergenz|soccors|urgenz|aiuto/i.test(text);
     const type = isSOS ? 'sos' : 'shared';
     const defaultNote = isSOS ? 'SOS ricevuto' : 'Punto condiviso';
-    // Try to extract a note hint from the message
+    // Build note from the message text, stripping numbers and coordinate-like tokens
     let note = defaultNote;
-    const noteMatch = text.match(/nota[:\s]+([^\n\r]+)/i);
-    if (noteMatch) note = noteMatch[1].trim().slice(0, 80) || defaultNote;
+    const cleanedText = text
+        .replace(/https?:\/\/\S+/g, '')
+        .replace(/[-+]?\d+(?:[.,]\d+)?[°º′'"EWONSns]*/g, '')
+        .replace(/[°º′'"@#&=?]/g, ' ')
+        .replace(/[,;:]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 200);
+    if (cleanedText.replace(/\s/g, '').length >= 3) note = cleanedText;
     addPoi(coords.lat, coords.lng, note, type, from || undefined);
     renderAllPoiMarkers();
-    const icon = isSOS ? '🚨' : '📩';
+    const icon = isSOS ? '🆘' : '📩';
     showToast(`${icon} Punto importato con successo!`, 'success');
     msgEl.value = '';
     if (fromEl) fromEl.value = '';
@@ -1218,7 +1243,7 @@ function openModule(moduleName, editMode = false) {
                     const isAuto = poi.type === 'auto';
                     const isSos = poi.type === 'sos';
                     const isShared = poi.type === 'shared';
-                    const poiIcon = isAuto ? '🚗' : isSos ? '🚨' : isShared ? '📩' : '📍';
+                    const poiIcon = isAuto ? '🚗' : isSos ? '🆘' : isShared ? '📩' : '🥔';
                     const fromLine = safePoi.from ? `<p class="text-muted small-text" style="margin:2px 0;">Da: ${safePoi.from}</p>` : '';
                     const isEditing = editingPoiIndex === idx;
                     if (isEditing) {
@@ -5074,7 +5099,7 @@ function importaCalendariJSON(event) {
 async function mostraInfoModulo(moduleName) {
     const guideTesti = {
         'poilist': "ℹ️ Guida - Elenco Punti & Tartufaie\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con coordinate e note. Il tasto '🧭 Vai' imposta una navigazione basata su GPS: l'app calcola la distanza e la direzione geografica del punto rispetto al Nord.\n\nQuesta navigazione non usa il magnetometro / la bussola hardware del telefono, quindi non indica dove stai guardando con il dispositivo. Per orientarti devi confrontare la mappa con i tuoi spostamenti reali.\n\nPuoi anche condividere la posizione o eliminare i punti non più utili.",
-        'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS, rileva il nome del mittente quando presente nel testo e salva il punto nell'elenco con l'icona appropriata (📩 condiviso, 🚨 SOS).",
+        'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS, rileva il nome del mittente quando presente nel testo e salva il punto nell'elenco con l'icona appropriata (📩 condiviso, 🆘 SOS).",
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'archivio_documenti': "ℹ️ **Guida - Archivio Altri Documenti**\n\nSalva altri documenti (es. carta d'identità o autorizzazione funghi) indicando numero documento, scadenza e immagine del documento. Puoi anche allegare l'immagine della ricevuta di rinnovo.",
