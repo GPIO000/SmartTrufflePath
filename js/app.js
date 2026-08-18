@@ -348,19 +348,32 @@ function appPrompt(message, defaultValue = '') {
         const okBtn = document.getElementById('app-dialog-ok');
         if (!dialog) { resolve(window.prompt(message, defaultValue)); return; }
         msg.textContent = message;
+        const previousInputDisplay = inputField.style.display;
         inputField.style.display = '';
         inputField.value = defaultValue;
         cancelBtn.style.display = '';
         cancelBtn.textContent = 'Annulla';
         okBtn.textContent = 'OK';
+        let resolved = false;
         const cleanup = () => {
             okBtn.removeEventListener('click', onOk);
             cancelBtn.removeEventListener('click', onCancel);
+            dialog.removeEventListener('close', onDialogClose);
+            inputField.style.display = previousInputDisplay;
         };
-        const onOk = () => { const val = inputField.value; dialog.close(); cleanup(); resolve(val); };
-        const onCancel = () => { dialog.close(); cleanup(); resolve(null); };
+        const settle = (value) => {
+            if (resolved) return;
+            resolved = true;
+            cleanup();
+            resolve(value);
+        };
+        let pendingValue = null;
+        const onOk = () => { pendingValue = inputField.value; dialog.close(); };
+        const onCancel = () => { pendingValue = null; dialog.close(); };
+        const onDialogClose = () => { settle(pendingValue); };
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
+        dialog.addEventListener('close', onDialogClose);
         dialog.showModal();
         requestAnimationFrame(() => inputField.focus());
     });
@@ -1214,7 +1227,7 @@ function saveCarPosition() {
 async function savePoiPosition() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
-        const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "Tartufaia");
+        const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
         if (note === null) return;
         const marker = await choosePoiMarker();
         if (marker === null) return;
