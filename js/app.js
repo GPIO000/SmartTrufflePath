@@ -414,8 +414,8 @@ function appSelect(message, options = [], defaultValue = '') {
             cleanup();
             resolve(value);
         };
-        const onOk = () => { const val = selectField.value; dialog.close(); settle(val); };
-        const onCancel = () => { dialog.close(); settle(null); };
+        const onOk = () => { const val = selectField.value; settle(val); dialog.close(); };
+        const onCancel = () => { settle(null); dialog.close(); };
         const onDialogClose = () => { settle(null); };
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
