@@ -818,6 +818,39 @@ function formatPoiDisplayDate(savedAtIso) {
     return parsed.toLocaleDateString() + ' ' + parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+const CUSTOM_POI_MARKERS = ['📩', '🥔', '📍', '🚫', '🛃'];
+const DEFAULT_GENERIC_POI_MARKER = '🥔';
+const DEFAULT_SHARED_POI_MARKER = '📩';
+
+function getDefaultMarkerForPoiType(type) {
+    if (type === 'auto') return '🚗';
+    if (type === 'sos') return '🆘';
+    if (type === 'shared') return DEFAULT_SHARED_POI_MARKER;
+    return DEFAULT_GENERIC_POI_MARKER;
+}
+
+function normalizePoiMarker(marker, type) {
+    if (type === 'auto' || type === 'sos') return getDefaultMarkerForPoiType(type);
+    if (typeof marker === 'string' && CUSTOM_POI_MARKERS.includes(marker.trim())) return marker.trim();
+    return getDefaultMarkerForPoiType(type);
+}
+
+function buildPoiMarkerOptionsHtml(selectedMarker) {
+    const normalizedSelectedMarker = normalizePoiMarker(selectedMarker);
+    return CUSTOM_POI_MARKERS
+        .map((marker) => `<option value="${marker}" ${marker === normalizedSelectedMarker ? 'selected' : ''}>${marker}</option>`)
+        .join('');
+}
+
+function getPoiMarkerAndTitle(poi) {
+    const type = poi && typeof poi.type === 'string' ? poi.type : undefined;
+    const marker = normalizePoiMarker(poi?.marker, type);
+    if (type === 'auto') return { marker, popupTitle: `${marker} Auto` };
+    if (type === 'sos') return { marker, popupTitle: `${marker} SOS` };
+    if (type === 'shared') return { marker, popupTitle: `${marker} Punto Condiviso` };
+    return { marker, popupTitle: `${marker} Tartufo / Punto` };
+}
+
 function normalizePoiList(rawPoiList) {
     const baseTimestamp = Date.now();
     const normalized = Array.isArray(rawPoiList) ? rawPoiList : [];
@@ -836,7 +869,8 @@ function normalizePoiList(rawPoiList) {
             const id = typeof poi.id === 'string' && poi.id.trim() ? poi.id.trim() : `poi-${savedAt}-${index}`;
             const type = typeof poi.type === 'string' && poi.type.trim() ? poi.type.trim() : undefined;
             const from = typeof poi.from === 'string' && poi.from.trim() ? poi.from.trim() : undefined;
-            const entry = { id, lat, lng, note, savedAt, date: formatPoiDisplayDate(savedAt) };
+            const marker = normalizePoiMarker(poi.marker, type);
+            const entry = { id, lat, lng, note, savedAt, date: formatPoiDisplayDate(savedAt), marker };
             if (type) entry.type = type;
             if (from) entry.from = from;
             return entry;
@@ -857,6 +891,8 @@ if (legacyCarCoordinates && Number.isFinite(Number(legacyCarCoordinates.lat)) &&
         lat: Number(legacyCarCoordinates.lat),
         lng: Number(legacyCarCoordinates.lng),
         note: 'Auto',
+        type: 'auto',
+        marker: '🚗',
         savedAt: migratedAt,
         date: formatPoiDisplayDate(migratedAt)
     });
@@ -958,27 +994,12 @@ function renderAllPoiMarkers() {
     poiMapMarkers = {};
     poiList.forEach((poi, index) => {
         const safePoi = sanitizeRenderable(poi);
-        const isAuto = poi.type === 'auto';
-        const isSos = poi.type === 'sos';
-        const isShared = poi.type === 'shared';
-        let icon, popupTitle;
-        if (isAuto) {
-            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">🚗</div>', iconAnchor: [14, 14] });
-            popupTitle = '🚗 Auto';
-        } else if (isSos) {
-            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">🆘</div>', iconAnchor: [14, 14] });
-            popupTitle = '🆘 SOS';
-        } else if (isShared) {
-            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">📩</div>', iconAnchor: [14, 14] });
-            popupTitle = '📩 Punto Condiviso';
-        } else {
-            icon = L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;">🥔</div>', iconAnchor: [14, 14] });
-            popupTitle = '🥔 Tartufo / Punto';
-        }
+        const { marker, popupTitle } = getPoiMarkerAndTitle(poi);
+        const icon = L.divIcon({ className: '', html: `<div style="font-size:28px;line-height:1;">${marker}</div>`, iconAnchor: [14, 14] });
         const fromInfo = poi.from ? `<br><small>Da: ${escapeHtml(safePoi.from || '')}</small>` : '';
-        const marker = L.marker([poi.lat, poi.lng], { icon }).addTo(map)
+        const poiMarker = L.marker([poi.lat, poi.lng], { icon }).addTo(map)
             .bindPopup(`<b>${popupTitle}</b><br>Nota: ${safePoi.note || 'Nessuna nota'}<br><small>${safePoi.date || ''}</small>${fromInfo}`);
-        poiMapMarkers[index] = marker;
+        poiMapMarkers[index] = poiMarker;
     });
 }
 function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
@@ -1007,7 +1028,11 @@ function updateCompass(currentLat, currentLng) {
     let target = null, label = '';
     if (typeof targetNavigation === 'string' && targetNavigation.startsWith('poi_')) {
         const index = parseInt(targetNavigation.split('_')[1]);
-        if (poiList[index]) { target = poiList[index]; label = `🥔 ${poiList[index].note || 'Punto'}`; }
+        if (poiList[index]) {
+            target = poiList[index];
+            const marker = normalizePoiMarker(poiList[index].marker, poiList[index].type);
+            label = `${marker} ${poiList[index].note || 'Punto'}`;
+        }
     }
     if (target) {
         const res = calculateDistanceAndBearing(currentLat, currentLng, target.lat, target.lng);
@@ -1028,16 +1053,17 @@ function buildSharedPoiMessage(poi) {
     return `📍 TARTUFAIA CONDIVISA${senderLine}\nNota: ${poi.note}\nData: ${poi.date}\nGoogle Maps: https://maps.google.com/?q=${poi.lat},${poi.lng}`;
 }
 
-function addPoi(lat, lng, note, type, from) {
+function addPoi(lat, lng, note, type, from, marker) {
     const savedAt = new Date().toISOString();
     const id = `poi-${savedAt}-${Math.random().toString(36).slice(2, 8)}`;
     const entry = {
         id,
-        lat,
-        lng,
-        note: note.trim() || 'Punto di interesse',
+        lat: Number(lat),
+        lng: Number(lng),
+        note: String(note || 'Punto di interesse').trim() || 'Punto di interesse',
         savedAt,
-        date: formatPoiDisplayDate(savedAt)
+        date: formatPoiDisplayDate(savedAt),
+        marker: normalizePoiMarker(marker, type)
     };
     if (type) entry.type = type;
     if (from) entry.from = from;
@@ -1060,7 +1086,7 @@ async function savePoiPosition() {
         const pos = userMarker.getLatLng();
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "Tartufaia");
         if (note === null) return;
-        const newIndex = addPoi(pos.lat, pos.lng, note);
+        const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, DEFAULT_GENERIC_POI_MARKER);
         renderAllPoiMarkers();
         targetNavigation = `poi_${newIndex}`;
         map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18));
@@ -1104,6 +1130,7 @@ function savePoiEdit(index) {
     const noteEl = document.getElementById(`poi-edit-note-${index}`);
     const latEl = document.getElementById(`poi-edit-lat-${index}`);
     const lngEl = document.getElementById(`poi-edit-lng-${index}`);
+    const markerEl = document.getElementById(`poi-edit-marker-${index}`);
     if (!noteEl || !latEl || !lngEl) return;
     const note = noteEl.value.trim();
     const lat = parseFloat(latEl.value);
@@ -1113,6 +1140,7 @@ function savePoiEdit(index) {
     poiList[index].note = note;
     poiList[index].lat = lat;
     poiList[index].lng = lng;
+    poiList[index].marker = normalizePoiMarker(markerEl ? markerEl.value : poiList[index].marker, poiList[index].type);
     poiList = normalizePoiList(poiList);
     localStorage.setItem('poi_list', JSON.stringify(poiList));
     renderAllPoiMarkers();
@@ -1162,6 +1190,7 @@ function extractSenderNameFromMessage(text) {
 function importSharedPoint() {
     const msgEl = document.getElementById('condiviso-msg-input');
     const fromEl = document.getElementById('condiviso-from-input');
+    const markerEl = document.getElementById('condiviso-marker-select');
     if (!msgEl) return;
     const text = msgEl.value.trim();
     if (!text) { showToast("Incolla prima il messaggio ricevuto.", 'error'); return; }
@@ -1186,10 +1215,10 @@ function importSharedPoint() {
         .trim()
         .slice(0, 200);
     if (cleanedText.replace(/\s/g, '').length >= 3) note = cleanedText;
-    addPoi(coords.lat, coords.lng, note, type, from || undefined);
+    const marker = isSOS ? '🆘' : normalizePoiMarker(markerEl ? markerEl.value : DEFAULT_SHARED_POI_MARKER, type);
+    addPoi(coords.lat, coords.lng, note, type, from || undefined, marker);
     renderAllPoiMarkers();
-    const icon = isSOS ? '🆘' : '📩';
-    showToast(`${icon} Punto importato con successo!`, 'success');
+    showToast(`${marker} Punto importato con successo!`, 'success');
     msgEl.value = '';
     if (fromEl) fromEl.value = '';
     openModule('poilist');
@@ -1242,11 +1271,13 @@ function openModule(moduleName, editMode = false) {
                     const safePoi = sanitizeRenderable(poi);
                     const isAuto = poi.type === 'auto';
                     const isSos = poi.type === 'sos';
-                    const isShared = poi.type === 'shared';
-                    const poiIcon = isAuto ? '🚗' : isSos ? '🆘' : isShared ? '📩' : '🥔';
+                    const poiIcon = normalizePoiMarker(poi.marker, poi.type);
                     const fromLine = safePoi.from ? `<p class="text-muted small-text" style="margin:2px 0;">Da: ${safePoi.from}</p>` : '';
                     const isEditing = editingPoiIndex === idx;
                     if (isEditing) {
+                        const markerField = (isAuto || isSos)
+                            ? `<input type="text" class="mod-input" value="${poiIcon}" readonly>`
+                            : `<select id="poi-edit-marker-${idx}" class="mod-input">${buildPoiMarkerOptionsHtml(poiIcon)}</select>`;
                         poiHtml += `
                         <div class="module-card card-gap" style="border-left:4px solid #2563eb;">
                             <strong class="text-accent">✏️ Modifica Punto</strong>
@@ -1256,6 +1287,8 @@ function openModule(moduleName, editMode = false) {
                             <input type="number" step="0.000001" id="poi-edit-lat-${idx}" class="mod-input" value="${poi.lat}">
                             <label>Longitudine:</label>
                             <input type="number" step="0.000001" id="poi-edit-lng-${idx}" class="mod-input" value="${poi.lng}">
+                            <label>Marker:</label>
+                            ${markerField}
                             <div class="btn-row" style="margin-top:10px;">
                                 <button class="overlay-btn btn-primary" ${actionAttrs('savePoiEdit', [idx])}>💾 Salva</button>
                                 <button class="overlay-btn btn-neutral" ${actionAttrs('cancelPoiEdit')}>✕ Annulla</button>
@@ -1289,6 +1322,8 @@ function openModule(moduleName, editMode = false) {
                     <textarea id="condiviso-msg-input" class="mod-input" rows="6" placeholder="Incolla qui il messaggio ricevuto...&#10;&#10;Esempio:&#10;📍 TARTUFAIA CONDIVISA&#10;Da: Mario Rossi&#10;Nota: Quercia grande&#10;Google Maps: https://maps.google.com/?q=43.1234,11.5678&#10;&#10;oppure:&#10;EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO. Da: Mario Rossi. Coordinate GPS: Lat: 43.1234, Lng: 11.5678." style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
                     <label for="condiviso-from-input" style="display:block; margin:12px 0 6px; font-weight:bold;">Da (mittente, opzionale solo per messaggi vecchi):</label>
                     <input type="text" id="condiviso-from-input" class="mod-input" placeholder="Es. Mario Rossi" style="width:100%; box-sizing:border-box;">
+                    <label for="condiviso-marker-select" style="display:block; margin:12px 0 6px; font-weight:bold;">Marker (solo punti non SOS):</label>
+                    <select id="condiviso-marker-select" class="mod-input" style="width:100%; box-sizing:border-box;">${buildPoiMarkerOptionsHtml(DEFAULT_SHARED_POI_MARKER)}</select>
                     <button class="overlay-btn btn-primary" style="margin-top:14px; width:100%;" ${actionAttrs('importSharedPoint', [])}>📥 Importa Punto</button>
                 </div>`;
             break;
@@ -5099,7 +5134,7 @@ function importaCalendariJSON(event) {
 async function mostraInfoModulo(moduleName) {
     const guideTesti = {
         'poilist': "ℹ️ Guida - Elenco Punti & Tartufaie\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con coordinate e note. Il tasto '🧭 Vai' imposta una navigazione basata su GPS: l'app calcola la distanza e la direzione geografica del punto rispetto al Nord.\n\nQuesta navigazione non usa il magnetometro / la bussola hardware del telefono, quindi non indica dove stai guardando con il dispositivo. Per orientarti devi confrontare la mappa con i tuoi spostamenti reali.\n\nPuoi anche condividere la posizione o eliminare i punti non più utili.",
-        'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS, rileva il nome del mittente quando presente nel testo e salva il punto nell'elenco con l'icona appropriata (📩 condiviso, 🆘 SOS).",
+        'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS, rileva il nome del mittente quando presente nel testo e salva il punto nell'elenco: per i SOS usa sempre 🆘, mentre per gli altri puoi scegliere il marker.",
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'archivio_documenti': "ℹ️ **Guida - Archivio Altri Documenti**\n\nSalva altri documenti (es. carta d'identità o autorizzazione funghi) indicando numero documento, scadenza e immagine del documento. Puoi anche allegare l'immagine della ricevuta di rinnovo.",
