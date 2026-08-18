@@ -1167,7 +1167,9 @@ function savePoiEdit(index) {
     localStorage.setItem('poi_list', JSON.stringify(poiList));
     renderAllPoiMarkers();
     editingPoiIndex = null;
-    showToast("🥔 Punto aggiornato!", 'success');
+    const updatedPoi = poiList[index];
+    const updatedMarker = normalizePoiMarker(updatedPoi?.marker, updatedPoi?.type);
+    showToast(`${updatedMarker} Punto aggiornato!`, 'success');
     openModule('poilist');
 }
 function extractCoordsFromMessage(text) {
