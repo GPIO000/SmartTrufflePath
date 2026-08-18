@@ -1,5 +1,5 @@
 // Il suffisso di versione viene aggiornato ad ogni modifica del SW per forzare il refresh della cache
-const CACHE_NAME = 'smarttruffle-path-' + '2026-08-18a';
+const CACHE_NAME = 'smarttruffle-path-' + '2026-08-18b';
 const MAP_OFFLINE_CACHE_NAME = 'smarttruffle-map-offline';
 let legacyAppCacheNames = null;
 let legacyAppCacheNamesPromise = null;
