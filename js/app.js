@@ -821,6 +821,7 @@ function formatPoiDisplayDate(savedAtIso) {
 const CUSTOM_POI_MARKERS = ['📩', '🥔', '📍', '🚫', '🛃'];
 const DEFAULT_GENERIC_POI_MARKER = '🥔';
 const DEFAULT_SHARED_POI_MARKER = '📩';
+const POI_MARKER_PREFERENCE_KEY = 'poi_marker_preference';
 
 function getDefaultMarkerForPoiType(type) {
     if (type === 'auto') return '🚗';
@@ -833,6 +834,23 @@ function normalizePoiMarker(marker, type) {
     if (type === 'auto' || type === 'sos') return getDefaultMarkerForPoiType(type);
     if (typeof marker === 'string' && CUSTOM_POI_MARKERS.includes(marker.trim())) return marker.trim();
     return getDefaultMarkerForPoiType(type);
+}
+
+function getPreferredPoiMarker() {
+    return normalizePoiMarker(localStorage.getItem(POI_MARKER_PREFERENCE_KEY), undefined);
+}
+
+function savePreferredPoiMarker(marker) {
+    const normalizedMarker = normalizePoiMarker(marker, undefined);
+    localStorage.setItem(POI_MARKER_PREFERENCE_KEY, normalizedMarker);
+    return normalizedMarker;
+}
+
+async function choosePoiMarker(defaultMarker = getPreferredPoiMarker()) {
+    const promptMessage = `Scegli il marker per il punto (${CUSTOM_POI_MARKERS.join(' ')}):`;
+    const selectedMarker = await appPrompt(promptMessage, normalizePoiMarker(defaultMarker, undefined));
+    if (selectedMarker === null) return null;
+    return savePreferredPoiMarker(selectedMarker);
 }
 
 function buildPoiMarkerOptionsHtml(selectedMarker, type) {
@@ -1086,12 +1104,14 @@ async function savePoiPosition() {
         const pos = userMarker.getLatLng();
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "Tartufaia");
         if (note === null) return;
-        const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, DEFAULT_GENERIC_POI_MARKER);
+        const marker = await choosePoiMarker();
+        if (marker === null) return;
+        const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, marker);
         renderAllPoiMarkers();
         targetNavigation = `poi_${newIndex}`;
         map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
-        showToast("🥔 Punto salvato!", 'success');
+        showToast(`${marker} Punto salvato!`, 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
 async function navigateToPoi(index) {
