@@ -835,10 +835,10 @@ function normalizePoiMarker(marker, type) {
     return getDefaultMarkerForPoiType(type);
 }
 
-function buildPoiMarkerOptionsHtml(selectedMarker) {
-    const normalizedSelectedMarker = normalizePoiMarker(selectedMarker);
+function buildPoiMarkerOptionsHtml(selectedMarker, type) {
+    const normalizedSelectedMarker = normalizePoiMarker(selectedMarker, type);
     return CUSTOM_POI_MARKERS
-        .map((marker) => `<option value="${marker}" ${marker === normalizedSelectedMarker ? 'selected' : ''}>${marker}</option>`)
+        .map((marker) => `<option value="${escapeHtml(marker)}" ${marker === normalizedSelectedMarker ? 'selected' : ''}>${escapeHtml(marker)}</option>`)
         .join('');
 }
 
@@ -995,7 +995,7 @@ function renderAllPoiMarkers() {
     poiList.forEach((poi, index) => {
         const safePoi = sanitizeRenderable(poi);
         const { marker, popupTitle } = getPoiMarkerAndTitle(poi);
-        const icon = L.divIcon({ className: '', html: `<div style="font-size:28px;line-height:1;">${marker}</div>`, iconAnchor: [14, 14] });
+        const icon = L.divIcon({ className: '', html: `<div style="font-size:28px;line-height:1;">${escapeHtml(marker)}</div>`, iconAnchor: [14, 14] });
         const fromInfo = poi.from ? `<br><small>Da: ${escapeHtml(safePoi.from || '')}</small>` : '';
         const poiMarker = L.marker([poi.lat, poi.lng], { icon }).addTo(map)
             .bindPopup(`<b>${popupTitle}</b><br>Nota: ${safePoi.note || 'Nessuna nota'}<br><small>${safePoi.date || ''}</small>${fromInfo}`);
@@ -1131,7 +1131,9 @@ function savePoiEdit(index) {
     const latEl = document.getElementById(`poi-edit-lat-${index}`);
     const lngEl = document.getElementById(`poi-edit-lng-${index}`);
     const markerEl = document.getElementById(`poi-edit-marker-${index}`);
-    if (!noteEl || !latEl || !lngEl) return;
+    const poiType = poiList[index]?.type;
+    const markerRequired = poiType !== 'auto' && poiType !== 'sos';
+    if (!noteEl || !latEl || !lngEl || (markerRequired && !markerEl)) return;
     const note = noteEl.value.trim();
     const lat = parseFloat(latEl.value);
     const lng = parseFloat(lngEl.value);
@@ -1140,7 +1142,7 @@ function savePoiEdit(index) {
     poiList[index].note = note;
     poiList[index].lat = lat;
     poiList[index].lng = lng;
-    poiList[index].marker = normalizePoiMarker(markerEl ? markerEl.value : poiList[index].marker, poiList[index].type);
+    poiList[index].marker = normalizePoiMarker(markerEl ? markerEl.value : poiList[index].marker, poiType);
     poiList = normalizePoiList(poiList);
     localStorage.setItem('poi_list', JSON.stringify(poiList));
     renderAllPoiMarkers();
@@ -1215,7 +1217,7 @@ function importSharedPoint() {
         .trim()
         .slice(0, 200);
     if (cleanedText.replace(/\s/g, '').length >= 3) note = cleanedText;
-    const marker = isSOS ? '🆘' : normalizePoiMarker(markerEl ? markerEl.value : DEFAULT_SHARED_POI_MARKER, type);
+    const marker = normalizePoiMarker(markerEl ? markerEl.value : DEFAULT_SHARED_POI_MARKER, type);
     addPoi(coords.lat, coords.lng, note, type, from || undefined, marker);
     renderAllPoiMarkers();
     showToast(`${marker} Punto importato con successo!`, 'success');
@@ -1276,8 +1278,8 @@ function openModule(moduleName, editMode = false) {
                     const isEditing = editingPoiIndex === idx;
                     if (isEditing) {
                         const markerField = (isAuto || isSos)
-                            ? `<input type="text" class="mod-input" value="${poiIcon}" readonly>`
-                            : `<select id="poi-edit-marker-${idx}" class="mod-input">${buildPoiMarkerOptionsHtml(poiIcon)}</select>`;
+                            ? `<input type="text" class="mod-input" value="${escapeHtml(poiIcon)}" readonly>`
+                            : `<select id="poi-edit-marker-${idx}" class="mod-input">${buildPoiMarkerOptionsHtml(poiIcon, poi.type)}</select>`;
                         poiHtml += `
                         <div class="module-card card-gap" style="border-left:4px solid #2563eb;">
                             <strong class="text-accent">✏️ Modifica Punto</strong>
@@ -1323,7 +1325,7 @@ function openModule(moduleName, editMode = false) {
                     <label for="condiviso-from-input" style="display:block; margin:12px 0 6px; font-weight:bold;">Da (mittente, opzionale solo per messaggi vecchi):</label>
                     <input type="text" id="condiviso-from-input" class="mod-input" placeholder="Es. Mario Rossi" style="width:100%; box-sizing:border-box;">
                     <label for="condiviso-marker-select" style="display:block; margin:12px 0 6px; font-weight:bold;">Marker (solo punti non SOS):</label>
-                    <select id="condiviso-marker-select" class="mod-input" style="width:100%; box-sizing:border-box;">${buildPoiMarkerOptionsHtml(DEFAULT_SHARED_POI_MARKER)}</select>
+                    <select id="condiviso-marker-select" class="mod-input" style="width:100%; box-sizing:border-box;">${buildPoiMarkerOptionsHtml(DEFAULT_SHARED_POI_MARKER, 'shared')}</select>
                     <button class="overlay-btn btn-primary" style="margin-top:14px; width:100%;" ${actionAttrs('importSharedPoint', [])}>📥 Importa Punto</button>
                 </div>`;
             break;
