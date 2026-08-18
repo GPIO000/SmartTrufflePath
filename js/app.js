@@ -382,6 +382,10 @@ function appSelect(message, options = [], defaultValue = '') {
             resolve(window.prompt(fallbackMessage, defaultValue));
             return;
         }
+        if (dialog.open) {
+            resolve(null);
+            return;
+        }
 
         msg.textContent = message;
         const previousInputDisplay = inputField.style.display;
