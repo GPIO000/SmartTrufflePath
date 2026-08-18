@@ -18,7 +18,7 @@ window.TruffleStorage = TruffleStorage;
 const SERVICE_WORKER_SCOPE = new URL('./', window.location.href).pathname;
 const SERVICE_WORKER_URL = `${SERVICE_WORKER_SCOPE}sw.js`;
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-18b`;
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-18g`;
 let lastServiceWorkerRegistrationError = null;
 let shouldReloadOnNextServiceWorkerControllerChange = false;
 
@@ -4278,6 +4278,8 @@ async function downloadBackupFile(data, { automatic = false } = {}) {
                         _automaticBackupDirHandle = backupDirHandle;
                         await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, backupDirHandle).catch(() => {});
                         setAutomaticBackupDestinationLabel(_normalizeAutomaticBackupDestinationLabel(resolvedDirectory.destinationLabel));
+                    } else {
+                        return 'needs_reauth';
                     }
                 } catch {
                     // Permission check unavailable — exit silently without any fallback
@@ -4302,9 +4304,13 @@ async function downloadBackupFile(data, { automatic = false } = {}) {
                 await TruffleStorage.saveAutomaticBackupSnapshot(data, automatic ? 'automatic' : 'manual').catch(() => {});
                 return true;
             } catch (err) {
-                // In automatic mode exit silently; in manual mode propagate so the caller can show a clear error.
+                // In automatic mode: surface permission errors for reauth; exit silently for other errors.
+                // In manual mode propagate so the caller can show a clear error.
                 if (!automatic) {
                     throw err;
+                }
+                if (err && err.name === 'NotAllowedError') {
+                    return 'needs_reauth';
                 }
             }
         }
@@ -4462,6 +4468,28 @@ async function ripristinaBackupDaFile(event) {
     reader.readAsText(file);
 }
 
+async function _requestBackupReauth() {
+    if (_backupReauthInProgress) return;
+    _backupReauthInProgress = true;
+    _automaticBackupDirHandle = null;
+    await TruffleStorage.saveDirectoryHandle(_BACKUP_DIR_HANDLE_KEY, null).catch(() => {});
+    setAutomaticBackupDestinationLabel(null);
+    try {
+        await appAlert(
+            '⚠️ Autorizzazione cartella backup scaduta\n\n' +
+            "Dopo l'aggiornamento o la reinstallazione dell'app il permesso di accesso alla cartella backup non è più valido.\n\n" +
+            'Premi OK per selezionare di nuovo la cartella e ripristinare il backup automatico.'
+        );
+        const configuredFolder = await configureAutomaticBackupFolder(true);
+        if (configuredFolder) {
+            showToast(`Cartella backup registrata: ${configuredFolder.destinationLabel}.`, 'success');
+            await runAutomaticLocalBackup();
+        }
+    } finally {
+        _backupReauthInProgress = false;
+    }
+}
+
 async function runAutomaticLocalBackup() {
     const hasDestinationLabel = Boolean(getAutomaticBackupDestinationLabel());
     const hasStoredHandle = hasDestinationLabel ? true : Boolean(await _loadBackupDirHandle());
@@ -4470,6 +4498,10 @@ async function runAutomaticLocalBackup() {
     const fingerprint = JSON.stringify(backupData);
     if (fingerprint === lastAutomaticBackupFingerprint) return;
     const backupSaved = await downloadBackupFile(backupData, { automatic: true });
+    if (backupSaved === 'needs_reauth') {
+        await _requestBackupReauth();
+        return;
+    }
     if (!backupSaved) return;
     lastAutomaticBackupFingerprint = fingerprint;
 }
@@ -4478,6 +4510,7 @@ const AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS = 500;
 let automaticBackupLifecycleInitialized = false;
 let lastAutomaticBackupFingerprint = '';
 let dataChangeDebounceTimer = null;
+let _backupReauthInProgress = false;
 
 function setupAutomaticBackupLifecycle() {
     if (automaticBackupLifecycleInitialized) return;
