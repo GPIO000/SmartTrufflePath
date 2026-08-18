@@ -380,6 +380,7 @@ function appSelect(message, options = [], defaultValue = '') {
         }
 
         msg.textContent = message;
+        const previousInputDisplay = inputField.style.display;
         inputField.style.display = 'none';
 
         const selectField = document.createElement('select');
@@ -399,15 +400,26 @@ function appSelect(message, options = [], defaultValue = '') {
         cancelBtn.textContent = 'Annulla';
         okBtn.textContent = 'OK';
 
+        let resolved = false;
         const cleanup = () => {
             okBtn.removeEventListener('click', onOk);
             cancelBtn.removeEventListener('click', onCancel);
+            dialog.removeEventListener('close', onDialogClose);
+            inputField.style.display = previousInputDisplay;
             selectField.remove();
         };
-        const onOk = () => { const val = selectField.value; dialog.close(); cleanup(); resolve(val); };
-        const onCancel = () => { dialog.close(); cleanup(); resolve(null); };
+        const settle = (value) => {
+            if (resolved) return;
+            resolved = true;
+            cleanup();
+            resolve(value);
+        };
+        const onOk = () => { const val = selectField.value; dialog.close(); settle(val); };
+        const onCancel = () => { dialog.close(); settle(null); };
+        const onDialogClose = () => { settle(null); };
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
+        dialog.addEventListener('close', onDialogClose);
         dialog.showModal();
         requestAnimationFrame(() => selectField.focus());
     });
