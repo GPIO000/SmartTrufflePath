@@ -1162,13 +1162,12 @@ function savePoiEdit(index) {
     poiList[index].note = note;
     poiList[index].lat = lat;
     poiList[index].lng = lng;
-    poiList[index].marker = normalizePoiMarker(markerEl ? markerEl.value : poiList[index].marker, poiType);
+    const updatedMarker = normalizePoiMarker(markerEl ? markerEl.value : poiList[index].marker, poiType);
+    poiList[index].marker = updatedMarker;
     poiList = normalizePoiList(poiList);
     localStorage.setItem('poi_list', JSON.stringify(poiList));
     renderAllPoiMarkers();
     editingPoiIndex = null;
-    const updatedPoi = poiList[index];
-    const updatedMarker = normalizePoiMarker(updatedPoi?.marker, updatedPoi?.type);
     showToast(`${updatedMarker} Punto aggiornato!`, 'success');
     openModule('poilist');
 }
