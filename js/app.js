@@ -366,6 +366,53 @@ function appPrompt(message, defaultValue = '') {
     });
 }
 
+function appSelect(message, options = [], defaultValue = '') {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('app-dialog');
+        const msg = document.getElementById('app-dialog-message');
+        const inputField = document.getElementById('app-dialog-input');
+        const cancelBtn = document.getElementById('app-dialog-cancel');
+        const okBtn = document.getElementById('app-dialog-ok');
+        if (!dialog) {
+            const fallbackMessage = `${message}\n${options.join(' ')}`;
+            resolve(window.prompt(fallbackMessage, defaultValue));
+            return;
+        }
+
+        msg.textContent = message;
+        inputField.style.display = 'none';
+
+        const selectField = document.createElement('select');
+        selectField.className = inputField.className;
+        selectField.style.display = '';
+        options.forEach((option) => {
+            const optionEl = document.createElement('option');
+            optionEl.value = option;
+            optionEl.textContent = option;
+            selectField.appendChild(optionEl);
+        });
+        const normalizedDefault = options.includes(defaultValue) ? defaultValue : options[0];
+        if (normalizedDefault) selectField.value = normalizedDefault;
+        inputField.insertAdjacentElement('afterend', selectField);
+
+        cancelBtn.style.display = '';
+        cancelBtn.textContent = 'Annulla';
+        okBtn.textContent = 'OK';
+
+        const cleanup = () => {
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            selectField.remove();
+        };
+        const onOk = () => { const val = selectField.value; dialog.close(); cleanup(); resolve(val); };
+        const onCancel = () => { dialog.close(); cleanup(); resolve(null); };
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        dialog.showModal();
+        requestAnimationFrame(() => selectField.focus());
+    });
+}
+
 function appChooseSendMethod(message) {
     return new Promise((resolve) => {
         const dialog = document.getElementById('app-dialog');
@@ -888,8 +935,11 @@ function savePreferredPoiMarker(marker) {
 }
 
 async function choosePoiMarker(defaultMarker = getPreferredPoiMarker()) {
-    const promptMessage = `Scegli il marker per il punto (${CUSTOM_POI_MARKERS.join(' ')}):`;
-    const selectedMarker = await appPrompt(promptMessage, normalizePoiMarker(defaultMarker, undefined));
+    const selectedMarker = await appSelect(
+        'Scegli il marker per il punto:',
+        CUSTOM_POI_MARKERS,
+        normalizePoiMarker(defaultMarker, undefined),
+    );
     if (selectedMarker === null) return null;
     return savePreferredPoiMarker(selectedMarker);
 }
