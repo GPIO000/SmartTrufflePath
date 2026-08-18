@@ -2194,7 +2194,7 @@ function openModule(moduleName, editMode = false) {
                 "Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)", "Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)",
                 "Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)"
             ];
-            let opzioniSpecieHtml = `<option value="tutte">Tutte le specie</option>`;
+            let opzioniSpecieHtml = `<option value="">-- Nessun filtro --</option><option value="tutte">Tutte le specie</option>`;
             listaSpecie9.forEach(s => { opzioniSpecieHtml += `<option value="${s}" ${filtroSpecie === s ? 'selected' : ''}>${s}</option>`; });
             let selectSpecieFormHtml = '';
             listaSpecie9.forEach(s => { selectSpecieFormHtml += `<option value="${s}">${s}</option>`; });
@@ -2225,11 +2225,32 @@ function openModule(moduleName, editMode = false) {
                 </div>`;
             let datiFiltrati = storicoRaccolta.filter(item => {
                 const annoItem = item.data ? item.data.slice(0,4) : '';
-                return (filtroAnno === 'tutti' || annoItem === filtroAnno) && (filtroSpecie === 'tutte' || item.specie === filtroSpecie);
+                const nessunFiltroSpecie = filtroSpecie === '' || filtroSpecie === 'tutte';
+                return (filtroAnno === 'tutti' || annoItem === filtroAnno) && (nessunFiltroSpecie || item.specie === filtroSpecie);
             });
+
             if (datiFiltrati.length === 0) {
                 registroHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun ritrovamento trovato con i filtri selezionati.</p></div>`;
             } else {
+                // Blocco riepilogo per la stampa
+                const totaleGeneraleRegistro = datiFiltrati.reduce((acc, item) => acc + (parseFloat(item.peso) || 0), 0);
+                let printSummaryRegistro = `<div class="print-only" style="margin-bottom:16px; border:1px solid #ccc; padding:10px;">
+                    <h3 style="font-size:1rem; margin:0 0 8px 0;">Riepilogo Raccolta${filtroAnno !== 'tutti' ? ` – ${filtroAnno}` : ''}${filtroSpecie && filtroSpecie !== 'tutte' ? ` – ${filtroSpecie}` : ''}</h3>`;
+                if (filtroSpecie && filtroSpecie !== 'tutte') {
+                    printSummaryRegistro += `<p style="margin:2px 0;"><b>${filtroSpecie}:</b> ${totaleGeneraleRegistro.toFixed(0)} g</p>`;
+                } else {
+                    const totaliPerSpecie = {};
+                    datiFiltrati.forEach(item => {
+                        totaliPerSpecie[item.specie] = (totaliPerSpecie[item.specie] || 0) + (parseFloat(item.peso) || 0);
+                    });
+                    Object.keys(totaliPerSpecie).sort().forEach(sp => {
+                        printSummaryRegistro += `<p style="margin:2px 0;"><b>${sp}:</b> ${totaliPerSpecie[sp].toFixed(0)} g</p>`;
+                    });
+                }
+                printSummaryRegistro += `<p style="margin:8px 0 0 0; border-top:1px solid #ccc; padding-top:6px;"><b>Totale generale: ${totaleGeneraleRegistro.toFixed(0)} g</b></p>`;
+                printSummaryRegistro += `</div>`;
+                registroHtml += printSummaryRegistro;
+
                 registroHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Storico Filtrato (${datiFiltrati.length}):</h3>`;
                 datiFiltrati.slice().reverse().forEach((item) => {
                     const originalIndex = storicoRaccolta.indexOf(item);
@@ -2295,6 +2316,20 @@ function openModule(moduleName, editMode = false) {
             if (speseFiltrate.length === 0) {
                 speseHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessuna spesa registrata${filtroAnnoSpese !== 'tutti' ? ` per il ${filtroAnnoSpese}` : ''}.</p></div>`;
             } else {
+                // Riepilogo per la stampa: totale per categoria + totale generale
+                const totaliPerCategoria = {};
+                speseFiltrate.forEach(({ item }) => {
+                    totaliPerCategoria[item.categoria] = (totaliPerCategoria[item.categoria] || 0) + (parseFloat(item.importo) || 0);
+                });
+                let printSummarySpese = `<div class="print-only" style="margin-bottom:16px; border:1px solid #ccc; padding:10px;">
+                    <h3 style="font-size:1rem; margin:0 0 8px 0;">Riepilogo Spese${filtroAnnoSpese !== 'tutti' ? ` – ${filtroAnnoSpese}` : ''}</h3>`;
+                Object.keys(totaliPerCategoria).sort().forEach(cat => {
+                    printSummarySpese += `<p style="margin:2px 0;"><b>${cat}:</b> € ${totaliPerCategoria[cat].toFixed(2)}</p>`;
+                });
+                printSummarySpese += `<p style="margin:8px 0 0 0; border-top:1px solid #ccc; padding-top:6px;"><b>Totale generale: € ${totaleSpeseAnno.toFixed(2)}</b></p>`;
+                printSummarySpese += `</div>`;
+                speseHtml += printSummarySpese;
+
                 speseHtml += `
                     <div class="module-card" style="background: #121610; border: 1px solid rgba(255,255,255,0.07); margin-bottom: 15px; text-align: center;">
                         <p style="font-size: 0.8rem; color: #b8b0a0; text-transform: uppercase;">Totale Spese${filtroAnnoSpese !== 'tutti' ? ` ${filtroAnnoSpese}` : ''}</p>

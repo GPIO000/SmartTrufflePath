@@ -686,6 +686,16 @@ textarea:focus-visible {
         color: #000 !important;
         border-radius: 0 !important;
     }
+
+    .print-only {
+        display: block !important;
+        color: #000000 !important;
+        background: #ffffff !important;
+    }
+}
+
+.print-only {
+    display: none;
 }
 
 /* ── Mappa Offline – Checkbox Regioni ─────────────────────────────────────── */
