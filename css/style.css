@@ -692,6 +692,10 @@ textarea:focus-visible {
         color: #000000 !important;
         background: #ffffff !important;
     }
+
+    body.summary-print-mode #active-module-view .module-body-content > *:not(.print-only) {
+        display: none !important;
+    }
 }
 
 .print-only {

@@ -695,6 +695,19 @@ function parseActionArgs(rawArgs) {
     }
 }
 
+function printPage() {
+    const activeView = document.getElementById('active-module-view');
+    const activeModule = activeView?.dataset?.activeModule;
+    const shouldPrintSummaryOnly = activeModule === 'registro_giornaliero' || activeModule === 'spese';
+    if (shouldPrintSummaryOnly && activeView?.querySelector('.print-only')) {
+        document.body.classList.add('summary-print-mode');
+        window.addEventListener('afterprint', () => {
+            document.body.classList.remove('summary-print-mode');
+        }, { once: true });
+    }
+    window.print();
+}
+
 const ACTION_HANDLERS = {
     toggleDrawer: () => toggleDrawer(),
     centerOnUser: () => centerOnUser(),
@@ -803,7 +816,7 @@ const ACTION_HANDLERS = {
         openModule('storico_ricevute');
     },
     saveArchivioRegionaleTartufiSelected: () => salvaArchivioRegionaleTartufi((document.getElementById('seleziona-regione-archivio') || {}).value),
-    printPage: () => window.print(),
+    printPage: () => printPage(),
     closeDrawerAndModule: () => {
         toggleDrawer();
         closeActiveModule();
@@ -2883,6 +2896,7 @@ function openModule(moduleName, editMode = false) {
         </div>
         <div class="module-body-content">${contentHTML}</div>
     `;
+    activeView.dataset.activeModule = moduleName;
     activeView.style.display = 'flex';
     if (moduleName === 'export') {
         setTimeout(syncAutomaticBackupDestinationUI, 0);
