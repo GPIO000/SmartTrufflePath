@@ -695,6 +695,35 @@ function parseActionArgs(rawArgs) {
     }
 }
 
+function printPage() {
+    const activeView = document.getElementById('active-module-view');
+    const activeModule = activeView?.dataset?.activeModule;
+    const shouldPrintSummaryOnly = activeModule === 'registro_giornaliero' || activeModule === 'spese';
+    let cleanupSummaryPrintMode = null;
+    let cleanupOnFocus = null;
+    if (shouldPrintSummaryOnly && activeView?.querySelector('.print-only')) {
+        cleanupSummaryPrintMode = () => {
+            document.body.classList.remove('summary-print-mode');
+            if (cleanupOnFocus) window.removeEventListener('focus', cleanupOnFocus);
+            window.removeEventListener('afterprint', cleanupSummaryPrintMode);
+        };
+        cleanupOnFocus = () => cleanupSummaryPrintMode();
+        window.addEventListener('focus', cleanupOnFocus, { once: true });
+        window.addEventListener('afterprint', cleanupSummaryPrintMode, { once: true });
+        document.body.classList.add('summary-print-mode');
+    }
+    try {
+        window.print();
+    } catch (error) {
+        if (cleanupSummaryPrintMode) {
+            window.removeEventListener('afterprint', cleanupSummaryPrintMode);
+            if (cleanupOnFocus) window.removeEventListener('focus', cleanupOnFocus);
+            cleanupSummaryPrintMode();
+        }
+        throw error;
+    }
+}
+
 const ACTION_HANDLERS = {
     toggleDrawer: () => toggleDrawer(),
     centerOnUser: () => centerOnUser(),
@@ -803,7 +832,7 @@ const ACTION_HANDLERS = {
         openModule('storico_ricevute');
     },
     saveArchivioRegionaleTartufiSelected: () => salvaArchivioRegionaleTartufi((document.getElementById('seleziona-regione-archivio') || {}).value),
-    printPage: () => window.print(),
+    printPage: () => printPage(),
     closeDrawerAndModule: () => {
         toggleDrawer();
         closeActiveModule();
@@ -2883,6 +2912,7 @@ function openModule(moduleName, editMode = false) {
         </div>
         <div class="module-body-content">${contentHTML}</div>
     `;
+    activeView.dataset.activeModule = moduleName;
     activeView.style.display = 'flex';
     if (moduleName === 'export') {
         setTimeout(syncAutomaticBackupDestinationUI, 0);
