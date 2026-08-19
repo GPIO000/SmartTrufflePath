@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
     CUSTOM_POI_MARKERS,
     DEFAULT_GENERIC_POI_MARKER,
+    DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX,
     DEFAULT_SHARED_POI_MARKER,
+    extractPointerClientPoint,
     formatPoiDisplayDate,
     getDefaultMarkerForPoiType,
+    hasMapLongPressExceededTolerance,
     normalizePoiList,
     normalizePoiMarker,
     parseLegacyDateToTimestamp,
@@ -52,6 +55,58 @@ describe('resolvePoiCoords', () => {
         const userMarker = { getLatLng: () => ({ lat: 43.5, lng: 10.2 }) };
         const result = resolvePoiCoords(undefined, 11.0, userMarker);
         expect(result).toEqual({ lat: 43.5, lng: 10.2 });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// map long-press helpers
+// ---------------------------------------------------------------------------
+
+describe('extractPointerClientPoint', () => {
+    it('estrae le coordinate da un evento mouse/pointer', () => {
+        expect(extractPointerClientPoint({ clientX: 120, clientY: 45 })).toEqual({ x: 120, y: 45 });
+    });
+
+    it('estrae le coordinate dal primo touch disponibile', () => {
+        expect(extractPointerClientPoint({
+            touches: [{ clientX: 33, clientY: 44 }],
+            changedTouches: [{ clientX: 99, clientY: 88 }]
+        })).toEqual({ x: 33, y: 44 });
+    });
+
+    it('usa changedTouches quando touches non è disponibile', () => {
+        expect(extractPointerClientPoint({
+            changedTouches: [{ clientX: 77, clientY: 55 }]
+        })).toEqual({ x: 77, y: 55 });
+    });
+
+    it('restituisce null quando le coordinate non sono disponibili', () => {
+        expect(extractPointerClientPoint(null)).toBeNull();
+        expect(extractPointerClientPoint({})).toBeNull();
+    });
+});
+
+describe('hasMapLongPressExceededTolerance', () => {
+    it('non annulla la pressione lunga per micro-spostamenti entro la soglia', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 108, y: 107 },
+            DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX
+        )).toBe(false);
+    });
+
+    it('annulla la pressione lunga quando il trascinamento supera la soglia', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 120, y: 120 },
+            DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX
+        )).toBe(true);
+    });
+
+    it('restituisce false quando i punti non sono disponibili o la soglia non è valida', () => {
+        expect(hasMapLongPressExceededTolerance(null, { x: 1, y: 1 })).toBe(false);
+        expect(hasMapLongPressExceededTolerance({ x: 1, y: 1 }, null)).toBe(false);
+        expect(hasMapLongPressExceededTolerance({ x: 1, y: 1 }, { x: 5, y: 5 }, -1)).toBe(false);
     });
 });
 
