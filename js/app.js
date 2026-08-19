@@ -761,9 +761,7 @@ const ACTION_HANDLERS = {
     deletePolizza: (_event, index) => deletePolizza(index),
     saveVetUnifiedEntry: () => saveVetUnifiedEntry(),
     syncVetUnifiedInputForm: () => syncVetUnifiedInputForm(),
-    saveVetHistoryItem: () => saveVetHistoryItem(),
     deleteVetHistoryItem: (_event, index) => deleteVetHistoryItem(index),
-    saveHeatEntry: () => saveHeatEntry(),
     deleteHeatEntry: (_event, index) => deleteHeatEntry(index),
     saveRaccoltaGiornaliera: () => saveRaccoltaGiornaliera(),
     deleteRaccoltaGiornaliera: (_event, index) => deleteRaccoltaGiornaliera(index),
@@ -2923,7 +2921,7 @@ function openModule(moduleName, editMode = false) {
         }
     }
     if (moduleName === 'vet') {
-        setTimeout(syncVetUnifiedInputForm, 0);
+        syncVetUnifiedInputForm();
     }
 }
 
@@ -4704,24 +4702,17 @@ function saveVetUnifiedEntry() {
         return;
     }
 
-    const tipo = ((document.getElementById('vet-entry-type') || {}).value || '').trim();
+    const tipoEl = document.getElementById('vet-entry-type');
+    if (!tipoEl) {
+        showToast("Tipologia intervento non disponibile.", 'error');
+        return;
+    }
+    const tipo = tipoEl.value;
     let vetHistory = readStorageJSON('vet_history_list', []);
     vetHistory.push({ cane, tipo, data, note });
     localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
     showToast("Trattamento registrato!", 'success');
     openModule('vet');
-}
-
-function saveVetHistoryItem() {
-    const cane = document.getElementById('vh-cane').value;
-    const tipo = document.getElementById('vh-tipo').value;
-    const data = document.getElementById('vh-data').value;
-    const note = document.getElementById('vh-note').value.trim();
-    if (!data) { showToast("Inserisci la data.", 'error'); return; }
-    let vetHistory = readStorageJSON('vet_history_list', []);
-    vetHistory.push({ cane, tipo, data, note });
-    localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
-    showToast("Trattamento registrato!", 'success'); openModule('vet');
 }
 
 async function deleteVetHistoryItem(index) {
@@ -4731,18 +4722,6 @@ async function deleteVetHistoryItem(index) {
         localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
         openModule('vet');
     }
-}
-
-function saveHeatEntry() {
-    const cane = document.getElementById('heat-cane').value;
-    const data = document.getElementById('heat-data').value;
-    const note = document.getElementById('heat-note').value.trim();
-    if (!data) { showToast("Inserisci la data dell'inizio calore.", 'error'); return; }
-    let heatDiary = readStorageJSON('heat_diary_list', []);
-    heatDiary.push({ cane, data, note });
-    localStorage.setItem('heat_diary_list', JSON.stringify(heatDiary));
-    showToast("Calore registrato!", 'success');
-    openModule('vet');
 }
 
 async function deleteHeatEntry(index) {
