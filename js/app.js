@@ -18,7 +18,7 @@ window.TruffleStorage = TruffleStorage;
 const SERVICE_WORKER_SCOPE = new URL('./', window.location.href).pathname;
 const SERVICE_WORKER_URL = `${SERVICE_WORKER_SCOPE}sw.js`;
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-18g`;
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-19a`;
 let lastServiceWorkerRegistrationError = null;
 let shouldReloadOnNextServiceWorkerControllerChange = false;
 
@@ -759,9 +759,11 @@ const ACTION_HANDLERS = {
     deleteDog: (_event, index) => deleteDog(index),
     savePolizza: () => savePolizza(),
     deletePolizza: (_event, index) => deletePolizza(index),
-    saveVetHistoryItem: () => saveVetHistoryItem(),
+    saveVetUnifiedEntry: () => saveVetUnifiedEntry(),
+    syncVetUnifiedInputForm: () => syncVetUnifiedInputForm(),
+    refreshVetBookletFilter: (event) => refreshVetBookletFilter(event),
+    printVetFilteredBooklet: () => printVetFilteredBooklet(),
     deleteVetHistoryItem: (_event, index) => deleteVetHistoryItem(index),
-    saveHeatEntry: () => saveHeatEntry(),
     deleteHeatEntry: (_event, index) => deleteHeatEntry(index),
     saveRaccoltaGiornaliera: () => saveRaccoltaGiornaliera(),
     deleteRaccoltaGiornaliera: (_event, index) => deleteRaccoltaGiornaliera(index),
@@ -2117,92 +2119,162 @@ function openModule(moduleName, editMode = false) {
             const cDataVet = getRenderableStorageJSON('cane_data', {});
             const nomeCaneDefault = cDataVet.nome || (dogsListVet.length > 0 ? dogsListVet[0].nome : 'Il tuo cane');
             const vetHistory = getRenderableStorageJSON('vet_history_list', []);
+            const heatDiary = getRenderableStorageJSON('heat_diary_list', []);
+            const femmineVet = dogsListVet.filter(d => d.sesso === 'Femmina');
+            const selectedVetFilterFromStorage = (localStorage.getItem('vet_filter_cane_nome') || '').trim();
+            let filtroCaneVet = selectedVetFilterFromStorage;
+            const isFiltroCaneValido = !filtroCaneVet || dogsListVet.some(d => d.nome === filtroCaneVet);
+            if (!isFiltroCaneValido) {
+                filtroCaneVet = '';
+                localStorage.removeItem('vet_filter_cane_nome');
+            }
+            const nomeCaneSelezionatoVet = filtroCaneVet || nomeCaneDefault;
             let optionsHtml = '';
             if (dogsListVet.length > 0) {
                 dogsListVet.forEach(dog => {
-                    const selected = dog.nome === nomeCaneDefault ? 'selected' : '';
-                    optionsHtml += `<option value="${dog.nome}" ${selected}>${dog.nome} (${dog.razza})</option>`;
+                    const selected = dog.nome === nomeCaneSelezionatoVet ? 'selected' : '';
+                    const sessoDog = dog.sesso === 'Femmina' ? 'Femmina' : 'Maschio';
+                    optionsHtml += `<option value="${escapeHtml(dog.nome)}" data-sesso="${sessoDog}" ${selected}>${escapeHtml(dog.nome)} (${escapeHtml(dog.razza || '')})</option>`;
                 });
-            } else { optionsHtml += `<option value="${nomeCaneDefault}">${nomeCaneDefault}</option>`; }
+            } else { optionsHtml += `<option value="${escapeHtml(nomeCaneDefault)}" data-sesso="Maschio">${escapeHtml(nomeCaneDefault)}</option>`; }
+            let filtroCaniOptionsHtml = `<option value="" ${filtroCaneVet ? '' : 'selected'}>Tutti i cani</option>`;
+            dogsListVet.forEach((dog) => {
+                const selected = dog.nome === filtroCaneVet ? 'selected' : '';
+                filtroCaniOptionsHtml += `<option value="${escapeHtml(dog.nome)}" ${selected}>${escapeHtml(dog.nome)}</option>`;
+            });
+
+            const vetHistoryEntries = vetHistory.map((entry, originalIndex) => ({ entry, originalIndex }));
+            const filteredVetHistoryEntries = filtroCaneVet
+                ? vetHistoryEntries.filter(({ entry }) => entry.cane === filtroCaneVet)
+                : vetHistoryEntries;
+
+            const heatDiaryEntries = heatDiary.map((entry, originalIndex) => ({ entry, originalIndex }));
+            const filteredHeatDiaryEntries = filtroCaneVet
+                ? heatDiaryEntries.filter(({ entry }) => entry.cane === filtroCaneVet)
+                : heatDiaryEntries;
+
+            const hasFilteredVetData = filteredVetHistoryEntries.length > 0 || filteredHeatDiaryEntries.length > 0;
+            const filteredDogProfile = dogsListVet.find((dog) => dog.nome === filtroCaneVet) || null;
+            const isFilteredDogFemale = dogsListVet.some((dog) => dog.nome === filtroCaneVet && dog.sesso === 'Femmina');
             let vetHtml = `
                 <h2>Libretti Sanitari Cani & Profilassi</h2>
-                <p>Storico trattamenti, vaccini e visite per il cane:</p>
+                <p>Storico trattamenti, vaccini, visite e diario calore:</p>
                 <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
-                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Trattamento / Visita</h3>
-                    <label>Seleziona Cane:</label>
-                    <select id="vh-cane" class="mod-input">${optionsHtml}</select>
-                    <label>Tipologia Intervento:</label>
-                    <select id="vh-tipo" class="mod-input">
-                        <option value="💉 Vaccino">Vaccino</option>
-                        <option value="💊 Antiparassitario Intestinale">Antiparassitario Intestinale (Pillola)</option>
-                        <option value="💧 Spot-on">Spot-on (Antipulci / Zecche)</option>
-                        <option value="🎗️ Collare Antiparassitario">Collare Antiparassitario</option>
-                        <option value="🩺 Visita Veterinaria">Visita Veterinaria / Controllo</option>
-                        <option value="🩹 Medicazione / Zecca">Medicazione / Ferita / Zecca</option>
-                        <option value="🏥 Somministrazione Farmaci / Altro">Somministrazione Farmaci / Altro</option>
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Nuova Registrazione</h3>
+                    <label>Tipo Registrazione:</label>
+                    <select id="vet-entry-category" class="mod-input" ${eventActionAttrs('change', 'syncVetUnifiedInputForm')}>
+                        <option value="vet_history" selected>🩺 Trattamento / Visita</option>
+                        ${femmineVet.length > 0 ? '<option value="heat_diary">🌸 Diario Calore (solo femmine)</option>' : ''}
                     </select>
-                    <label>Data del Trattamento:</label>
-                    <input type="date" id="vh-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
-                    <label>Note / Dettagli:</label>
-                    <input type="text" id="vh-note" class="mod-input" placeholder="Es. Nome farmaco o dosaggio">
-                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveVetHistoryItem')}>Registra nel Libretto</button>
+                    <label>Seleziona Cane:</label>
+                    <select id="vet-entry-cane" class="mod-input">${optionsHtml}</select>
+                    <div id="vet-entry-type-row">
+                        <label>Tipologia Intervento:</label>
+                        <select id="vet-entry-type" class="mod-input">
+                            <option value="💉 Vaccino">Vaccino</option>
+                            <option value="💊 Antiparassitario Intestinale">Antiparassitario Intestinale (Pillola)</option>
+                            <option value="💧 Spot-on">Spot-on (Antipulci / Zecche)</option>
+                            <option value="🎗️ Collare Antiparassitario">Collare Antiparassitario</option>
+                            <option value="🩺 Visita Veterinaria">Visita Veterinaria / Controllo</option>
+                            <option value="🩹 Medicazione / Zecca">Medicazione / Ferita / Zecca</option>
+                            <option value="🏥 Somministrazione Farmaci / Altro">Somministrazione Farmaci / Altro</option>
+                        </select>
+                    </div>
+                    <label id="vet-entry-date-label">Data del Trattamento:</label>
+                    <input type="date" id="vet-entry-date" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+                    <label id="vet-entry-note-label">Note / Dettagli:</label>
+                    <input type="text" id="vet-entry-note" class="mod-input" placeholder="Es. Nome farmaco o dosaggio">
+                    <button id="vet-entry-save-btn" class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveVetUnifiedEntry')}>Registra nel Libretto</button>
+                </div>
+                <div class="module-card" style="margin-bottom: 16px;">
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">🔎 Visualizza Libretto per Cane</h3>
+                    <label for="vet-filter-cane">Filtro per nome cane:</label>
+                    <select id="vet-filter-cane" class="mod-input" ${eventActionAttrs('change', 'refreshVetBookletFilter')}>
+                        ${filtroCaniOptionsHtml}
+                    </select>
+                    <button class="overlay-btn btn-neutral" style="width:100%; margin-top:8px;" ${actionAttrs('printVetFilteredBooklet')}>
+                        🖨️ Stampa Libretto Cane Selezionato
+                    </button>
                 </div>`;
-            if (vetHistory.length === 0) {
-                vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun trattamento registrato.</p></div>`;
+            if (filteredVetHistoryEntries.length === 0) {
+                vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">${filtroCaneVet ? 'Nessun trattamento registrato per il cane selezionato.' : 'Nessun trattamento registrato.'}</p></div>`;
             } else {
                 vetHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Storico Registrazioni:</h3>`;
-                vetHistory.slice().reverse().forEach((item, index) => {
-                    const originalIndex = vetHistory.length - 1 - index;
+                filteredVetHistoryEntries.slice().reverse().forEach(({ entry: item, originalIndex }) => {
                     vetHtml += `
-                        <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
-                            <strong style="color:#f6f1e6; font-size:0.95rem;">🐕 ${item.cane}</strong>
-                            <p style="font-size:0.9rem; color:#4d8a98; margin: 4px 0;"><b>${item.tipo}</b></p>
-                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Data: ${item.data}</p>
-                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                        <div class="module-card vet-record-card" data-cane="${escapeHtml(item.cane || '')}" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
+                            <strong style="color:#f6f1e6; font-size:0.95rem;">🐕 ${escapeHtml(item.cane || 'Cane non specificato')}</strong>
+                            <p style="font-size:0.9rem; color:#4d8a98; margin: 4px 0;"><b>${escapeHtml(item.tipo || 'Tipologia non specificata')}</b></p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Data: ${escapeHtml(item.data || 'Non specificata')}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${escapeHtml(item.note || 'Nessuna nota')}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteVetHistoryItem', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
             }
             // Diario calore per cagne femmine
-            const femmineVet = dogsListVet.filter(d => d.sesso === 'Femmina');
             if (femmineVet.length > 0) {
-                const heatDiary = getRenderableStorageJSON('heat_diary_list', []);
                 vetHtml += `<h3 style="font-size:0.85rem; color:#f472b6; margin:20px 0 8px; text-transform:uppercase;">🌸 Diario Calore (Cagne Femmine)</h3>`;
-                // Form aggiunta calore
-                let optionsFemmine = '';
-                femmineVet.forEach(d => { optionsFemmine += `<option value="${d.nome}">${d.nome}</option>`; });
-                vetHtml += `
-                <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid #f472b6;">
-                    <h3 style="font-size:0.9rem; color:#f472b6; margin-bottom:10px;">➕ Registra Inizio Calore</h3>
-                    <label>Seleziona Cagna:</label>
-                    <select id="heat-cane" class="mod-input">${optionsFemmine}</select>
-                    <label>Data Inizio Calore:</label>
-                    <input type="date" id="heat-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
-                    <label>Note:</label>
-                    <input type="text" id="heat-note" class="mod-input" placeholder="Es. Durata, comportamento...">
-                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#be185d;" ${actionAttrs('saveHeatEntry')}>Registra Calore</button>
-                </div>`;
-                if (heatDiary.length === 0) {
-                    vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun calore registrato.</p></div>`;
+                if (filteredHeatDiaryEntries.length === 0) {
+                    vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">${filtroCaneVet ? 'Nessun calore registrato per il cane selezionato.' : 'Nessun calore registrato.'}</p></div>`;
                 } else {
                     vetHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Storico Calori:</h3>`;
-                    heatDiary.slice().reverse().forEach((entry, index) => {
-                        const originalIndex = heatDiary.length - 1 - index;
+                    filteredHeatDiaryEntries.slice().reverse().forEach(({ entry, originalIndex }) => {
                         const dataInizio = new Date(entry.data);
                         const prossimoCalore = new Date(dataInizio);
                         prossimoCalore.setDate(prossimoCalore.getDate() + 180);
                         const prossimoStr = prossimoCalore.toISOString().slice(0, 10);
                         vetHtml += `
-                        <div class="module-card" style="border-left: 4px solid #f472b6; margin-bottom: 12px;">
-                            <strong style="color:#f6f1e6; font-size:0.95rem;">🐩 ${entry.cane}</strong>
-                            <p style="font-size:0.9rem; color:#f472b6; margin: 4px 0;"><b>🌸 Inizio Calore: ${entry.data}</b></p>
+                        <div class="module-card vet-heat-card" data-cane="${escapeHtml(entry.cane || '')}" style="border-left: 4px solid #f472b6; margin-bottom: 12px;">
+                            <strong style="color:#f6f1e6; font-size:0.95rem;">🐩 ${escapeHtml(entry.cane || 'Cane non specificato')}</strong>
+                            <p style="font-size:0.9rem; color:#f472b6; margin: 4px 0;"><b>🌸 Inizio Calore: ${escapeHtml(entry.data || 'Non specificata')}</b></p>
                             <p style="font-size:0.85rem; color:#fbbf24; margin: 2px 0;">📅 Prossimo calore previsto: <b>${prossimoStr}</b></p>
-                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${entry.note || 'Nessuna nota'}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${escapeHtml(entry.note || 'Nessuna nota')}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteHeatEntry', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                     });
                 }
             }
+            let printOnlyVetBooklet = '';
+            if (filtroCaneVet) {
+                const filteredDogBirthDate = filteredDogProfile?.nascita || '';
+                const filteredDogAge = filteredDogBirthDate ? formatDogAge(filteredDogBirthDate) : 'Non disponibile';
+                printOnlyVetBooklet = `
+                    <div id="vet-filtered-print-only" class="print-only" data-has-data="${hasFilteredVetData ? '1' : '0'}">
+                        <h2 style="margin-bottom:6px;">Libretto sanitario cane: ${escapeHtml(filtroCaneVet)}</h2>
+                        <p style="margin-bottom:12px;">Stampa filtrata per il cane selezionato.</p>
+                        <div style="margin:0 0 12px; padding:10px; border:1px solid #ddd;">
+                            <h3 style="margin:0 0 8px;">Anagrafica cane selezionato</h3>
+                            <p><b>Nome:</b> ${escapeHtml(filteredDogProfile?.nome || filtroCaneVet)}</p>
+                            <p><b>Razza:</b> ${escapeHtml(filteredDogProfile?.razza || 'Non specificata')}</p>
+                            <p><b>Sesso:</b> ${escapeHtml(filteredDogProfile?.sesso || 'Non specificato')}</p>
+                            <p><b>Data di nascita:</b> ${escapeHtml(filteredDogBirthDate || 'Non specificata')}</p>
+                            <p><b>Età:</b> ${escapeHtml(filteredDogAge)}</p>
+                            <p><b>Microchip:</b> ${escapeHtml(filteredDogProfile?.microchip || 'Non specificato')}</p>
+                        </div>
+                        <h3 style="margin:14px 0 8px;">Trattamenti / Visite</h3>
+                        ${filteredVetHistoryEntries.length === 0
+                            ? '<p>Nessun trattamento registrato.</p>'
+                            : filteredVetHistoryEntries.slice().reverse().map(({ entry }) => `
+                                <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ddd;">
+                                    <p><b>Tipo:</b> ${escapeHtml(entry.tipo || 'Tipologia non specificata')}</p>
+                                    <p><b>Data:</b> ${escapeHtml(entry.data || 'Non specificata')}</p>
+                                    <p><b>Note:</b> ${escapeHtml(entry.note || 'Nessuna nota')}</p>
+                                </div>
+                            `).join('')}
+                        ${isFilteredDogFemale
+                            ? `<h3 style="margin:14px 0 8px;">Diario Calore</h3>
+                               ${filteredHeatDiaryEntries.length === 0
+                                   ? '<p>Nessun calore registrato.</p>'
+                                   : filteredHeatDiaryEntries.slice().reverse().map(({ entry }) => `
+                                       <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ddd;">
+                                           <p><b>Inizio calore:</b> ${escapeHtml(entry.data || 'Non specificata')}</p>
+                                           <p><b>Note:</b> ${escapeHtml(entry.note || 'Nessuna nota')}</p>
+                                       </div>
+                                   `).join('')}`
+                            : ''}
+                    </div>`;
+            }
+            vetHtml += printOnlyVetBooklet;
             contentHTML = vetHtml;
             break;
         case 'registro_giornaliero':
@@ -2925,6 +2997,9 @@ function openModule(moduleName, editMode = false) {
             const progressArea = document.getElementById('offline-progress-area');
             if (progressArea) progressArea.style.display = 'block';
         }
+    }
+    if (moduleName === 'vet') {
+        syncVetUnifiedInputForm();
     }
 }
 
@@ -4631,16 +4706,147 @@ function whatsappVetClinicByIndex(index) {
     window.location.href = `whatsapp://send?phone=${encodeURIComponent(sanitizePhoneHref(clinic.cell))}`;
 }
 
-function saveVetHistoryItem() {
-    const cane = document.getElementById('vh-cane').value;
-    const tipo = document.getElementById('vh-tipo').value;
-    const data = document.getElementById('vh-data').value;
-    const note = document.getElementById('vh-note').value.trim();
-    if (!data) { showToast("Inserisci la data.", 'error'); return; }
+function syncVetUnifiedInputForm() {
+    const modeSelect = document.getElementById('vet-entry-category');
+    const caneSelect = document.getElementById('vet-entry-cane');
+    const typeRow = document.getElementById('vet-entry-type-row');
+    const dateLabel = document.getElementById('vet-entry-date-label');
+    const noteLabel = document.getElementById('vet-entry-note-label');
+    const noteInput = document.getElementById('vet-entry-note');
+    const saveBtn = document.getElementById('vet-entry-save-btn');
+    if (!modeSelect || !caneSelect || !typeRow || !dateLabel || !noteLabel || !noteInput || !saveBtn) return;
+
+    const isHeatMode = modeSelect.value === 'heat_diary';
+    const options = Array.from(caneSelect.options);
+    const femaleOptions = options.filter(opt => opt.dataset.sesso === 'Femmina');
+
+    if (isHeatMode && femaleOptions.length === 0) {
+        modeSelect.value = 'vet_history';
+    }
+
+    const applyHeatMode = modeSelect.value === 'heat_diary';
+    options.forEach((opt) => {
+        const isFemale = opt.dataset.sesso === 'Femmina';
+        opt.hidden = applyHeatMode && !isFemale;
+        opt.disabled = applyHeatMode && !isFemale;
+    });
+
+    if (applyHeatMode) {
+        if (!caneSelect.selectedOptions[0] || caneSelect.selectedOptions[0].dataset.sesso !== 'Femmina') {
+            const firstFemale = femaleOptions[0];
+            if (firstFemale) caneSelect.value = firstFemale.value;
+        }
+        typeRow.style.display = 'none';
+        dateLabel.textContent = 'Data Inizio Calore:';
+        noteLabel.textContent = 'Note:';
+        noteInput.placeholder = 'Es. Durata, comportamento...';
+        saveBtn.textContent = 'Registra Calore';
+        saveBtn.style.background = '#be185d';
+        return;
+    }
+
+    typeRow.style.display = '';
+    dateLabel.textContent = 'Data del Trattamento:';
+    noteLabel.textContent = 'Note / Dettagli:';
+    noteInput.placeholder = 'Es. Nome farmaco o dosaggio';
+    saveBtn.textContent = 'Registra nel Libretto';
+    saveBtn.style.background = '#2563eb';
+}
+
+function refreshVetBookletFilter(event) {
+    const selectedDog = ((event?.target?.value) || '').trim();
+    if (selectedDog) {
+        localStorage.setItem('vet_filter_cane_nome', selectedDog);
+    } else {
+        localStorage.removeItem('vet_filter_cane_nome');
+    }
+    openModule('vet');
+}
+
+function printVetFilteredBooklet() {
+    const activeView = document.getElementById('active-module-view');
+    if ((activeView?.dataset?.activeModule || '') !== 'vet') return;
+
+    const selectedDog = ((document.getElementById('vet-filter-cane') || {}).value || '').trim();
+    if (!selectedDog) {
+        showToast("Seleziona un cane nel filtro prima di stampare.", 'error');
+        return;
+    }
+
+    const printBlock = document.getElementById('vet-filtered-print-only');
+    if (!printBlock || printBlock.dataset.hasData !== '1') {
+        showToast("Nessun dato da stampare per il cane selezionato.", 'error');
+        return;
+    }
+
+    let hasCleanedUp = false;
+    let cleanupTimerId = null;
+    let cleanupOnFocus = null;
+    const cleanupSummaryPrintMode = () => {
+        if (hasCleanedUp) return;
+        hasCleanedUp = true;
+        document.body.classList.remove('summary-print-mode');
+        if (cleanupTimerId) {
+            clearTimeout(cleanupTimerId);
+            cleanupTimerId = null;
+        }
+        if (cleanupOnFocus) window.removeEventListener('focus', cleanupOnFocus);
+        window.removeEventListener('afterprint', cleanupSummaryPrintMode);
+    };
+    cleanupOnFocus = () => cleanupSummaryPrintMode();
+
+    try {
+        window.addEventListener('focus', cleanupOnFocus, { once: true });
+        window.addEventListener('afterprint', cleanupSummaryPrintMode, { once: true });
+        document.body.classList.add('summary-print-mode');
+        cleanupTimerId = window.setTimeout(cleanupSummaryPrintMode, 5000);
+        window.print();
+    } catch (error) {
+        window.removeEventListener('afterprint', cleanupSummaryPrintMode);
+        if (cleanupOnFocus) window.removeEventListener('focus', cleanupOnFocus);
+        cleanupSummaryPrintMode();
+        throw error;
+    }
+}
+
+function saveVetUnifiedEntry() {
+    const mode = (document.getElementById('vet-entry-category') || {}).value || 'vet_history';
+    const caneSelect = document.getElementById('vet-entry-cane');
+    const selectedCane = caneSelect ? caneSelect.selectedOptions[0] : null;
+    const cane = selectedCane ? selectedCane.value : '';
+    const data = (document.getElementById('vet-entry-date') || {}).value || '';
+    const note = ((document.getElementById('vet-entry-note') || {}).value || '').trim();
+
+    if (!data) {
+        const message = mode === 'heat_diary' ? "Inserisci la data dell'inizio calore." : "Inserisci la data.";
+        showToast(message, 'error');
+        return;
+    }
+
+    if (mode === 'heat_diary') {
+        if (!selectedCane || selectedCane.dataset.sesso !== 'Femmina') {
+            showToast("Per il diario calore seleziona una cagna femmina.", 'error');
+            return;
+        }
+        let heatDiary = readStorageJSON('heat_diary_list', []);
+        heatDiary.push({ cane, data, note });
+        localStorage.setItem('heat_diary_list', JSON.stringify(heatDiary));
+        showToast("Calore registrato!", 'success');
+        openModule('vet');
+        return;
+    }
+
+    const tipoEl = document.getElementById('vet-entry-type');
+    if (!tipoEl) {
+        showToast("Tipologia intervento non disponibile.", 'error');
+        return;
+    }
+    const tipo = tipoEl.value;
     let vetHistory = readStorageJSON('vet_history_list', []);
     vetHistory.push({ cane, tipo, data, note });
     localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
-    showToast("Trattamento registrato!", 'success'); openModule('vet');
+    showToast("Trattamento registrato!", 'success');
+    openModule('vet');
 }
 
 async function deleteVetHistoryItem(index) {
@@ -4650,18 +4856,6 @@ async function deleteVetHistoryItem(index) {
         localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
         openModule('vet');
     }
-}
-
-function saveHeatEntry() {
-    const cane = document.getElementById('heat-cane').value;
-    const data = document.getElementById('heat-data').value;
-    const note = document.getElementById('heat-note').value.trim();
-    if (!data) { showToast("Inserisci la data dell'inizio calore.", 'error'); return; }
-    let heatDiary = readStorageJSON('heat_diary_list', []);
-    heatDiary.push({ cane, data, note });
-    localStorage.setItem('heat_diary_list', JSON.stringify(heatDiary));
-    showToast("Calore registrato!", 'success');
-    openModule('vet');
 }
 
 async function deleteHeatEntry(index) {
@@ -5392,7 +5586,7 @@ async function mostraInfoModulo(moduleName) {
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
         'canidiary': "ℹ️ **Guida - Anagrafica Cane**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo razza, sesso, data di nascita e numero di microchip.",
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
-        'vet': "ℹ️ **Guida - Libretti Sanitari Cani & Profilassi**\n\nRegistra lo storico dei trattamenti veterinari, dei vaccini e della somministrazione di antiparassitari per i tuoi cani. Per le cagne femmine è disponibile il diario del calore con previsione del prossimo ciclo.",
+        'vet': "ℹ️ **Guida - Libretti Sanitari Cani & Profilassi**\n\nUsa la card unica \"Nuova Registrazione\" per inserire trattamenti/visite oppure voci del diario calore. In modalità diario calore puoi selezionare solo cagne femmine, con previsione del prossimo ciclo nello storico.",
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
