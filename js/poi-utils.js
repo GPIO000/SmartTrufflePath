@@ -5,8 +5,6 @@ export const CUSTOM_POI_MARKERS = ['📩', '🥔', '📍', '🚫', '🛃'];
 export const DEFAULT_GENERIC_POI_MARKER = '🥔';
 export const DEFAULT_SHARED_POI_MARKER = '📩';
 export const DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX = 12;
-export const DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS = 1500;
-export const DEFAULT_MAP_LONG_PRESS_DUPLICATE_COORD_TOLERANCE = 0.00001;
 
 export function parseLegacyDateToTimestamp(dateText) {
     if (typeof dateText !== 'string') return null;
@@ -117,32 +115,4 @@ export function hasMapLongPressExceededTolerance(startPoint, currentPoint, toler
     const deltaX = currentPoint.x - startPoint.x;
     const deltaY = currentPoint.y - startPoint.y;
     return (deltaX * deltaX) + (deltaY * deltaY) > tolerance * tolerance;
-}
-
-export function isDuplicateMapLongPress(lastHandled, latlng, now = Date.now(), duplicateWindowMs = DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS, coordTolerance = DEFAULT_MAP_LONG_PRESS_DUPLICATE_COORD_TOLERANCE) {
-    if (!lastHandled || !latlng) return false;
-    const timestamp = Number(lastHandled.timestamp);
-    const currentTimestamp = Number(now);
-    const windowMs = Number(duplicateWindowMs);
-    const tolerance = Number(coordTolerance);
-    const lastLat = Number(lastHandled.lat);
-    const lastLng = Number(lastHandled.lng);
-    const nextLat = Number(latlng.lat);
-    const nextLng = Number(latlng.lng);
-
-    if (!Number.isFinite(timestamp)
-        || !Number.isFinite(currentTimestamp)
-        || !Number.isFinite(windowMs)
-        || windowMs < 0
-        || !Number.isFinite(tolerance)
-        || tolerance < 0
-        || !Number.isFinite(lastLat)
-        || !Number.isFinite(lastLng)
-        || !Number.isFinite(nextLat)
-        || !Number.isFinite(nextLng)) {
-        return false;
-    }
-
-    if (currentTimestamp - timestamp > windowMs) return false;
-    return Math.abs(lastLat - nextLat) <= tolerance && Math.abs(lastLng - nextLng) <= tolerance;
 }
