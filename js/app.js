@@ -936,6 +936,33 @@ map.on('zoomend', () => {
     updateZoomIndicator();
 });
 
+// Long-press on map: ask user if they want to report a new POI at that location
+let _mapLongPressTimer = null;
+let _mapLongPressMoved = false;
+const MAP_LONG_PRESS_MS = 600;
+
+map.on('mousedown touchstart', (e) => {
+    // Ignore multi-touch gestures (e.g. pinch-to-zoom)
+    if (e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length > 1) return;
+    _mapLongPressMoved = false;
+    clearTimeout(_mapLongPressTimer);
+    const latlng = { lat: e.latlng.lat, lng: e.latlng.lng };
+    _mapLongPressTimer = setTimeout(async () => {
+        if (_mapLongPressMoved) return;
+        const ok = await appConfirm(`📍 Vuoi segnalare un nuovo punto in questa posizione?\n(${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)})`);
+        if (ok) savePoiPosition(latlng.lat, latlng.lng);
+    }, MAP_LONG_PRESS_MS);
+});
+
+map.on('mousemove touchmove', () => {
+    _mapLongPressMoved = true;
+    clearTimeout(_mapLongPressTimer);
+});
+
+map.on('mouseup touchend touchcancel', () => {
+    clearTimeout(_mapLongPressTimer);
+});
+
 let userMarker = null;
 let poiMapMarkers = {}; 
 let targetNavigation = null;
@@ -1255,9 +1282,10 @@ function saveCarPosition() {
         showToast("🚗 Posizione auto aggiunta nell'elenco punti!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
-async function savePoiPosition() {
-    if (userMarker) {
-        const pos = userMarker.getLatLng();
+async function savePoiPosition(forceLat, forceLng) {
+    const hasForced = forceLat !== undefined && forceLng !== undefined;
+    if (hasForced || userMarker) {
+        const pos = hasForced ? { lat: forceLat, lng: forceLng } : userMarker.getLatLng();
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
         if (note === null) return;
         const marker = await choosePoiMarker();
