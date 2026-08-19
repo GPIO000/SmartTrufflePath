@@ -1207,7 +1207,7 @@ function updateCompass(currentLat, currentLng) {
     }
     if (target) {
         const res = calculateDistanceAndBearing(currentLat, currentLng, target.lat, target.lng);
-        compassText.innerHTML = `🧭 <b>${escapeHtml(label)}:</b> ${res.arrow} ${res.distance} (${res.direction}) <button data-action="stopNavigation" style="pointer-events:auto;margin-left:8px;background:rgba(239,68,68,0.85);border:none;border-radius:8px;color:#fff;padding:2px 8px;font-size:0.75rem;cursor:pointer;">❌ Stop</button>`;
+        compassText.innerHTML = `<span class="compass-nav-row">🧭 <b>${escapeHtml(label)}:</b> ${res.arrow} ${res.distance} (${res.direction})</span><button data-action="stopNavigation" class="btn-stop-nav">❌ Stop</button>`;
     } else {
         compassText.innerHTML = `🧭 Seleziona una destinazione dall'elenco punti`;
     }

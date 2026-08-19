@@ -177,6 +177,31 @@ textarea:focus-visible {
     pointer-events: auto;
 }
 
+#compass-box .compass-nav-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+#compass-box .btn-stop-nav {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    background: rgba(239, 68, 68, 0.85);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    justify-content: center;
+}
+
 #map-overlays {
     position: absolute;
     bottom: 18px;
