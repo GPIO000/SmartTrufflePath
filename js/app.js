@@ -761,6 +761,8 @@ const ACTION_HANDLERS = {
     deletePolizza: (_event, index) => deletePolizza(index),
     saveVetUnifiedEntry: () => saveVetUnifiedEntry(),
     syncVetUnifiedInputForm: () => syncVetUnifiedInputForm(),
+    refreshVetBookletFilter: (event) => refreshVetBookletFilter(event),
+    printVetFilteredBooklet: () => printVetFilteredBooklet(),
     deleteVetHistoryItem: (_event, index) => deleteVetHistoryItem(index),
     deleteHeatEntry: (_event, index) => deleteHeatEntry(index),
     saveRaccoltaGiornaliera: () => saveRaccoltaGiornaliera(),
@@ -2119,6 +2121,14 @@ function openModule(moduleName, editMode = false) {
             const vetHistory = getRenderableStorageJSON('vet_history_list', []);
             const heatDiary = getRenderableStorageJSON('heat_diary_list', []);
             const femmineVet = dogsListVet.filter(d => d.sesso === 'Femmina');
+            const selectedVetFilterFromUi = ((document.getElementById('vet-filter-cane') || {}).value || '').trim();
+            const selectedVetFilterFromStorage = (localStorage.getItem('vet_filter_cane_nome') || '').trim();
+            let filtroCaneVet = selectedVetFilterFromUi || selectedVetFilterFromStorage;
+            const isFiltroCaneValido = !filtroCaneVet || dogsListVet.some(d => d.nome === filtroCaneVet);
+            if (!isFiltroCaneValido) {
+                filtroCaneVet = '';
+                localStorage.removeItem('vet_filter_cane_nome');
+            }
             let optionsHtml = '';
             if (dogsListVet.length > 0) {
                 dogsListVet.forEach(dog => {
@@ -2127,6 +2137,23 @@ function openModule(moduleName, editMode = false) {
                     optionsHtml += `<option value="${escapeHtml(dog.nome)}" data-sesso="${sessoDog}" ${selected}>${escapeHtml(dog.nome)} (${escapeHtml(dog.razza || '')})</option>`;
                 });
             } else { optionsHtml += `<option value="${escapeHtml(nomeCaneDefault)}" data-sesso="Maschio">${escapeHtml(nomeCaneDefault)}</option>`; }
+            let filtroCaniOptionsHtml = `<option value="" ${filtroCaneVet ? '' : 'selected'}>Tutti i cani</option>`;
+            dogsListVet.forEach((dog) => {
+                const selected = dog.nome === filtroCaneVet ? 'selected' : '';
+                filtroCaniOptionsHtml += `<option value="${escapeHtml(dog.nome)}" ${selected}>${escapeHtml(dog.nome)}</option>`;
+            });
+
+            const vetHistoryEntries = vetHistory.map((entry, originalIndex) => ({ entry, originalIndex }));
+            const filteredVetHistoryEntries = filtroCaneVet
+                ? vetHistoryEntries.filter(({ entry }) => entry.cane === filtroCaneVet)
+                : vetHistoryEntries;
+
+            const heatDiaryEntries = heatDiary.map((entry, originalIndex) => ({ entry, originalIndex }));
+            const filteredHeatDiaryEntries = filtroCaneVet
+                ? heatDiaryEntries.filter(({ entry }) => entry.cane === filtroCaneVet)
+                : heatDiaryEntries;
+
+            const hasFilteredVetData = filteredVetHistoryEntries.length > 0 || filteredHeatDiaryEntries.length > 0;
             let vetHtml = `
                 <h2>Libretti Sanitari Cani & Profilassi</h2>
                 <p>Storico trattamenti, vaccini, visite e diario calore:</p>
@@ -2156,19 +2183,28 @@ function openModule(moduleName, editMode = false) {
                     <label id="vet-entry-note-label">Note / Dettagli:</label>
                     <input type="text" id="vet-entry-note" class="mod-input" placeholder="Es. Nome farmaco o dosaggio">
                     <button id="vet-entry-save-btn" class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveVetUnifiedEntry')}>Registra nel Libretto</button>
+                </div>
+                <div class="module-card" style="margin-bottom: 16px;">
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">🔎 Visualizza Libretto per Cane</h3>
+                    <label for="vet-filter-cane">Filtro per nome cane:</label>
+                    <select id="vet-filter-cane" class="mod-input" ${eventActionAttrs('change', 'refreshVetBookletFilter')}>
+                        ${filtroCaniOptionsHtml}
+                    </select>
+                    <button class="overlay-btn btn-neutral" style="width:100%; margin-top:8px;" ${actionAttrs('printVetFilteredBooklet')}>
+                        🖨️ Stampa Libretto Cane Selezionato
+                    </button>
                 </div>`;
-            if (vetHistory.length === 0) {
-                vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun trattamento registrato.</p></div>`;
+            if (filteredVetHistoryEntries.length === 0) {
+                vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">${filtroCaneVet ? 'Nessun trattamento registrato per il cane selezionato.' : 'Nessun trattamento registrato.'}</p></div>`;
             } else {
                 vetHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Storico Registrazioni:</h3>`;
-                vetHistory.slice().reverse().forEach((item, index) => {
-                    const originalIndex = vetHistory.length - 1 - index;
+                filteredVetHistoryEntries.slice().reverse().forEach(({ entry: item, originalIndex }) => {
                     vetHtml += `
-                        <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
-                            <strong style="color:#f6f1e6; font-size:0.95rem;">🐕 ${item.cane}</strong>
-                            <p style="font-size:0.9rem; color:#4d8a98; margin: 4px 0;"><b>${item.tipo}</b></p>
-                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Data: ${item.data}</p>
-                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
+                        <div class="module-card vet-record-card" data-cane="${escapeHtml(item.cane || '')}" style="border-left: 4px solid #22c55e; margin-bottom: 12px;">
+                            <strong style="color:#f6f1e6; font-size:0.95rem;">🐕 ${escapeHtml(item.cane || 'Cane non specificato')}</strong>
+                            <p style="font-size:0.9rem; color:#4d8a98; margin: 4px 0;"><b>${escapeHtml(item.tipo || 'Tipologia non specificata')}</b></p>
+                            <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📅 Data: ${escapeHtml(item.data || 'Non specificata')}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${escapeHtml(item.note || 'Nessuna nota')}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteVetHistoryItem', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                 });
@@ -2176,27 +2212,54 @@ function openModule(moduleName, editMode = false) {
             // Diario calore per cagne femmine
             if (femmineVet.length > 0) {
                 vetHtml += `<h3 style="font-size:0.85rem; color:#f472b6; margin:20px 0 8px; text-transform:uppercase;">🌸 Diario Calore (Cagne Femmine)</h3>`;
-                if (heatDiary.length === 0) {
-                    vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun calore registrato.</p></div>`;
+                if (filteredHeatDiaryEntries.length === 0) {
+                    vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">${filtroCaneVet ? 'Nessun calore registrato per il cane selezionato.' : 'Nessun calore registrato.'}</p></div>`;
                 } else {
                     vetHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Storico Calori:</h3>`;
-                    heatDiary.slice().reverse().forEach((entry, index) => {
-                        const originalIndex = heatDiary.length - 1 - index;
+                    filteredHeatDiaryEntries.slice().reverse().forEach(({ entry, originalIndex }) => {
                         const dataInizio = new Date(entry.data);
                         const prossimoCalore = new Date(dataInizio);
                         prossimoCalore.setDate(prossimoCalore.getDate() + 180);
                         const prossimoStr = prossimoCalore.toISOString().slice(0, 10);
                         vetHtml += `
-                        <div class="module-card" style="border-left: 4px solid #f472b6; margin-bottom: 12px;">
-                            <strong style="color:#f6f1e6; font-size:0.95rem;">🐩 ${entry.cane}</strong>
-                            <p style="font-size:0.9rem; color:#f472b6; margin: 4px 0;"><b>🌸 Inizio Calore: ${entry.data}</b></p>
+                        <div class="module-card vet-heat-card" data-cane="${escapeHtml(entry.cane || '')}" style="border-left: 4px solid #f472b6; margin-bottom: 12px;">
+                            <strong style="color:#f6f1e6; font-size:0.95rem;">🐩 ${escapeHtml(entry.cane || 'Cane non specificato')}</strong>
+                            <p style="font-size:0.9rem; color:#f472b6; margin: 4px 0;"><b>🌸 Inizio Calore: ${escapeHtml(entry.data || 'Non specificata')}</b></p>
                             <p style="font-size:0.85rem; color:#fbbf24; margin: 2px 0;">📅 Prossimo calore previsto: <b>${prossimoStr}</b></p>
-                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${entry.note || 'Nessuna nota'}</p>
+                            <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${escapeHtml(entry.note || 'Nessuna nota')}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteHeatEntry', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
                     });
                 }
             }
+            let printOnlyVetBooklet = '';
+            if (filtroCaneVet) {
+                printOnlyVetBooklet = `
+                    <div id="vet-filtered-print-only" class="print-only" data-has-data="${hasFilteredVetData ? '1' : '0'}">
+                        <h2 style="margin-bottom:6px;">Libretto sanitario cane: ${escapeHtml(filtroCaneVet)}</h2>
+                        <p style="margin-bottom:12px;">Stampa filtrata per il cane selezionato.</p>
+                        <h3 style="margin:14px 0 8px;">Trattamenti / Visite</h3>
+                        ${filteredVetHistoryEntries.length === 0
+                            ? '<p>Nessun trattamento registrato.</p>'
+                            : filteredVetHistoryEntries.slice().reverse().map(({ entry }) => `
+                                <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ddd;">
+                                    <p><b>Tipo:</b> ${escapeHtml(entry.tipo || 'Tipologia non specificata')}</p>
+                                    <p><b>Data:</b> ${escapeHtml(entry.data || 'Non specificata')}</p>
+                                    <p><b>Note:</b> ${escapeHtml(entry.note || 'Nessuna nota')}</p>
+                                </div>
+                            `).join('')}
+                        <h3 style="margin:14px 0 8px;">Diario Calore</h3>
+                        ${filteredHeatDiaryEntries.length === 0
+                            ? '<p>Nessun calore registrato.</p>'
+                            : filteredHeatDiaryEntries.slice().reverse().map(({ entry }) => `
+                                <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ddd;">
+                                    <p><b>Inizio calore:</b> ${escapeHtml(entry.data || 'Non specificata')}</p>
+                                    <p><b>Note:</b> ${escapeHtml(entry.note || 'Nessuna nota')}</p>
+                                </div>
+                            `).join('')}
+                    </div>`;
+            }
+            vetHtml += printOnlyVetBooklet;
             contentHTML = vetHtml;
             break;
         case 'registro_giornaliero':
@@ -4673,6 +4736,54 @@ function syncVetUnifiedInputForm() {
     noteInput.placeholder = 'Es. Nome farmaco o dosaggio';
     saveBtn.textContent = 'Registra nel Libretto';
     saveBtn.style.background = '#2563eb';
+}
+
+function refreshVetBookletFilter(event) {
+    const selectedDog = ((event?.target?.value) || '').trim();
+    if (selectedDog) {
+        localStorage.setItem('vet_filter_cane_nome', selectedDog);
+    } else {
+        localStorage.removeItem('vet_filter_cane_nome');
+    }
+    openModule('vet');
+}
+
+function printVetFilteredBooklet() {
+    const activeView = document.getElementById('active-module-view');
+    if ((activeView?.dataset?.activeModule || '') !== 'vet') return;
+
+    const selectedDog = ((document.getElementById('vet-filter-cane') || {}).value || '').trim();
+    if (!selectedDog) {
+        showToast("Seleziona un cane nel filtro prima di stampare.", 'error');
+        return;
+    }
+
+    const printBlock = document.getElementById('vet-filtered-print-only');
+    if (!printBlock || printBlock.dataset.hasData !== '1') {
+        showToast("Nessun dato da stampare per il cane selezionato.", 'error');
+        return;
+    }
+
+    let cleanupSummaryPrintMode = null;
+    let cleanupOnFocus = null;
+    cleanupSummaryPrintMode = () => {
+        document.body.classList.remove('summary-print-mode');
+        if (cleanupOnFocus) window.removeEventListener('focus', cleanupOnFocus);
+        window.removeEventListener('afterprint', cleanupSummaryPrintMode);
+    };
+    cleanupOnFocus = () => cleanupSummaryPrintMode();
+    window.addEventListener('focus', cleanupOnFocus, { once: true });
+    window.addEventListener('afterprint', cleanupSummaryPrintMode, { once: true });
+    document.body.classList.add('summary-print-mode');
+
+    try {
+        window.print();
+    } catch (error) {
+        window.removeEventListener('afterprint', cleanupSummaryPrintMode);
+        if (cleanupOnFocus) window.removeEventListener('focus', cleanupOnFocus);
+        cleanupSummaryPrintMode();
+        throw error;
+    }
 }
 
 function saveVetUnifiedEntry() {
