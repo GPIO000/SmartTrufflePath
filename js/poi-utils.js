@@ -4,6 +4,7 @@
 export const CUSTOM_POI_MARKERS = ['📩', '🥔', '📍', '🚫', '🛃'];
 export const DEFAULT_GENERIC_POI_MARKER = '🥔';
 export const DEFAULT_SHARED_POI_MARKER = '📩';
+export const DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX = 12;
 
 export function parseLegacyDateToTimestamp(dateText) {
     if (typeof dateText !== 'string') return null;
@@ -95,4 +96,23 @@ export function resolvePoiCoords(forceLat, forceLng, userMarker) {
         return { lat: latlng.lat, lng: latlng.lng };
     }
     return null;
+}
+
+export function extractPointerClientPoint(event) {
+    const source = event?.touches?.[0]
+        || event?.changedTouches?.[0]
+        || event;
+    const clientX = Number(source?.clientX);
+    const clientY = Number(source?.clientY);
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+    return { x: clientX, y: clientY };
+}
+
+export function hasMapLongPressExceededTolerance(startPoint, currentPoint, tolerancePx = DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX) {
+    if (!startPoint || !currentPoint) return false;
+    const tolerance = Number(tolerancePx);
+    if (!Number.isFinite(tolerance) || tolerance < 0) return false;
+    const deltaX = currentPoint.x - startPoint.x;
+    const deltaY = currentPoint.y - startPoint.y;
+    return (deltaX * deltaX) + (deltaY * deltaY) > tolerance * tolerance;
 }

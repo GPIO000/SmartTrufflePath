@@ -14,6 +14,8 @@ import { downloadTileBatchesWithRecovery, downloadTileWithRetry, isValidCachedTi
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
 import {
     CUSTOM_POI_MARKERS,
+    extractPointerClientPoint,
+    hasMapLongPressExceededTolerance,
     DEFAULT_GENERIC_POI_MARKER,
     DEFAULT_SHARED_POI_MARKER,
     formatPoiDisplayDate,
@@ -29,7 +31,7 @@ window.TruffleStorage = TruffleStorage;
 const SERVICE_WORKER_SCOPE = new URL('./', window.location.href).pathname;
 const SERVICE_WORKER_URL = `${SERVICE_WORKER_SCOPE}sw.js`;
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-19c`;
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-19d`;
 let lastServiceWorkerRegistrationError = null;
 let shouldReloadOnNextServiceWorkerControllerChange = false;
 
@@ -950,12 +952,14 @@ map.on('zoomend', () => {
 // Long-press on map: ask user if they want to report a new POI at that location
 let _mapLongPressTimer = null;
 let _mapLongPressMoved = false;
+let _mapLongPressStartPoint = null;
 const MAP_LONG_PRESS_MS = 600;
 
 map.on('mousedown touchstart', (e) => {
     // Ignore multi-touch gestures (e.g. pinch-to-zoom)
     if (e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length > 1) return;
     _mapLongPressMoved = false;
+    _mapLongPressStartPoint = extractPointerClientPoint(e.originalEvent);
     clearTimeout(_mapLongPressTimer);
     const latlng = { lat: e.latlng.lat, lng: e.latlng.lng };
     _mapLongPressTimer = setTimeout(async () => {
@@ -965,13 +969,21 @@ map.on('mousedown touchstart', (e) => {
     }, MAP_LONG_PRESS_MS);
 });
 
-map.on('mousemove touchmove', () => {
+map.on('mousemove touchmove', (e) => {
+    if (e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length > 1) {
+        _mapLongPressMoved = true;
+        clearTimeout(_mapLongPressTimer);
+        return;
+    }
+    const currentPoint = extractPointerClientPoint(e.originalEvent);
+    if (!hasMapLongPressExceededTolerance(_mapLongPressStartPoint, currentPoint)) return;
     _mapLongPressMoved = true;
     clearTimeout(_mapLongPressTimer);
 });
 
 map.on('mouseup touchend touchcancel', () => {
     clearTimeout(_mapLongPressTimer);
+    _mapLongPressStartPoint = null;
 });
 
 let userMarker = null;
