@@ -14,10 +14,8 @@ import { downloadTileBatchesWithRecovery, downloadTileWithRetry, isValidCachedTi
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
 import {
     CUSTOM_POI_MARKERS,
-    DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
     extractPointerClientPoint,
     hasMapLongPressExceededTolerance,
-    isDuplicateMapLongPress,
     DEFAULT_GENERIC_POI_MARKER,
     DEFAULT_SHARED_POI_MARKER,
     formatPoiDisplayDate,
@@ -33,7 +31,7 @@ window.TruffleStorage = TruffleStorage;
 const SERVICE_WORKER_SCOPE = new URL('./', window.location.href).pathname;
 const SERVICE_WORKER_URL = `${SERVICE_WORKER_SCOPE}sw.js`;
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-19e`;
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-19d`;
 let lastServiceWorkerRegistrationError = null;
 let shouldReloadOnNextServiceWorkerControllerChange = false;
 
@@ -956,16 +954,6 @@ let _mapLongPressTimer = null;
 let _mapLongPressMoved = false;
 let _mapLongPressStartPoint = null;
 const MAP_LONG_PRESS_MS = 600;
-let _lastHandledMapLongPress = null;
-
-async function confirmPoiFromMapLongPress(latlng) {
-    if (!latlng) return;
-    const handledAt = Date.now();
-    if (isDuplicateMapLongPress(_lastHandledMapLongPress, latlng, handledAt, DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS)) return;
-    _lastHandledMapLongPress = { lat: latlng.lat, lng: latlng.lng, timestamp: handledAt };
-    const ok = await appConfirm(`📍 Vuoi segnalare un nuovo punto in questa posizione?\n(${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)})`);
-    if (ok) savePoiPosition(latlng.lat, latlng.lng);
-}
 
 map.on('mousedown touchstart', (e) => {
     // Ignore multi-touch gestures (e.g. pinch-to-zoom)
@@ -976,7 +964,8 @@ map.on('mousedown touchstart', (e) => {
     const latlng = { lat: e.latlng.lat, lng: e.latlng.lng };
     _mapLongPressTimer = setTimeout(async () => {
         if (_mapLongPressMoved) return;
-        await confirmPoiFromMapLongPress(latlng);
+        const ok = await appConfirm(`📍 Vuoi segnalare un nuovo punto in questa posizione?\n(${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)})`);
+        if (ok) savePoiPosition(latlng.lat, latlng.lng);
     }, MAP_LONG_PRESS_MS);
 });
 
@@ -995,14 +984,6 @@ map.on('mousemove touchmove', (e) => {
 map.on('mouseup touchend touchcancel', () => {
     clearTimeout(_mapLongPressTimer);
     _mapLongPressStartPoint = null;
-});
-
-map.on('contextmenu', (e) => {
-    e.originalEvent?.preventDefault?.();
-    clearTimeout(_mapLongPressTimer);
-    _mapLongPressStartPoint = null;
-    _mapLongPressMoved = false;
-    void confirmPoiFromMapLongPress({ lat: e.latlng.lat, lng: e.latlng.lng });
 });
 
 let userMarker = null;
