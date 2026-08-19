@@ -960,8 +960,9 @@ let _lastHandledMapLongPress = null;
 
 async function confirmPoiFromMapLongPress(latlng) {
     if (!latlng) return;
-    if (isDuplicateMapLongPress(_lastHandledMapLongPress, latlng, Date.now(), DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS)) return;
-    _lastHandledMapLongPress = { lat: latlng.lat, lng: latlng.lng, timestamp: Date.now() };
+    const handledAt = Date.now();
+    if (isDuplicateMapLongPress(_lastHandledMapLongPress, latlng, handledAt, DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS)) return;
+    _lastHandledMapLongPress = { lat: latlng.lat, lng: latlng.lng, timestamp: handledAt };
     const ok = await appConfirm(`📍 Vuoi segnalare un nuovo punto in questa posizione?\n(${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)})`);
     if (ok) savePoiPosition(latlng.lat, latlng.lng);
 }
