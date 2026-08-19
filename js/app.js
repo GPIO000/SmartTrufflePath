@@ -31,7 +31,7 @@ window.TruffleStorage = TruffleStorage;
 const SERVICE_WORKER_SCOPE = new URL('./', window.location.href).pathname;
 const SERVICE_WORKER_URL = `${SERVICE_WORKER_SCOPE}sw.js`;
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-19c`;
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-19d`;
 let lastServiceWorkerRegistrationError = null;
 let shouldReloadOnNextServiceWorkerControllerChange = false;
 
