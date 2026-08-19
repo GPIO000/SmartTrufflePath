@@ -699,13 +699,29 @@ function printPage() {
     const activeView = document.getElementById('active-module-view');
     const activeModule = activeView?.dataset?.activeModule;
     const shouldPrintSummaryOnly = activeModule === 'registro_giornaliero' || activeModule === 'spese';
+    let cleanupSummaryPrintMode = null;
+    let cleanupOnFocus = null;
     if (shouldPrintSummaryOnly && activeView?.querySelector('.print-only')) {
-        document.body.classList.add('summary-print-mode');
-        window.addEventListener('afterprint', () => {
+        cleanupSummaryPrintMode = () => {
             document.body.classList.remove('summary-print-mode');
-        }, { once: true });
+            if (cleanupOnFocus) window.removeEventListener('focus', cleanupOnFocus);
+            window.removeEventListener('afterprint', cleanupSummaryPrintMode);
+        };
+        cleanupOnFocus = () => cleanupSummaryPrintMode();
+        window.addEventListener('focus', cleanupOnFocus, { once: true });
+        window.addEventListener('afterprint', cleanupSummaryPrintMode, { once: true });
+        document.body.classList.add('summary-print-mode');
     }
-    window.print();
+    try {
+        window.print();
+    } catch (error) {
+        if (cleanupSummaryPrintMode) {
+            window.removeEventListener('afterprint', cleanupSummaryPrintMode);
+            if (cleanupOnFocus) window.removeEventListener('focus', cleanupOnFocus);
+            cleanupSummaryPrintMode();
+        }
+        throw error;
+    }
 }
 
 const ACTION_HANDLERS = {
