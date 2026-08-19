@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
     CUSTOM_POI_MARKERS,
     DEFAULT_GENERIC_POI_MARKER,
+    DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
     DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX,
     DEFAULT_SHARED_POI_MARKER,
     extractPointerClientPoint,
     formatPoiDisplayDate,
     getDefaultMarkerForPoiType,
     hasMapLongPressExceededTolerance,
+    isDuplicateMapLongPress,
     normalizePoiList,
     normalizePoiMarker,
     parseLegacyDateToTimestamp,
@@ -107,6 +109,38 @@ describe('hasMapLongPressExceededTolerance', () => {
         expect(hasMapLongPressExceededTolerance(null, { x: 1, y: 1 })).toBe(false);
         expect(hasMapLongPressExceededTolerance({ x: 1, y: 1 }, null)).toBe(false);
         expect(hasMapLongPressExceededTolerance({ x: 1, y: 1 }, { x: 5, y: 5 }, -1)).toBe(false);
+    });
+});
+
+describe('isDuplicateMapLongPress', () => {
+    it('riconosce come duplicato un secondo evento ravvicinato sulle stesse coordinate', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.123456, lng: 11.654321, timestamp: 1000 },
+            { lat: 44.123459, lng: 11.654319 },
+            1000 + DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS - 1
+        )).toBe(true);
+    });
+
+    it('non tratta come duplicato un evento fuori dalla finestra temporale', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.123456, lng: 11.654321, timestamp: 1000 },
+            { lat: 44.123456, lng: 11.654321 },
+            1000 + DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS + 1
+        )).toBe(false);
+    });
+
+    it('non tratta come duplicato un evento con coordinate diverse', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.123456, lng: 11.654321, timestamp: 1000 },
+            { lat: 44.223456, lng: 11.754321 },
+            1200
+        )).toBe(false);
+    });
+
+    it('restituisce false quando i dati in ingresso non sono validi', () => {
+        expect(isDuplicateMapLongPress(null, { lat: 44, lng: 11 }, 1200)).toBe(false);
+        expect(isDuplicateMapLongPress({ lat: 44, lng: 11, timestamp: 1000 }, null, 1200)).toBe(false);
+        expect(isDuplicateMapLongPress({ lat: 'x', lng: 11, timestamp: 1000 }, { lat: 44, lng: 11 }, 1200)).toBe(false);
     });
 });
 
