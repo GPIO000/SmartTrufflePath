@@ -12,6 +12,17 @@ import {
 } from './offline-cache-utils.js';
 import { downloadTileBatchesWithRecovery, downloadTileWithRetry, isValidCachedTileResponse } from './offline-map-download-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
+import {
+    CUSTOM_POI_MARKERS,
+    DEFAULT_GENERIC_POI_MARKER,
+    DEFAULT_SHARED_POI_MARKER,
+    formatPoiDisplayDate,
+    getDefaultMarkerForPoiType,
+    normalizePoiList,
+    normalizePoiMarker,
+    parseLegacyDateToTimestamp,
+    resolvePoiCoords,
+} from './poi-utils.js';
 
 window.TruffleStorage = TruffleStorage;
 
@@ -970,51 +981,7 @@ const GPS_NAVIGATION_EXPLANATION_SEEN_KEY = 'gps_navigation_explanation_seen';
 const GPS_NAVIGATION_EXPLANATION_TEXT = "La navigazione di SmartTruffle Path usa il GPS per calcolare distanza e direzione geografica del punto rispetto al Nord.\nNon usa il magnetometro / la bussola hardware del telefono, quindi non rileva dove stai guardando con il dispositivo.\n\nCome orientarti con i movimenti:\n1. Seleziona il punto di destinazione dall'elenco.\n2. Inizia a camminare per qualche metro in una direzione qualsiasi.\n3. Guarda la freccia: se punta davanti a te, stai andando nella direzione giusta. Se punta a destra o sinistra, ruotati fino a farla puntare dritto davanti.\n4. Continua ad avanzare: la distanza diminuisce? Stai andando verso il punto. Aumenta? Stai allontanandoti — gira di 180°.\n5. Più ti avvicini, più la freccia è precisa. Negli ultimi metri affidati agli occhi e alla mappa.";
 const legacyCarCoordinates = readStorageJSON('car_coords', null);
 
-function parseLegacyDateToTimestamp(dateText) {
-    if (typeof dateText !== 'string') return null;
-    const normalized = dateText.trim();
-    if (!normalized) return null;
-    const direct = Date.parse(normalized);
-    if (!Number.isNaN(direct)) return new Date(direct).toISOString();
-
-    const match = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-    if (!match) return null;
-
-    const day = Number(match[1]);
-    const month = Number(match[2]) - 1;
-    const yearRaw = Number(match[3]);
-    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
-    const hour = Number(match[4] || 0);
-    const minute = Number(match[5] || 0);
-    const second = Number(match[6] || 0);
-    const parsed = new Date(year, month, day, hour, minute, second);
-    if (Number.isNaN(parsed.getTime())) return null;
-    return parsed.toISOString();
-}
-
-function formatPoiDisplayDate(savedAtIso) {
-    const parsed = new Date(savedAtIso);
-    if (Number.isNaN(parsed.getTime())) return '';
-    return parsed.toLocaleDateString() + ' ' + parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-const CUSTOM_POI_MARKERS = ['📩', '🥔', '📍', '🚫', '🛃'];
-const DEFAULT_GENERIC_POI_MARKER = '🥔';
-const DEFAULT_SHARED_POI_MARKER = '📩';
 const POI_MARKER_PREFERENCE_KEY = 'poi_marker_preference';
-
-function getDefaultMarkerForPoiType(type) {
-    if (type === 'auto') return '🚗';
-    if (type === 'sos') return '🆘';
-    if (type === 'shared') return DEFAULT_SHARED_POI_MARKER;
-    return DEFAULT_GENERIC_POI_MARKER;
-}
-
-function normalizePoiMarker(marker, type) {
-    if (type === 'auto' || type === 'sos') return getDefaultMarkerForPoiType(type);
-    if (typeof marker === 'string' && CUSTOM_POI_MARKERS.includes(marker.trim())) return marker.trim();
-    return getDefaultMarkerForPoiType(type);
-}
 
 function getPreferredPoiMarker() {
     return normalizePoiMarker(localStorage.getItem(POI_MARKER_PREFERENCE_KEY), undefined);
@@ -1052,35 +1019,6 @@ function getPoiMarkerAndTitle(poi) {
     return { marker, popupTitle: `${marker} Tartufo / Punto` };
 }
 
-function normalizePoiList(rawPoiList) {
-    const baseTimestamp = Date.now();
-    const normalized = Array.isArray(rawPoiList) ? rawPoiList : [];
-    const result = normalized
-        .map((poi, index) => {
-            if (!poi || typeof poi !== 'object') return null;
-            const lat = Number(poi.lat);
-            const lng = Number(poi.lng);
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-
-            const savedAt = parseLegacyDateToTimestamp(poi.savedAt)
-                || parseLegacyDateToTimestamp(poi.date)
-                || new Date(baseTimestamp + index).toISOString();
-
-            const note = typeof poi.note === 'string' && poi.note.trim() ? poi.note.trim() : 'Punto di interesse';
-            const id = typeof poi.id === 'string' && poi.id.trim() ? poi.id.trim() : `poi-${savedAt}-${index}`;
-            const type = typeof poi.type === 'string' && poi.type.trim() ? poi.type.trim() : undefined;
-            const from = typeof poi.from === 'string' && poi.from.trim() ? poi.from.trim() : undefined;
-            const marker = normalizePoiMarker(poi.marker, type);
-            const entry = { id, lat, lng, note, savedAt, date: formatPoiDisplayDate(savedAt), marker };
-            if (type) entry.type = type;
-            if (from) entry.from = from;
-            return entry;
-        })
-        .filter(Boolean);
-
-    result.sort((a, b) => new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime());
-    return result;
-}
 
 const rawPoiList = readStorageJSON('poi_list', []);
 let poiList = normalizePoiList(rawPoiList);
@@ -1283,9 +1221,8 @@ function saveCarPosition() {
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
 async function savePoiPosition(forceLat, forceLng) {
-    const hasForced = forceLat !== undefined && forceLng !== undefined;
-    if (hasForced || userMarker) {
-        const pos = hasForced ? { lat: forceLat, lng: forceLng } : userMarker.getLatLng();
+    const pos = resolvePoiCoords(forceLat, forceLng, userMarker);
+    if (pos) {
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
         if (note === null) return;
         const marker = await choosePoiMarker();
