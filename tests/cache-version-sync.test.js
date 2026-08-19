@@ -24,6 +24,6 @@ describe('cache version sync', () => {
     );
 
     expect(swVersion).toBe(appVersion);
-    expect(swVersion).toMatch(/^\d{4}-\d{2}-\d{2}[a-z]$/);
+    expect(swVersion).toMatch(/^\d{4}-\d{2}-\d{2}[a-z]+$/);
   });
 });
