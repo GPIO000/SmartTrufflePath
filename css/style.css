@@ -1,4 +1,8 @@
 :root {
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-right: env(safe-area-inset-right, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-left: env(safe-area-inset-left, 0px);
     --bg-app: #121610;
     --bg-shell: #182018;
     --bg-shell-strong: #202b20;
@@ -93,14 +97,13 @@ textarea:focus-visible {
 }
 
 #app-header {
-    height: 58px;
-    min-height: 58px;
+    min-height: calc(58px + var(--safe-area-top));
     background: linear-gradient(180deg, rgba(29, 39, 28, 0.98), rgba(22, 31, 23, 0.95));
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 0 16px;
+    padding: calc(var(--safe-area-top) + 8px) calc(16px + var(--safe-area-right)) 8px calc(16px + var(--safe-area-left));
     z-index: 1000;
     border-bottom: 1px solid var(--border-soft);
     box-shadow: var(--shadow-soft);
@@ -155,11 +158,22 @@ textarea:focus-visible {
     filter: saturate(0.92) contrast(1.02);
 }
 
-#compass-box {
+#map-top-status {
     position: absolute;
     top: 12px;
     left: 12px;
-    right: 78px;
+    right: calc(78px + var(--safe-area-right));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    z-index: 999;
+    pointer-events: none;
+}
+
+#compass-box {
+    position: static;
+    width: 100%;
     background: rgba(21, 29, 21, 0.82);
     border: 1px solid rgba(198, 171, 117, 0.18);
     padding: 10px 14px;
@@ -174,10 +188,8 @@ textarea:focus-visible {
 }
 
 #stop-nav-btn {
-    position: absolute;
-    top: 60px;
-    left: 12px;
-    z-index: 1000;
+    position: static;
+    z-index: auto;
     background: rgba(239, 68, 68, 0.88);
     color: #fff;
     border: none;
@@ -190,6 +202,7 @@ textarea:focus-visible {
     backdrop-filter: blur(10px);
     white-space: nowrap;
     pointer-events: auto;
+    max-width: 100%;
 }
 
 #map-overlays {
@@ -227,10 +240,8 @@ textarea:focus-visible {
 }
 
 #zoom-level-indicator {
-    position: absolute;
-    top: 80px;
-    left: 12px;
-    z-index: 999;
+    position: static;
+    z-index: auto;
     background: rgba(21, 29, 21, 0.82);
     border: 1px solid rgba(198, 171, 117, 0.18);
     border-radius: 8px;
@@ -624,6 +635,10 @@ textarea:focus-visible {
 }
 
 @media (max-width: 520px) {
+    #map-top-status {
+        right: calc(72px + var(--safe-area-right));
+    }
+
     #map-overlays {
         gap: 4px;
         left: 6px;
