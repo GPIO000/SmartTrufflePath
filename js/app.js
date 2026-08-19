@@ -751,6 +751,7 @@ const ACTION_HANDLERS = {
     closeActiveModule: () => closeActiveModule(),
     mostraInfoModulo: (_event, moduleName) => mostraInfoModulo(moduleName),
     navigateToPoi: (_event, index) => navigateToPoi(index),
+    stopNavigation: () => { targetNavigation = null; showToast('🧭 Navigazione interrotta', 'info'); updateCompass(lastKnownLat, lastKnownLng); },
     sharePoi: (_event, index) => sharePoi(index),
     deletePoi: (_event, index) => deletePoi(index),
     editPoi: (_event, index) => editPoi(index),
@@ -1008,6 +1009,8 @@ map.on('contextmenu', (e) => {
 let userMarker = null;
 let poiMapMarkers = {}; 
 let targetNavigation = null;
+let lastKnownLat = null;
+let lastKnownLng = null;
 const GPS_NAVIGATION_EXPLANATION_SEEN_KEY = 'gps_navigation_explanation_seen';
 const GPS_NAVIGATION_EXPLANATION_TEXT = "La navigazione di SmartTruffle Path usa il GPS per calcolare distanza e direzione geografica del punto rispetto al Nord.\nNon usa il magnetometro / la bussola hardware del telefono, quindi non rileva dove stai guardando con il dispositivo.\n\nCome orientarti con i movimenti:\n1. Seleziona il punto di destinazione dall'elenco.\n2. Inizia a camminare per qualche metro in una direzione qualsiasi.\n3. Guarda la freccia: se punta davanti a te, stai andando nella direzione giusta. Se punta a destra o sinistra, ruotati fino a farla puntare dritto davanti.\n4. Continua ad avanzare: la distanza diminuisce? Stai andando verso il punto. Aumenta? Stai allontanandoti — gira di 180°.\n5. Più ti avvicini, più la freccia è precisa. Negli ultimi metri affidati agli occhi e alla mappa.";
 const legacyCarCoordinates = readStorageJSON('car_coords', null);
@@ -1144,6 +1147,8 @@ if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
+        lastKnownLat = lat;
+        lastKnownLng = lng;
         const dot = document.getElementById('gps-status-dot');
         if (dot) { dot.style.backgroundColor = '#22c55e'; dot.title = "GPS Attivo: " + lat.toFixed(4) + ", " + lng.toFixed(4); }
         reverseGeocodePosition(lat, lng);
@@ -1206,7 +1211,7 @@ function updateCompass(currentLat, currentLng) {
     }
     if (target) {
         const res = calculateDistanceAndBearing(currentLat, currentLng, target.lat, target.lng);
-        compassText.innerHTML = `🧭 <b>${escapeHtml(label)}:</b> ${res.arrow} ${res.distance} (${res.direction})`;
+        compassText.innerHTML = `🧭 <b>${escapeHtml(label)}:</b> ${res.arrow} ${res.distance} (${res.direction}) <button data-action="stopNavigation" class="overlay-btn btn-danger" style="padding:2px 8px; font-size:0.78rem; margin-left:6px; vertical-align:middle;">✕ Ferma</button>`;
     } else {
         compassText.innerHTML = `🧭 Seleziona una destinazione dall'elenco punti`;
     }
@@ -1437,6 +1442,7 @@ function openModule(moduleName, editMode = false) {
                         <li>Se la freccia punta davanti a te, stai andando bene. Se punta di lato, ruotati finché non ti punta dritto davanti.</li>
                         <li>La distanza diminuisce? Stai avanzando. Aumenta? Gira di 180°.</li>
                         <li>Negli ultimi metri affidati alla mappa e agli occhi.</li>
+                        <li>Per fermare la navigazione, tocca il tasto <strong>✕ Ferma</strong> accanto alla bussola.</li>
                     </ol>
                 </div>`;
             if (poiList.length === 0) {
