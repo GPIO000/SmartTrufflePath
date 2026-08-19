@@ -2121,18 +2121,18 @@ function openModule(moduleName, editMode = false) {
             const vetHistory = getRenderableStorageJSON('vet_history_list', []);
             const heatDiary = getRenderableStorageJSON('heat_diary_list', []);
             const femmineVet = dogsListVet.filter(d => d.sesso === 'Femmina');
-            const selectedVetFilterFromUi = ((document.getElementById('vet-filter-cane') || {}).value || '').trim();
             const selectedVetFilterFromStorage = (localStorage.getItem('vet_filter_cane_nome') || '').trim();
-            let filtroCaneVet = selectedVetFilterFromUi || selectedVetFilterFromStorage;
+            let filtroCaneVet = selectedVetFilterFromStorage;
             const isFiltroCaneValido = !filtroCaneVet || dogsListVet.some(d => d.nome === filtroCaneVet);
             if (!isFiltroCaneValido) {
                 filtroCaneVet = '';
                 localStorage.removeItem('vet_filter_cane_nome');
             }
+            const nomeCaneSelezionatoVet = filtroCaneVet || nomeCaneDefault;
             let optionsHtml = '';
             if (dogsListVet.length > 0) {
                 dogsListVet.forEach(dog => {
-                    const selected = dog.nome === nomeCaneDefault ? 'selected' : '';
+                    const selected = dog.nome === nomeCaneSelezionatoVet ? 'selected' : '';
                     const sessoDog = dog.sesso === 'Femmina' ? 'Femmina' : 'Maschio';
                     optionsHtml += `<option value="${escapeHtml(dog.nome)}" data-sesso="${sessoDog}" ${selected}>${escapeHtml(dog.nome)} (${escapeHtml(dog.razza || '')})</option>`;
                 });
@@ -2154,6 +2154,7 @@ function openModule(moduleName, editMode = false) {
                 : heatDiaryEntries;
 
             const hasFilteredVetData = filteredVetHistoryEntries.length > 0 || filteredHeatDiaryEntries.length > 0;
+            const isFilteredDogFemale = dogsListVet.some((dog) => dog.nome === filtroCaneVet && dog.sesso === 'Femmina');
             let vetHtml = `
                 <h2>Libretti Sanitari Cani & Profilassi</h2>
                 <p>Storico trattamenti, vaccini, visite e diario calore:</p>
@@ -2248,15 +2249,17 @@ function openModule(moduleName, editMode = false) {
                                     <p><b>Note:</b> ${escapeHtml(entry.note || 'Nessuna nota')}</p>
                                 </div>
                             `).join('')}
-                        <h3 style="margin:14px 0 8px;">Diario Calore</h3>
-                        ${filteredHeatDiaryEntries.length === 0
-                            ? '<p>Nessun calore registrato.</p>'
-                            : filteredHeatDiaryEntries.slice().reverse().map(({ entry }) => `
-                                <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ddd;">
-                                    <p><b>Inizio calore:</b> ${escapeHtml(entry.data || 'Non specificata')}</p>
-                                    <p><b>Note:</b> ${escapeHtml(entry.note || 'Nessuna nota')}</p>
-                                </div>
-                            `).join('')}
+                        ${isFilteredDogFemale
+                            ? `<h3 style="margin:14px 0 8px;">Diario Calore</h3>
+                               ${filteredHeatDiaryEntries.length === 0
+                                   ? '<p>Nessun calore registrato.</p>'
+                                   : filteredHeatDiaryEntries.slice().reverse().map(({ entry }) => `
+                                       <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ddd;">
+                                           <p><b>Inizio calore:</b> ${escapeHtml(entry.data || 'Non specificata')}</p>
+                                           <p><b>Note:</b> ${escapeHtml(entry.note || 'Nessuna nota')}</p>
+                                       </div>
+                                   `).join('')}`
+                            : ''}
                     </div>`;
             }
             vetHtml += printOnlyVetBooklet;
@@ -4764,19 +4767,27 @@ function printVetFilteredBooklet() {
         return;
     }
 
-    let cleanupSummaryPrintMode = null;
+    let hasCleanedUp = false;
+    let cleanupTimerId = null;
     let cleanupOnFocus = null;
-    cleanupSummaryPrintMode = () => {
+    const cleanupSummaryPrintMode = () => {
+        if (hasCleanedUp) return;
+        hasCleanedUp = true;
         document.body.classList.remove('summary-print-mode');
+        if (cleanupTimerId) {
+            clearTimeout(cleanupTimerId);
+            cleanupTimerId = null;
+        }
         if (cleanupOnFocus) window.removeEventListener('focus', cleanupOnFocus);
         window.removeEventListener('afterprint', cleanupSummaryPrintMode);
     };
     cleanupOnFocus = () => cleanupSummaryPrintMode();
-    window.addEventListener('focus', cleanupOnFocus, { once: true });
-    window.addEventListener('afterprint', cleanupSummaryPrintMode, { once: true });
-    document.body.classList.add('summary-print-mode');
 
     try {
+        window.addEventListener('focus', cleanupOnFocus, { once: true });
+        window.addEventListener('afterprint', cleanupSummaryPrintMode, { once: true });
+        document.body.classList.add('summary-print-mode');
+        cleanupTimerId = window.setTimeout(cleanupSummaryPrintMode, 5000);
         window.print();
     } catch (error) {
         window.removeEventListener('afterprint', cleanupSummaryPrintMode);
