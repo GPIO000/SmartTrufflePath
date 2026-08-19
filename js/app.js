@@ -759,6 +759,8 @@ const ACTION_HANDLERS = {
     deleteDog: (_event, index) => deleteDog(index),
     savePolizza: () => savePolizza(),
     deletePolizza: (_event, index) => deletePolizza(index),
+    saveVetUnifiedEntry: () => saveVetUnifiedEntry(),
+    syncVetUnifiedInputForm: () => syncVetUnifiedInputForm(),
     saveVetHistoryItem: () => saveVetHistoryItem(),
     deleteVetHistoryItem: (_event, index) => deleteVetHistoryItem(index),
     saveHeatEntry: () => saveHeatEntry(),
@@ -2117,35 +2119,45 @@ function openModule(moduleName, editMode = false) {
             const cDataVet = getRenderableStorageJSON('cane_data', {});
             const nomeCaneDefault = cDataVet.nome || (dogsListVet.length > 0 ? dogsListVet[0].nome : 'Il tuo cane');
             const vetHistory = getRenderableStorageJSON('vet_history_list', []);
+            const heatDiary = getRenderableStorageJSON('heat_diary_list', []);
+            const femmineVet = dogsListVet.filter(d => d.sesso === 'Femmina');
             let optionsHtml = '';
             if (dogsListVet.length > 0) {
                 dogsListVet.forEach(dog => {
                     const selected = dog.nome === nomeCaneDefault ? 'selected' : '';
-                    optionsHtml += `<option value="${dog.nome}" ${selected}>${dog.nome} (${dog.razza})</option>`;
+                    const sessoDog = dog.sesso === 'Femmina' ? 'Femmina' : 'Maschio';
+                    optionsHtml += `<option value="${escapeHtml(dog.nome)}" data-sesso="${sessoDog}" ${selected}>${escapeHtml(dog.nome)} (${escapeHtml(dog.razza || '')})</option>`;
                 });
-            } else { optionsHtml += `<option value="${nomeCaneDefault}">${nomeCaneDefault}</option>`; }
+            } else { optionsHtml += `<option value="${escapeHtml(nomeCaneDefault)}" data-sesso="Maschio">${escapeHtml(nomeCaneDefault)}</option>`; }
             let vetHtml = `
                 <h2>Libretti Sanitari Cani & Profilassi</h2>
-                <p>Storico trattamenti, vaccini e visite per il cane:</p>
+                <p>Storico trattamenti, vaccini, visite e diario calore:</p>
                 <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
-                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Trattamento / Visita</h3>
-                    <label>Seleziona Cane:</label>
-                    <select id="vh-cane" class="mod-input">${optionsHtml}</select>
-                    <label>Tipologia Intervento:</label>
-                    <select id="vh-tipo" class="mod-input">
-                        <option value="💉 Vaccino">Vaccino</option>
-                        <option value="💊 Antiparassitario Intestinale">Antiparassitario Intestinale (Pillola)</option>
-                        <option value="💧 Spot-on">Spot-on (Antipulci / Zecche)</option>
-                        <option value="🎗️ Collare Antiparassitario">Collare Antiparassitario</option>
-                        <option value="🩺 Visita Veterinaria">Visita Veterinaria / Controllo</option>
-                        <option value="🩹 Medicazione / Zecca">Medicazione / Ferita / Zecca</option>
-                        <option value="🏥 Somministrazione Farmaci / Altro">Somministrazione Farmaci / Altro</option>
+                    <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Nuova Registrazione</h3>
+                    <label>Tipo Registrazione:</label>
+                    <select id="vet-entry-category" class="mod-input" ${eventActionAttrs('change', 'syncVetUnifiedInputForm')}>
+                        <option value="vet_history" selected>🩺 Trattamento / Visita</option>
+                        ${femmineVet.length > 0 ? '<option value="heat_diary">🌸 Diario Calore (solo femmine)</option>' : ''}
                     </select>
-                    <label>Data del Trattamento:</label>
-                    <input type="date" id="vh-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
-                    <label>Note / Dettagli:</label>
-                    <input type="text" id="vh-note" class="mod-input" placeholder="Es. Nome farmaco o dosaggio">
-                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveVetHistoryItem')}>Registra nel Libretto</button>
+                    <label>Seleziona Cane:</label>
+                    <select id="vet-entry-cane" class="mod-input">${optionsHtml}</select>
+                    <div id="vet-entry-type-row">
+                        <label>Tipologia Intervento:</label>
+                        <select id="vet-entry-type" class="mod-input">
+                            <option value="💉 Vaccino">Vaccino</option>
+                            <option value="💊 Antiparassitario Intestinale">Antiparassitario Intestinale (Pillola)</option>
+                            <option value="💧 Spot-on">Spot-on (Antipulci / Zecche)</option>
+                            <option value="🎗️ Collare Antiparassitario">Collare Antiparassitario</option>
+                            <option value="🩺 Visita Veterinaria">Visita Veterinaria / Controllo</option>
+                            <option value="🩹 Medicazione / Zecca">Medicazione / Ferita / Zecca</option>
+                            <option value="🏥 Somministrazione Farmaci / Altro">Somministrazione Farmaci / Altro</option>
+                        </select>
+                    </div>
+                    <label id="vet-entry-date-label">Data del Trattamento:</label>
+                    <input type="date" id="vet-entry-date" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+                    <label id="vet-entry-note-label">Note / Dettagli:</label>
+                    <input type="text" id="vet-entry-note" class="mod-input" placeholder="Es. Nome farmaco o dosaggio">
+                    <button id="vet-entry-save-btn" class="overlay-btn" style="margin-top:12px; width:100%; background:#2563eb;" ${actionAttrs('saveVetUnifiedEntry')}>Registra nel Libretto</button>
                 </div>`;
             if (vetHistory.length === 0) {
                 vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun trattamento registrato.</p></div>`;
@@ -2164,24 +2176,8 @@ function openModule(moduleName, editMode = false) {
                 });
             }
             // Diario calore per cagne femmine
-            const femmineVet = dogsListVet.filter(d => d.sesso === 'Femmina');
             if (femmineVet.length > 0) {
-                const heatDiary = getRenderableStorageJSON('heat_diary_list', []);
                 vetHtml += `<h3 style="font-size:0.85rem; color:#f472b6; margin:20px 0 8px; text-transform:uppercase;">🌸 Diario Calore (Cagne Femmine)</h3>`;
-                // Form aggiunta calore
-                let optionsFemmine = '';
-                femmineVet.forEach(d => { optionsFemmine += `<option value="${d.nome}">${d.nome}</option>`; });
-                vetHtml += `
-                <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid #f472b6;">
-                    <h3 style="font-size:0.9rem; color:#f472b6; margin-bottom:10px;">➕ Registra Inizio Calore</h3>
-                    <label>Seleziona Cagna:</label>
-                    <select id="heat-cane" class="mod-input">${optionsFemmine}</select>
-                    <label>Data Inizio Calore:</label>
-                    <input type="date" id="heat-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
-                    <label>Note:</label>
-                    <input type="text" id="heat-note" class="mod-input" placeholder="Es. Durata, comportamento...">
-                    <button class="overlay-btn" style="margin-top:12px; width:100%; background:#be185d;" ${actionAttrs('saveHeatEntry')}>Registra Calore</button>
-                </div>`;
                 if (heatDiary.length === 0) {
                     vetHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun calore registrato.</p></div>`;
                 } else {
@@ -2925,6 +2921,9 @@ function openModule(moduleName, editMode = false) {
             const progressArea = document.getElementById('offline-progress-area');
             if (progressArea) progressArea.style.display = 'block';
         }
+    }
+    if (moduleName === 'vet') {
+        setTimeout(syncVetUnifiedInputForm, 0);
     }
 }
 
@@ -4631,6 +4630,88 @@ function whatsappVetClinicByIndex(index) {
     window.location.href = `whatsapp://send?phone=${encodeURIComponent(sanitizePhoneHref(clinic.cell))}`;
 }
 
+function syncVetUnifiedInputForm() {
+    const modeSelect = document.getElementById('vet-entry-category');
+    const caneSelect = document.getElementById('vet-entry-cane');
+    const typeRow = document.getElementById('vet-entry-type-row');
+    const dateLabel = document.getElementById('vet-entry-date-label');
+    const noteLabel = document.getElementById('vet-entry-note-label');
+    const noteInput = document.getElementById('vet-entry-note');
+    const saveBtn = document.getElementById('vet-entry-save-btn');
+    if (!modeSelect || !caneSelect || !typeRow || !dateLabel || !noteLabel || !noteInput || !saveBtn) return;
+
+    const isHeatMode = modeSelect.value === 'heat_diary';
+    const options = Array.from(caneSelect.options);
+    const femaleOptions = options.filter(opt => opt.dataset.sesso === 'Femmina');
+
+    if (isHeatMode && femaleOptions.length === 0) {
+        modeSelect.value = 'vet_history';
+    }
+
+    const applyHeatMode = modeSelect.value === 'heat_diary';
+    options.forEach((opt) => {
+        const isFemale = opt.dataset.sesso === 'Femmina';
+        opt.hidden = applyHeatMode && !isFemale;
+        opt.disabled = applyHeatMode && !isFemale;
+    });
+
+    if (applyHeatMode) {
+        if (!caneSelect.selectedOptions[0] || caneSelect.selectedOptions[0].dataset.sesso !== 'Femmina') {
+            const firstFemale = femaleOptions[0];
+            if (firstFemale) caneSelect.value = firstFemale.value;
+        }
+        typeRow.style.display = 'none';
+        dateLabel.textContent = 'Data Inizio Calore:';
+        noteLabel.textContent = 'Note:';
+        noteInput.placeholder = 'Es. Durata, comportamento...';
+        saveBtn.textContent = 'Registra Calore';
+        saveBtn.style.background = '#be185d';
+        return;
+    }
+
+    typeRow.style.display = '';
+    dateLabel.textContent = 'Data del Trattamento:';
+    noteLabel.textContent = 'Note / Dettagli:';
+    noteInput.placeholder = 'Es. Nome farmaco o dosaggio';
+    saveBtn.textContent = 'Registra nel Libretto';
+    saveBtn.style.background = '#2563eb';
+}
+
+function saveVetUnifiedEntry() {
+    const mode = (document.getElementById('vet-entry-category') || {}).value || 'vet_history';
+    const caneSelect = document.getElementById('vet-entry-cane');
+    const selectedCane = caneSelect ? caneSelect.selectedOptions[0] : null;
+    const cane = selectedCane ? selectedCane.value : '';
+    const data = (document.getElementById('vet-entry-date') || {}).value || '';
+    const note = ((document.getElementById('vet-entry-note') || {}).value || '').trim();
+
+    if (!data) {
+        const message = mode === 'heat_diary' ? "Inserisci la data dell'inizio calore." : "Inserisci la data.";
+        showToast(message, 'error');
+        return;
+    }
+
+    if (mode === 'heat_diary') {
+        if (!selectedCane || selectedCane.dataset.sesso !== 'Femmina') {
+            showToast("Per il diario calore seleziona una cagna femmina.", 'error');
+            return;
+        }
+        let heatDiary = readStorageJSON('heat_diary_list', []);
+        heatDiary.push({ cane, data, note });
+        localStorage.setItem('heat_diary_list', JSON.stringify(heatDiary));
+        showToast("Calore registrato!", 'success');
+        openModule('vet');
+        return;
+    }
+
+    const tipo = ((document.getElementById('vet-entry-type') || {}).value || '').trim();
+    let vetHistory = readStorageJSON('vet_history_list', []);
+    vetHistory.push({ cane, tipo, data, note });
+    localStorage.setItem('vet_history_list', JSON.stringify(vetHistory));
+    showToast("Trattamento registrato!", 'success');
+    openModule('vet');
+}
+
 function saveVetHistoryItem() {
     const cane = document.getElementById('vh-cane').value;
     const tipo = document.getElementById('vh-tipo').value;
@@ -5392,7 +5473,7 @@ async function mostraInfoModulo(moduleName) {
         'f24': "ℹ️ **Guida - F24 ELIDE**\n\nRegistra il versamento dell'imposta sostitutiva annuale di 100€ prevista dalla Legge 145/2018 per la vendita occasionale dei tartufi.",
         'canidiary': "ℹ️ **Guida - Anagrafica Cane**\n\nGestisci l'anagrafica dei tuoi cani da tartufo inserendo razza, sesso, data di nascita e numero di microchip.",
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
-        'vet': "ℹ️ **Guida - Libretti Sanitari Cani & Profilassi**\n\nRegistra lo storico dei trattamenti veterinari, dei vaccini e della somministrazione di antiparassitari per i tuoi cani. Per le cagne femmine è disponibile il diario del calore con previsione del prossimo ciclo.",
+        'vet': "ℹ️ **Guida - Libretti Sanitari Cani & Profilassi**\n\nUsa la card unica \"Nuova Registrazione\" per inserire trattamenti/visite oppure voci del diario calore. In modalità diario calore puoi selezionare solo cagne femmine, con previsione del prossimo ciclo nello storico.",
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
