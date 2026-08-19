@@ -2154,6 +2154,7 @@ function openModule(moduleName, editMode = false) {
                 : heatDiaryEntries;
 
             const hasFilteredVetData = filteredVetHistoryEntries.length > 0 || filteredHeatDiaryEntries.length > 0;
+            const filteredDogProfile = dogsListVet.find((dog) => dog.nome === filtroCaneVet) || null;
             const isFilteredDogFemale = dogsListVet.some((dog) => dog.nome === filtroCaneVet && dog.sesso === 'Femmina');
             let vetHtml = `
                 <h2>Libretti Sanitari Cani & Profilassi</h2>
@@ -2235,10 +2236,21 @@ function openModule(moduleName, editMode = false) {
             }
             let printOnlyVetBooklet = '';
             if (filtroCaneVet) {
+                const filteredDogBirthDate = filteredDogProfile?.nascita || '';
+                const filteredDogAge = filteredDogBirthDate ? formatDogAge(filteredDogBirthDate) : 'Non disponibile';
                 printOnlyVetBooklet = `
                     <div id="vet-filtered-print-only" class="print-only" data-has-data="${hasFilteredVetData ? '1' : '0'}">
                         <h2 style="margin-bottom:6px;">Libretto sanitario cane: ${escapeHtml(filtroCaneVet)}</h2>
                         <p style="margin-bottom:12px;">Stampa filtrata per il cane selezionato.</p>
+                        <div style="margin:0 0 12px; padding:10px; border:1px solid #ddd;">
+                            <h3 style="margin:0 0 8px;">Anagrafica cane selezionato</h3>
+                            <p><b>Nome:</b> ${escapeHtml(filteredDogProfile?.nome || filtroCaneVet)}</p>
+                            <p><b>Razza:</b> ${escapeHtml(filteredDogProfile?.razza || 'Non specificata')}</p>
+                            <p><b>Sesso:</b> ${escapeHtml(filteredDogProfile?.sesso || 'Non specificato')}</p>
+                            <p><b>Data di nascita:</b> ${escapeHtml(filteredDogBirthDate || 'Non specificata')}</p>
+                            <p><b>Età:</b> ${escapeHtml(filteredDogAge)}</p>
+                            <p><b>Microchip:</b> ${escapeHtml(filteredDogProfile?.microchip || 'Non specificato')}</p>
+                        </div>
                         <h3 style="margin:14px 0 8px;">Trattamenti / Visite</h3>
                         ${filteredVetHistoryEntries.length === 0
                             ? '<p>Nessun trattamento registrato.</p>'
