@@ -173,6 +173,10 @@ textarea:focus-visible {
     pointer-events: none;
 }
 
+#compass-box button {
+    pointer-events: auto;
+}
+
 #map-overlays {
     position: absolute;
     bottom: 18px;

@@ -33,7 +33,7 @@ window.TruffleStorage = TruffleStorage;
 const SERVICE_WORKER_SCOPE = new URL('./', window.location.href).pathname;
 const SERVICE_WORKER_URL = `${SERVICE_WORKER_SCOPE}sw.js`;
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-19f`;
+const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-19g`;
 let lastServiceWorkerRegistrationError = null;
 let shouldReloadOnNextServiceWorkerControllerChange = false;
 
@@ -751,6 +751,7 @@ const ACTION_HANDLERS = {
     closeActiveModule: () => closeActiveModule(),
     mostraInfoModulo: (_event, moduleName) => mostraInfoModulo(moduleName),
     navigateToPoi: (_event, index) => navigateToPoi(index),
+    stopNavigation: () => stopNavigation(),
     sharePoi: (_event, index) => sharePoi(index),
     deletePoi: (_event, index) => deletePoi(index),
     editPoi: (_event, index) => editPoi(index),
@@ -1206,7 +1207,7 @@ function updateCompass(currentLat, currentLng) {
     }
     if (target) {
         const res = calculateDistanceAndBearing(currentLat, currentLng, target.lat, target.lng);
-        compassText.innerHTML = `🧭 <b>${escapeHtml(label)}:</b> ${res.arrow} ${res.distance} (${res.direction})`;
+        compassText.innerHTML = `🧭 <b>${escapeHtml(label)}:</b> ${res.arrow} ${res.distance} (${res.direction}) <button data-action="stopNavigation" style="pointer-events:auto;margin-left:8px;background:rgba(239,68,68,0.85);border:none;border-radius:8px;color:#fff;padding:2px 8px;font-size:0.75rem;cursor:pointer;">❌ Stop</button>`;
     } else {
         compassText.innerHTML = `🧭 Seleziona una destinazione dall'elenco punti`;
     }
@@ -1275,6 +1276,12 @@ async function navigateToPoi(index) {
         closeActiveModule();
         showToast(`🧭 Destinazione: ${poiList[index].note}`, 'success');
     }
+}
+function stopNavigation() {
+    targetNavigation = null;
+    const compassText = document.getElementById('compass-box');
+    if (compassText) compassText.innerHTML = `🧭 Seleziona una destinazione dall'elenco punti`;
+    showToast('🧭 Navigazione annullata', 'info');
 }
 function sharePoi(index) {
     if (poiList[index]) {
