@@ -173,7 +173,22 @@ textarea:focus-visible {
     pointer-events: none;
 }
 
-#compass-box button {
+#stop-nav-btn {
+    position: absolute;
+    top: 60px;
+    left: 12px;
+    z-index: 1000;
+    background: rgba(239, 68, 68, 0.88);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 8px 16px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
     pointer-events: auto;
 }
 
