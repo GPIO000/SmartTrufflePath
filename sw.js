@@ -25,6 +25,7 @@ const LOCAL_ASSETS = [
   './js/backup-utils.js',
   './js/offline-cache-utils.js',
   './js/offline-map-download-utils.js',
+  './js/poi-utils.js',
   './js/sw-utils.js'
 ];
 
