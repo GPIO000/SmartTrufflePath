@@ -326,6 +326,7 @@ function appAlert(message) {
         const cancelBtn = document.getElementById('app-dialog-cancel');
         const okBtn = document.getElementById('app-dialog-ok');
         if (!dialog) { window.alert(message); resolve(); return; }
+        if (dialog.open) { console.warn('appAlert: dialog already open, alert dropped:', message); resolve(); return; }
         msg.textContent = message;
         inputField.style.display = 'none';
         cancelBtn.style.display = 'none';
@@ -344,6 +345,7 @@ function appConfirm(message) {
         const cancelBtn = document.getElementById('app-dialog-cancel');
         const okBtn = document.getElementById('app-dialog-ok');
         if (!dialog) { resolve(window.confirm(message)); return; }
+        if (dialog.open) { resolve(false); return; }
         msg.textContent = message;
         inputField.style.display = 'none';
         cancelBtn.style.display = '';
@@ -563,6 +565,7 @@ function appChooseSendMethod(message) {
         const altBtn = document.getElementById('app-dialog-alt');
         const okBtn = document.getElementById('app-dialog-ok');
         if (!dialog || !altBtn) { resolve(null); return; }
+        if (dialog.open) { resolve(null); return; }
         msg.textContent = message;
         inputField.style.display = 'none';
         cancelBtn.style.display = '';
@@ -596,6 +599,7 @@ function appChooseCallMethod(message, hasTel, hasCell) {
         const altBtn = document.getElementById('app-dialog-alt');
         const okBtn = document.getElementById('app-dialog-ok');
         if (!dialog) { resolve(null); return; }
+        if (dialog.open) { resolve(null); return; }
         msg.textContent = message;
         inputField.style.display = 'none';
         cancelBtn.style.display = '';
@@ -1482,6 +1486,7 @@ async function savePoiPosition(forceLat, forceLng) {
     }
     const pos = resolvePoiCoords(forceLat, forceLng, userMarker);
     if (pos) {
+        await waitForDialogToSettle(document.getElementById('app-dialog'));
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
         if (note === null) return;
         await waitForDialogToSettle(document.getElementById('app-dialog'));
