@@ -421,13 +421,31 @@ function waitForNextUiFrame() {
     });
 }
 
-async function waitForDialogToSettle(dialog = document.getElementById('app-dialog')) {
+async function waitForDialogToSettle(dialog) {
     if (!dialog) return;
-    const maxWaitMs = 300;
-    const startTime = Date.now();
-    while (dialog.open && (Date.now() - startTime) < maxWaitMs) {
-        await waitForNextUiFrame();
-    }
+    await waitForNextUiFrame();
+    if (!dialog.open) return;
+
+    await new Promise((resolve) => {
+        let settled = false;
+        let timeoutId = null;
+        const cleanup = () => {
+            dialog.removeEventListener('close', onClose);
+            if (timeoutId !== null) clearTimeout(timeoutId);
+        };
+        const settle = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve();
+        };
+        const onClose = () => {
+            void waitForNextUiFrame().then(settle);
+        };
+
+        dialog.addEventListener('close', onClose);
+        timeoutId = setTimeout(settle, 300);
+    });
 }
 
 function appSelect(message, options = [], defaultValue = '') {
