@@ -3901,6 +3901,22 @@ function visualizzaRicevutaSalvata(index) {
         </div>
     ` : `<p style="margin-top: 8px;"><strong>Modalità di Pagamento:</strong> ${metodoPagamentoLabel}</p>`;
 
+    const paginaCortesiaRitenutaHtml = isRitenuta ? `
+        <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px; margin-top:0; page-break-before:always; break-before:page;">
+            <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Pagina di Cortesia per l'Acquirente — Adempimenti Ritenuta d'Acconto</h3>
+            <p style="margin-bottom:8px;"><strong>Questa pagina è un promemoria operativo per l'acquirente.</strong> Le scadenze possono subire proroghe: verificare sempre con il proprio consulente fiscale.</p>
+            <ol style="padding-left:18px; line-height:1.45;">
+                <li style="margin-bottom:8px;"><strong>Autofattura / documento di acquisto da privato:</strong> registrare correttamente l'acquisto del tartufo da raccoglitore occasionale con i dati della ricevuta.</li>
+                <li style="margin-bottom:8px;"><strong>Pagamento ritenuta con F24:</strong> versare la ritenuta d'acconto del 23% trattenuta sul corrispettivo imponibile.</li>
+                <li style="margin-bottom:8px;"><strong>Compilazione F24:</strong> indicare codice tributo, periodo di riferimento, importo ritenuta e dati anagrafici/fiscali dell'acquirente secondo le istruzioni fiscali vigenti.</li>
+                <li style="margin-bottom:8px;"><strong>Scadenza versamento F24:</strong> entro il giorno 16 del mese successivo al pagamento del corrispettivo (salvo proroghe).</li>
+                <li style="margin-bottom:8px;"><strong>Certificazione Unica (CU):</strong> predisporre e rilasciare al tartufaio la CU dei compensi/ritenute entro il 16 marzo dell'anno successivo (salvo proroghe).</li>
+                <li style="margin-bottom:8px;"><strong>Modello 770:</strong> includere i dati delle ritenute operate nel modello 770 con invio telematico entro la scadenza annuale prevista (tipicamente 31 ottobre, salvo proroghe).</li>
+                <li style="margin-bottom:0;"><strong>Promemoria consegna CU al tartufaio:</strong> ricordare la consegna della certificazione unica al venditore entro i termini, conservando prova della trasmissione.</li>
+            </ol>
+        </div>
+    ` : '';
+
     // Supporto per retrocompatibilità con vecchie ricevute salvate come v.comune
     const luogoAreaVisualizzazione = safeReceipt.luogoRaccolta || safeReceipt.comune || 'Non specificato';
 
@@ -3950,6 +3966,7 @@ function visualizzaRicevutaSalvata(index) {
                     </div>
                 </div>
             </div>
+            ${paginaCortesiaRitenutaHtml}
         </div>
         <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('printPage')}>🖨️ Stampa / Salva PDF Conforme</button>
         <button class="overlay-btn btn-info btn-full" style="margin-top:10px;" ${actionAttrs('condividiRicevuta', [index])}>📤 Condividi Ricevuta (WhatsApp)</button>
