@@ -11,7 +11,7 @@ import {
     summarizeTileCoverage
 } from './offline-cache-utils.js';
 import { downloadTileBatchesWithRecovery, downloadTileWithRetry, isValidCachedTileResponse } from './offline-map-download-utils.js';
-import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite } from './fiscal-utils.js';
+import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite, riepilogaAcquistiCliente } from './fiscal-utils.js';
 import {
     CUSTOM_POI_MARKERS,
     DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
@@ -2650,9 +2650,25 @@ function openModule(moduleName, editMode = false) {
 
        case 'clienti':
     const rubricaClienti = readStorageJSON('rubrica_clienti', []);
+    const storicoVenditeRubrica = readStorageJSON('storico_vendite', []);
+    const storicoVenditePerCliente = new Map();
+    storicoVenditeRubrica.forEach((vendita) => {
+        const nomeAcquirente = String(vendita && vendita.acquirente ? vendita.acquirente : '').trim().toLowerCase();
+        if (!nomeAcquirente) return;
+        if (!storicoVenditePerCliente.has(nomeAcquirente)) {
+            storicoVenditePerCliente.set(nomeAcquirente, []);
+        }
+        storicoVenditePerCliente.get(nomeAcquirente).push(vendita);
+    });
     const clientiOrdinati = rubricaClienti
-        .map((cliente, originalIndex) => ({ ...cliente, originalIndex }))
-        .sort((a, b) => (b.totaleAcquisti || 0) - (a.totaleAcquisti || 0));
+        .map((cliente, originalIndex) => ({
+            ...cliente,
+            originalIndex,
+            riepilogoAcquisti: riepilogaAcquistiCliente(
+                storicoVenditePerCliente.get((cliente.nome || '').trim().toLowerCase()) || []
+            )
+        }))
+        .sort((a, b) => (b.riepilogoAcquisti?.totaleAcquisti || 0) - (a.riepilogoAcquisti?.totaleAcquisti || 0));
 
     let clientiHtml = `
         <h2>Rubrica Clienti</h2>
@@ -2662,35 +2678,18 @@ function openModule(moduleName, editMode = false) {
     if (clientiOrdinati.length === 0) {
         clientiHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun cliente salvato in rubrica.</p></div>`;
     } else {
-        const storicoVenditeRubrica = readStorageJSON('storico_vendite', []);
-
         clientiOrdinati.forEach((clienteData) => {
             const originalIndex = Number(clienteData.originalIndex);
             if (!Number.isInteger(originalIndex) || originalIndex < 0) return;
 
             const safeCliente = sanitizeRenderable(clienteData);
-            const totaleFormattato = (clienteData.totaleAcquisti || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
-            const numeroAcquisti = Number(clienteData.numeroAcquisti) || 0;
-
-            // Calcola netto percepito e totale ritenute per questo cliente
-            const nomeClienteLower = (clienteData.nome || '').trim().toLowerCase();
-            let nettoPercepito = 0;
-            let totaleRitenute = 0;
-            storicoVenditeRubrica.forEach(vendita => {
-                if ((vendita.acquirente || '').trim().toLowerCase() !== nomeClienteLower) return;
-                const importo = parseFloat(vendita.importo) || 0;
-                if (vendita.regime === 'ritenuta') {
-                    const dettagli = calcolaDettaglioRitenuta(importo);
-                    const netto = vendita.netto !== undefined ? parseFloat(vendita.netto) : dettagli.netto;
-                    const ritenuta = vendita.ritenuta !== undefined ? parseFloat(vendita.ritenuta) : dettagli.ritenuta;
-                    nettoPercepito += netto;
-                    totaleRitenute += ritenuta;
-                } else {
-                    nettoPercepito += importo;
-                }
-            });
-            const nettoPerceputoFormattato = nettoPercepito.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
-            const totaleRitenuteFormattato = totaleRitenute.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+            const riepilogoAcquisti = clienteData.riepilogoAcquisti;
+            const totaleAcquistiFormattato = riepilogoAcquisti.totaleAcquisti.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+            const nettoSostitutivaFormattato = riepilogoAcquisti.nettoAcquistiImpostaSostitutiva.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+            const nettoRitenutaFormattato = riepilogoAcquisti.nettoAcquistiRitenutaAcconto.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+            const totaleRitenuteFormattato = riepilogoAcquisti.ritenuteDaVersare.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+            const numeroAcquisti = riepilogoAcquisti.numeroAcquisti;
+            const ultimoAcquisto = riepilogoAcquisti.dataUltimoAcquisto || safeCliente.dataUltimoAcquisto || 'N.D.';
 
             clientiHtml += `
                 <div class="module-card" style="border-left: 4px solid #0284c7; margin-bottom: 12px;">
@@ -2700,10 +2699,11 @@ function openModule(moduleName, editMode = false) {
                     <p style="font-size:0.8rem; color:#ddd6c8; margin: 2px 0;">📧 Email: ${safeCliente.email || 'Non specificata'}</p>
                     
                     <div style="background: rgba(15, 23, 42, 0.6); padding: 8px; border-radius: 6px; margin: 8px 0;">
-                        <p style="font-size:0.85rem; color:#4ade80; margin: 0; font-weight: bold;">💰 Totale Acquisti: ${totaleFormattato}</p>
-                        <p style="font-size:0.85rem; color:#22d3ee; margin: 4px 0 2px 0; font-weight: bold;">💵 Netto Percepito: ${nettoPerceputoFormattato}</p>
-                        <p style="font-size:0.85rem; color:#fbbf24; margin: 2px 0; font-weight: bold;">🪙 Ritenute da Versare: ${totaleRitenuteFormattato}</p>
-                        <p style="font-size:0.75rem; color:#b8b0a0; margin: 4px 0 0 0;">📦 Ricevute emesse: ${numeroAcquisti} | Ultimo: ${safeCliente.dataUltimoAcquisto || 'N.D.'}</p>
+                        <p style="font-size:0.85rem; color:#22c55e; margin: 0; font-weight: bold;">🟢 Netto acquisti imposta sostitutiva: ${nettoSostitutivaFormattato}</p>
+                        <p style="font-size:0.85rem; color:#22d3ee; margin: 4px 0 2px 0; font-weight: bold;">🔹 Netto acquisti ritenuta d'acconto: ${nettoRitenutaFormattato}</p>
+                        <p style="font-size:0.85rem; color:#fbbf24; margin: 2px 0; font-weight: bold;">🪙 Ritenute da versare: ${totaleRitenuteFormattato}</p>
+                        <p style="font-size:0.85rem; color:#4ade80; margin: 2px 0; font-weight: bold;">💰 Totale acquisti (imposta sostitutiva + ritenuta d'acconto): ${totaleAcquistiFormattato}</p>
+                        <p style="font-size:0.75rem; color:#b8b0a0; margin: 4px 0 0 0;">📦 Ricevute emesse: ${numeroAcquisti} | Ultimo: ${ultimoAcquisto}</p>
                     </div>
 
                     <div style="margin: 8px 0;">

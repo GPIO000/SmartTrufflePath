@@ -43,3 +43,65 @@ export function calcolaStatoSogliaVendite(storicoVendite = [], annoCorrente = ne
         superato: nuovoTotaleAnno > SOGLIA_VENDITE_ANNUE
     };
 }
+
+function parseDataVendita(dataStringa) {
+    if (typeof dataStringa !== 'string' || !dataStringa.trim()) return null;
+    if (dataStringa.includes('/')) return parseDataItaliana(dataStringa);
+    const data = new Date(dataStringa);
+    return Number.isNaN(data.getTime()) ? null : data;
+}
+
+export function riepilogaAcquistiCliente(storicoVendite = [], nomeCliente = '') {
+    const nomeClienteNormalizzato = String(nomeCliente || '').trim().toLowerCase();
+    const filtraPerCliente = Boolean(nomeClienteNormalizzato);
+    const riepilogo = {
+        totaleAcquisti: 0,
+        totaleImpostaSostitutiva: 0,
+        nettoAcquistiImpostaSostitutiva: 0,
+        totaleRitenutaAcconto: 0,
+        nettoAcquistiRitenutaAcconto: 0,
+        ritenuteDaVersare: 0,
+        numeroAcquisti: 0,
+        dataUltimoAcquisto: ''
+    };
+
+    let timestampUltimoAcquisto = null;
+
+    storicoVendite.forEach((vendita) => {
+        const nomeAcquirente = String(vendita && vendita.acquirente ? vendita.acquirente : '').trim().toLowerCase();
+        if (filtraPerCliente && nomeAcquirente !== nomeClienteNormalizzato) return;
+
+        const importoLordo = parseFloat(vendita && vendita.importo) || 0;
+        const regime = vendita && vendita.regime ? vendita.regime : 'sostitutiva';
+        riepilogo.totaleAcquisti += importoLordo;
+        riepilogo.numeroAcquisti += 1;
+
+        if (regime === 'ritenuta') {
+            const nettoSalvato = vendita && vendita.netto !== undefined;
+            const ritenutaSalvata = vendita && vendita.ritenuta !== undefined;
+            const dettagliSalvati = nettoSalvato && ritenutaSalvata;
+            const dettagliRitenuta = dettagliSalvati ? null : calcolaDettaglioRitenuta(importoLordo);
+            riepilogo.totaleRitenutaAcconto += importoLordo;
+            riepilogo.nettoAcquistiRitenutaAcconto += dettagliSalvati
+                ? parseFloat(vendita.netto) || 0
+                : dettagliRitenuta.netto;
+            riepilogo.ritenuteDaVersare += dettagliSalvati
+                ? parseFloat(vendita.ritenuta) || 0
+                : dettagliRitenuta.ritenuta;
+        } else {
+            riepilogo.totaleImpostaSostitutiva += importoLordo;
+            riepilogo.nettoAcquistiImpostaSostitutiva += importoLordo;
+        }
+
+        const dataVendita = parseDataVendita(vendita && vendita.data ? vendita.data : '');
+        if (!dataVendita) return;
+
+        const timestampVendita = dataVendita.getTime();
+        if (timestampUltimoAcquisto === null || timestampVendita > timestampUltimoAcquisto) {
+            timestampUltimoAcquisto = timestampVendita;
+            riepilogo.dataUltimoAcquisto = vendita.data;
+        }
+    });
+
+    return riepilogo;
+}
