@@ -423,10 +423,10 @@ function waitForNextUiFrame() {
 
 async function waitForDialogToSettle(dialog = document.getElementById('app-dialog')) {
     if (!dialog) return;
-    let attempts = 0;
-    while (dialog.open && attempts < 4) {
+    const maxWaitMs = 300;
+    const startTime = Date.now();
+    while (dialog.open && (Date.now() - startTime) < maxWaitMs) {
         await waitForNextUiFrame();
-        attempts += 1;
     }
 }
 
