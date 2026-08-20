@@ -955,6 +955,7 @@ map.on('zoomend', () => {
 let _mapLongPressTimer = null;
 let _mapLongPressMoved = false;
 let _mapLongPressStartPoint = null;
+let _pendingMapLongPressLatLng = null;
 const MAP_LONG_PRESS_MS = 600;
 let _lastHandledMapLongPress = null;
 
@@ -972,29 +973,44 @@ map.on('mousedown touchstart', (e) => {
     if (e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length > 1) return;
     _mapLongPressMoved = false;
     _mapLongPressStartPoint = extractPointerClientPoint(e.originalEvent);
+    _pendingMapLongPressLatLng = null;
     clearTimeout(_mapLongPressTimer);
     const latlng = { lat: e.latlng.lat, lng: e.latlng.lng };
-    _mapLongPressTimer = setTimeout(async () => {
+    _mapLongPressTimer = setTimeout(() => {
         if (_mapLongPressMoved) return;
-        await confirmPoiFromMapLongPress(latlng);
+        _pendingMapLongPressLatLng = latlng;
     }, MAP_LONG_PRESS_MS);
 });
 
 map.on('mousemove touchmove', (e) => {
     if (e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length > 1) {
         _mapLongPressMoved = true;
+        _pendingMapLongPressLatLng = null;
         clearTimeout(_mapLongPressTimer);
         return;
     }
     const currentPoint = extractPointerClientPoint(e.originalEvent);
     if (!hasMapLongPressExceededTolerance(_mapLongPressStartPoint, currentPoint)) return;
     _mapLongPressMoved = true;
+    _pendingMapLongPressLatLng = null;
     clearTimeout(_mapLongPressTimer);
 });
 
-map.on('mouseup touchend touchcancel', () => {
+map.on('mouseup touchend', () => {
     clearTimeout(_mapLongPressTimer);
     _mapLongPressStartPoint = null;
+    const latlng = _pendingMapLongPressLatLng;
+    _pendingMapLongPressLatLng = null;
+    const shouldConfirmLongPress = !_mapLongPressMoved && latlng;
+    _mapLongPressMoved = false;
+    if (shouldConfirmLongPress) void confirmPoiFromMapLongPress(latlng);
+});
+
+map.on('touchcancel', () => {
+    clearTimeout(_mapLongPressTimer);
+    _mapLongPressStartPoint = null;
+    _mapLongPressMoved = false;
+    _pendingMapLongPressLatLng = null;
 });
 
 map.on('contextmenu', (e) => {
@@ -1002,6 +1018,7 @@ map.on('contextmenu', (e) => {
     clearTimeout(_mapLongPressTimer);
     _mapLongPressStartPoint = null;
     _mapLongPressMoved = false;
+    _pendingMapLongPressLatLng = null;
     void confirmPoiFromMapLongPress({ lat: e.latlng.lat, lng: e.latlng.lng });
 });
 
