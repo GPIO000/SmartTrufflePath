@@ -318,8 +318,16 @@ function showToast(message, type = 'info') {
     }, 3500);
 }
 
+let dialogOperationQueue = Promise.resolve();
+
+function runDialogOperation(operation) {
+    const queuedOperation = dialogOperationQueue.then(() => operation());
+    dialogOperationQueue = queuedOperation.catch(() => undefined);
+    return queuedOperation;
+}
+
 function appAlert(message) {
-    return new Promise((resolve) => {
+    return runDialogOperation(() => new Promise((resolve) => {
         const dialog = document.getElementById('app-dialog');
         const msg = document.getElementById('app-dialog-message');
         const inputField = document.getElementById('app-dialog-input');
@@ -333,11 +341,11 @@ function appAlert(message) {
         const onOk = () => { dialog.close(); okBtn.removeEventListener('click', onOk); resolve(); };
         okBtn.addEventListener('click', onOk);
         dialog.showModal();
-    });
+    }));
 }
 
 function appConfirm(message) {
-    return new Promise((resolve) => {
+    return runDialogOperation(() => new Promise((resolve) => {
         const dialog = document.getElementById('app-dialog');
         const msg = document.getElementById('app-dialog-message');
         const inputField = document.getElementById('app-dialog-input');
@@ -368,18 +376,17 @@ function appConfirm(message) {
         cancelBtn.addEventListener('click', onCancel);
         dialog.addEventListener('close', onDialogClose);
         dialog.showModal();
-    });
+    }));
 }
 
 function appPrompt(message, defaultValue = '') {
-    return new Promise((resolve) => {
+    return runDialogOperation(() => new Promise((resolve) => {
         const dialog = document.getElementById('app-dialog');
         const msg = document.getElementById('app-dialog-message');
         const inputField = document.getElementById('app-dialog-input');
         const cancelBtn = document.getElementById('app-dialog-cancel');
         const okBtn = document.getElementById('app-dialog-ok');
         if (!dialog) { resolve(window.prompt(message, defaultValue)); return; }
-        if (dialog.open) { resolve(null); return; }
         msg.textContent = message;
         inputField.style.display = 'block';
         inputField.value = defaultValue;
@@ -408,7 +415,7 @@ function appPrompt(message, defaultValue = '') {
         dialog.addEventListener('close', onDialogClose);
         dialog.showModal();
         requestAnimationFrame(() => inputField.focus());
-    });
+    }));
 }
 
 function waitForNextUiFrame() {
@@ -433,7 +440,7 @@ async function waitForDialogToSettle(dialog) {
 }
 
 function appSelect(message, options = [], defaultValue = '') {
-    return new Promise((resolve) => {
+    return runDialogOperation(() => new Promise((resolve) => {
         if (!Array.isArray(options) || options.length === 0) {
             resolve(null);
             return;
@@ -446,10 +453,6 @@ function appSelect(message, options = [], defaultValue = '') {
         if (!dialog) {
             const fallbackMessage = `${message}\n${options.join(' ')}`;
             resolve(window.prompt(fallbackMessage, defaultValue));
-            return;
-        }
-        if (dialog.open) {
-            resolve(null);
             return;
         }
 
@@ -497,11 +500,11 @@ function appSelect(message, options = [], defaultValue = '') {
         dialog.addEventListener('close', onDialogClose);
         dialog.showModal();
         requestAnimationFrame(() => selectField.focus());
-    });
+    }));
 }
 
 function appChoosePoiSaveSource(message) {
-    return new Promise((resolve) => {
+    return runDialogOperation(() => new Promise((resolve) => {
         const dialog = document.getElementById('app-dialog');
         const msg = document.getElementById('app-dialog-message');
         const inputField = document.getElementById('app-dialog-input');
@@ -514,10 +517,6 @@ function appChoosePoiSaveSource(message) {
             if (normalized === 'gps') resolve('gps');
             else if (normalized === 'mappa') resolve('map');
             else resolve(null);
-            return;
-        }
-        if (dialog.open) {
-            resolve(null);
             return;
         }
         msg.textContent = message;
@@ -551,11 +550,11 @@ function appChoosePoiSaveSource(message) {
         cancelBtn.addEventListener('click', onCancel);
         dialog.addEventListener('close', onDialogClose);
         dialog.showModal();
-    });
+    }));
 }
 
 function appChooseSendMethod(message) {
-    return new Promise((resolve) => {
+    return runDialogOperation(() => new Promise((resolve) => {
         const dialog = document.getElementById('app-dialog');
         const msg = document.getElementById('app-dialog-message');
         const inputField = document.getElementById('app-dialog-input');
@@ -584,11 +583,11 @@ function appChooseSendMethod(message) {
         altBtn.addEventListener('click', onWhatsApp);
         cancelBtn.addEventListener('click', onCancel);
         dialog.showModal();
-    });
+    }));
 }
 
 function appChooseCallMethod(message, hasTel, hasCell) {
-    return new Promise((resolve) => {
+    return runDialogOperation(() => new Promise((resolve) => {
         const dialog = document.getElementById('app-dialog');
         const msg = document.getElementById('app-dialog-message');
         const inputField = document.getElementById('app-dialog-input');
@@ -625,7 +624,7 @@ function appChooseCallMethod(message, hasTel, hasCell) {
         altBtn.addEventListener('click', onAlt);
         cancelBtn.addEventListener('click', onCancel);
         dialog.showModal();
-    });
+    }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1052,6 +1051,8 @@ let _pendingMapLongPressLatLng = null;
 const MAP_LONG_PRESS_MS = 600;
 let _lastHandledMapLongPress = null;
 let _isPoiMapPickModeActive = false;
+let _isHandlingMapLongPressConfirmation = false;
+let _isSavePoiPositionFlowActive = false;
 
 function updatePoiMapPickButtonState() {
     const button = document.querySelector('#map-overlays [data-action="savePoiPosition"]');
@@ -1155,17 +1156,22 @@ function isMouseLongPressEvent(originalEvent) {
 }
 
 async function confirmPoiFromMapLongPress(latlng) {
-    if (!latlng) return;
-    const handledAt = Date.now();
-    if (isDuplicateMapLongPress(_lastHandledMapLongPress, latlng, handledAt, DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS)) return;
-    _lastHandledMapLongPress = { lat: latlng.lat, lng: latlng.lng, timestamp: handledAt };
-    if (_isPoiMapPickModeActive) {
-        cancelPoiMapPickMode();
-        await savePoiPosition(latlng.lat, latlng.lng);
-        return;
+    if (!latlng || _isHandlingMapLongPressConfirmation) return;
+    _isHandlingMapLongPressConfirmation = true;
+    try {
+        const handledAt = Date.now();
+        if (isDuplicateMapLongPress(_lastHandledMapLongPress, latlng, handledAt, DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS)) return;
+        _lastHandledMapLongPress = { lat: latlng.lat, lng: latlng.lng, timestamp: handledAt };
+        if (_isPoiMapPickModeActive) {
+            cancelPoiMapPickMode();
+            await savePoiPosition(latlng.lat, latlng.lng);
+            return;
+        }
+        const ok = await appConfirm(`📍 Vuoi segnalare un nuovo punto in questa posizione?\n(${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)})`);
+        if (ok) await savePoiPosition(latlng.lat, latlng.lng);
+    } finally {
+        _isHandlingMapLongPressConfirmation = false;
     }
-    const ok = await appConfirm(`📍 Vuoi segnalare un nuovo punto in questa posizione?\n(${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)})`);
-    if (ok) savePoiPosition(latlng.lat, latlng.lng);
 }
 
 map.on('mousedown', (e) => {
@@ -1466,6 +1472,9 @@ function saveCarPosition() {
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
 async function savePoiPosition(forceLat, forceLng) {
+    if (_isSavePoiPositionFlowActive) return;
+    _isSavePoiPositionFlowActive = true;
+    try {
     const hasForcedCoords = forceLat !== undefined && forceLng !== undefined;
     if (!hasForcedCoords) {
         if (_isPoiMapPickModeActive) {
@@ -1494,6 +1503,9 @@ async function savePoiPosition(forceLat, forceLng) {
         if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
         showToast(`${marker} Punto salvato!`, 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
+    } finally {
+        _isSavePoiPositionFlowActive = false;
+    }
 }
 async function navigateToPoi(index) {
     if (poiList[index]) {
