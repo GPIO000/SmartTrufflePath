@@ -3983,6 +3983,7 @@ async function registraVenditaConPrezzoKg() {
     if (!(await appConfirm(messaggioConservazioneCartacea))) {
         return;
     }
+    await waitForDialogToSettle(document.getElementById('app-dialog'));
 
     // 8. MESSAGGIO DI RIEPILOGO CON TRACCIABILITÀ E PRESA VISIONE
     const tipoRicevutaTesto = regimeScelto === 'sostitutiva' 
