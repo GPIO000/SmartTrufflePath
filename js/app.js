@@ -3901,7 +3901,7 @@ function visualizzaRicevutaSalvata(index) {
         </div>
     ` : `<p style="margin-top: 8px;"><strong>Modalità di Pagamento:</strong> ${metodoPagamentoLabel}</p>`;
 
-    const ritenutaImportoF24 = safeReceipt.ritenuta || dettagliRitenutaRicevuta.ritenuta.toFixed(2);
+    const ritenutaImportoF24 = safeReceipt.ritenuta ? parseFloat(safeReceipt.ritenuta).toFixed(2) : dettagliRitenutaRicevuta.ritenuta.toFixed(2);
     const baseImponibileF24 = safeReceipt.importo
         ? (parseFloat(safeReceipt.importo) * 0.78).toFixed(2)
         : dettagliRitenutaRicevuta.baseImponibile.toFixed(2);
@@ -3949,7 +3949,7 @@ function visualizzaRicevutaSalvata(index) {
                         <td style="padding:5px 8px;">${annoRiferimento}</td>
                     </tr>
                     <tr>
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Mese di Riferimento</td>
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Periodo di Riferimento</td>
                         <td style="padding:5px 8px;">${periodoRiferimentoF24}</td>
                     </tr>
                     <tr style="background:#f0f4ff;">
