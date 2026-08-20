@@ -2655,9 +2655,10 @@ function openModule(moduleName, editMode = false) {
     storicoVenditeRubrica.forEach((vendita) => {
         const nomeAcquirente = String(vendita && vendita.acquirente ? vendita.acquirente : '').trim().toLowerCase();
         if (!nomeAcquirente) return;
-        const venditeCliente = storicoVenditePerCliente.get(nomeAcquirente) || [];
-        venditeCliente.push(vendita);
-        storicoVenditePerCliente.set(nomeAcquirente, venditeCliente);
+        if (!storicoVenditePerCliente.has(nomeAcquirente)) {
+            storicoVenditePerCliente.set(nomeAcquirente, []);
+        }
+        storicoVenditePerCliente.get(nomeAcquirente).push(vendita);
     });
     const clientiOrdinati = rubricaClienti
         .map((cliente, originalIndex) => ({
