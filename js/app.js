@@ -421,10 +421,15 @@ function waitForNextUiFrame() {
     });
 }
 
+const MAX_DIALOG_SETTLE_FRAMES = 12;
+
 async function waitForDialogToSettle(dialog) {
     if (!dialog) return;
-    await waitForNextUiFrame();
-    if (dialog.open) await waitForNextUiFrame();
+    let remainingFrames = MAX_DIALOG_SETTLE_FRAMES;
+    do {
+        await waitForNextUiFrame();
+        remainingFrames -= 1;
+    } while (dialog.open && remainingFrames > 0);
 }
 
 function appSelect(message, options = [], defaultValue = '') {
