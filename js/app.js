@@ -26,6 +26,7 @@ import {
     normalizePoiMarker,
     parseLegacyDateToTimestamp,
     resolvePoiCoords,
+    shouldConfirmMapLongPressOnTimeout,
     toMapContainerPoint,
 } from './poi-utils.js';
 
@@ -1068,11 +1069,16 @@ function resetMapLongPressState() {
     _pendingMapLongPressLatLng = null;
 }
 
-function scheduleMapLongPress(latlng) {
+function scheduleMapLongPress(latlng, originalEvent) {
     _pendingMapLongPressLatLng = null;
     clearMapLongPressTimer();
     _mapLongPressTimer = setTimeout(() => {
         if (_mapLongPressMoved) return;
+        if (shouldConfirmMapLongPressOnTimeout(originalEvent)) {
+            resetMapLongPressState();
+            void confirmPoiFromMapLongPress(latlng);
+            return;
+        }
         _pendingMapLongPressLatLng = latlng;
     }, MAP_LONG_PRESS_MS);
 }
@@ -1086,7 +1092,7 @@ function beginMapLongPress(latlng, originalEvent) {
     if (_mapLongPressTimer && _mapLongPressStartPoint && !_mapLongPressMoved) return;
     _mapLongPressMoved = false;
     _mapLongPressStartPoint = extractPointerClientPoint(originalEvent);
-    scheduleMapLongPress(latlng);
+    scheduleMapLongPress(latlng, originalEvent);
 }
 
 function updateMapLongPressMovement(originalEvent) {
