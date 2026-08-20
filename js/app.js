@@ -421,6 +421,8 @@ function waitForNextUiFrame() {
     });
 }
 
+const DIALOG_SETTLE_TIMEOUT_MS = 300;
+
 async function waitForDialogToSettle(dialog) {
     if (!dialog) return;
     await waitForNextUiFrame();
@@ -444,7 +446,7 @@ async function waitForDialogToSettle(dialog) {
         };
 
         dialog.addEventListener('close', onClose);
-        timeoutId = setTimeout(settle, 300);
+        timeoutId = setTimeout(settle, DIALOG_SETTLE_TIMEOUT_MS);
     });
 }
 
