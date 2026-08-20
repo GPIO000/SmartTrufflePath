@@ -2662,6 +2662,8 @@ function openModule(moduleName, editMode = false) {
     if (clientiOrdinati.length === 0) {
         clientiHtml += `<div class="module-card"><p style="color:#b8b0a0;">Nessun cliente salvato in rubrica.</p></div>`;
     } else {
+        const storicoVenditeRubrica = readStorageJSON('storico_vendite', []);
+
         clientiOrdinati.forEach((clienteData) => {
             const originalIndex = Number(clienteData.originalIndex);
             if (!Number.isInteger(originalIndex) || originalIndex < 0) return;
@@ -2669,6 +2671,26 @@ function openModule(moduleName, editMode = false) {
             const safeCliente = sanitizeRenderable(clienteData);
             const totaleFormattato = (clienteData.totaleAcquisti || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
             const numeroAcquisti = Number(clienteData.numeroAcquisti) || 0;
+
+            // Calcola netto percepito e totale ritenute per questo cliente
+            const nomeClienteLower = (clienteData.nome || '').trim().toLowerCase();
+            let nettoPercepito = 0;
+            let totaleRitenute = 0;
+            storicoVenditeRubrica.forEach(vendita => {
+                if ((vendita.acquirente || '').trim().toLowerCase() !== nomeClienteLower) return;
+                const importo = parseFloat(vendita.importo) || 0;
+                if (vendita.regime === 'ritenuta') {
+                    const dettagli = calcolaDettaglioRitenuta(importo);
+                    const netto = vendita.netto !== undefined ? parseFloat(vendita.netto) : dettagli.netto;
+                    const ritenuta = vendita.ritenuta !== undefined ? parseFloat(vendita.ritenuta) : dettagli.ritenuta;
+                    nettoPercepito += netto;
+                    totaleRitenute += ritenuta;
+                } else {
+                    nettoPercepito += importo;
+                }
+            });
+            const nettoPerceputoFormattato = nettoPercepito.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+            const totaleRitenuteFormattato = totaleRitenute.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
 
             clientiHtml += `
                 <div class="module-card" style="border-left: 4px solid #0284c7; margin-bottom: 12px;">
@@ -2679,7 +2701,9 @@ function openModule(moduleName, editMode = false) {
                     
                     <div style="background: rgba(15, 23, 42, 0.6); padding: 8px; border-radius: 6px; margin: 8px 0;">
                         <p style="font-size:0.85rem; color:#4ade80; margin: 0; font-weight: bold;">💰 Totale Acquisti: ${totaleFormattato}</p>
-                        <p style="font-size:0.75rem; color:#b8b0a0; margin: 2px 0 0 0;">📦 Ricevute emesse: ${numeroAcquisti} | Ultimo: ${safeCliente.dataUltimoAcquisto || 'N.D.'}</p>
+                        <p style="font-size:0.85rem; color:#22d3ee; margin: 4px 0 2px 0; font-weight: bold;">💵 Netto Percepito: ${nettoPerceputoFormattato}</p>
+                        <p style="font-size:0.85rem; color:#fbbf24; margin: 2px 0; font-weight: bold;">🪙 Ritenute da Versare: ${totaleRitenuteFormattato}</p>
+                        <p style="font-size:0.75rem; color:#b8b0a0; margin: 4px 0 0 0;">📦 Ricevute emesse: ${numeroAcquisti} | Ultimo: ${safeCliente.dataUltimoAcquisto || 'N.D.'}</p>
                     </div>
 
                     <div style="margin: 8px 0;">
