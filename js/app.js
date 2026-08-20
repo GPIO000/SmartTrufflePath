@@ -3975,10 +3975,6 @@ function visualizzaRicevutaSalvata(index) {
                         <td style="${f24LabelCellStyle}">Contribuente (Acquirente — Sostituto d'imposta)</td>
                         <td style="${f24ValueCellStyle}">${safeReceipt.acquirente}${safeReceipt.acquirenteCf ? ' — CF/P.IVA: ' + safeReceipt.acquirenteCf : ''}</td>
                     </tr>
-                    <tr>
-                        <td style="${f24LabelCellStyle}">Percipiente (Venditore)</td>
-                        <td style="${f24ValueCellStyle}">${safeReceipt.venditoreNome} — CF: ${safeReceipt.venditoreCf}</td>
-                    </tr>
                 </tbody>
             </table>
 
