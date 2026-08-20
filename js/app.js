@@ -478,6 +478,60 @@ function appSelect(message, options = [], defaultValue = '') {
     });
 }
 
+function appChoosePoiSaveSource(message) {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('app-dialog');
+        const msg = document.getElementById('app-dialog-message');
+        const inputField = document.getElementById('app-dialog-input');
+        const cancelBtn = document.getElementById('app-dialog-cancel');
+        const altBtn = document.getElementById('app-dialog-alt');
+        const okBtn = document.getElementById('app-dialog-ok');
+        if (!dialog || !altBtn) {
+            const fallback = window.prompt(`${message}\nScrivi "mappa" per scegliere un punto sulla mappa, altrimenti "gps".`, 'mappa');
+            const normalized = String(fallback || '').trim().toLowerCase();
+            if (normalized === 'gps') resolve('gps');
+            else if (normalized === 'mappa' || normalized === 'map') resolve('map');
+            else resolve(null);
+            return;
+        }
+        if (dialog.open) {
+            resolve(null);
+            return;
+        }
+        msg.textContent = message;
+        inputField.style.display = 'none';
+        cancelBtn.style.display = '';
+        cancelBtn.textContent = 'Annulla';
+        altBtn.style.display = '';
+        altBtn.textContent = '🗺️ Tocca mappa';
+        okBtn.textContent = '📡 Posizione GPS';
+        let resolved = false;
+        const cleanup = () => {
+            okBtn.removeEventListener('click', onOk);
+            altBtn.removeEventListener('click', onAlt);
+            cancelBtn.removeEventListener('click', onCancel);
+            dialog.removeEventListener('close', onDialogClose);
+            altBtn.style.display = 'none';
+        };
+        const settle = (value) => {
+            if (resolved) return;
+            resolved = true;
+            cleanup();
+            resolve(value);
+        };
+        let pendingValue = null;
+        const onOk = () => { pendingValue = 'gps'; dialog.close(); };
+        const onAlt = () => { pendingValue = 'map'; dialog.close(); };
+        const onCancel = () => { pendingValue = null; dialog.close(); };
+        const onDialogClose = () => { settle(pendingValue); };
+        okBtn.addEventListener('click', onOk);
+        altBtn.addEventListener('click', onAlt);
+        cancelBtn.addEventListener('click', onCancel);
+        dialog.addEventListener('close', onDialogClose);
+        dialog.showModal();
+    });
+}
+
 function appChooseSendMethod(message) {
     return new Promise((resolve) => {
         const dialog = document.getElementById('app-dialog');
@@ -975,6 +1029,32 @@ let _mapLongPressStartPoint = null;
 let _pendingMapLongPressLatLng = null;
 const MAP_LONG_PRESS_MS = 600;
 let _lastHandledMapLongPress = null;
+let _isPoiMapPickModeActive = false;
+
+function updatePoiMapPickButtonState() {
+    const button = document.querySelector('#map-overlays [data-action="savePoiPosition"]');
+    if (!button) return;
+    button.classList.toggle('btn-info', _isPoiMapPickModeActive);
+    button.setAttribute('aria-pressed', _isPoiMapPickModeActive ? 'true' : 'false');
+    button.textContent = _isPoiMapPickModeActive ? '✕ Annulla Punto' : '📍 Segna Punto';
+}
+
+function setPoiMapPickMode(active) {
+    _isPoiMapPickModeActive = Boolean(active);
+    updatePoiMapPickButtonState();
+}
+
+function cancelPoiMapPickMode(showFeedback = false) {
+    if (!_isPoiMapPickModeActive) return false;
+    setPoiMapPickMode(false);
+    if (showFeedback) showToast('Selezione punto annullata.', 'info');
+    return true;
+}
+
+function activatePoiMapPickMode() {
+    setPoiMapPickMode(true);
+    showToast('🗺️ Tocca un punto sulla mappa per salvarlo.', 'info');
+}
 
 function clearMapLongPressTimer() {
     clearTimeout(_mapLongPressTimer);
@@ -1049,6 +1129,11 @@ function isMouseLongPressEvent(originalEvent) {
 
 async function confirmPoiFromMapLongPress(latlng) {
     if (!latlng) return;
+    if (_isPoiMapPickModeActive) {
+        cancelPoiMapPickMode();
+        await savePoiPosition(latlng.lat, latlng.lng);
+        return;
+    }
     const handledAt = Date.now();
     if (isDuplicateMapLongPress(_lastHandledMapLongPress, latlng, handledAt, DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS)) return;
     _lastHandledMapLongPress = { lat: latlng.lat, lng: latlng.lng, timestamp: handledAt };
@@ -1097,6 +1182,12 @@ map.on('contextmenu', (e) => {
     e.originalEvent?.preventDefault?.();
     resetMapLongPressState();
     void confirmPoiFromMapLongPress({ lat: e.latlng.lat, lng: e.latlng.lng });
+});
+
+map.on('click', (e) => {
+    if (!_isPoiMapPickModeActive || !e?.latlng) return;
+    cancelPoiMapPickMode();
+    void savePoiPosition(e.latlng.lat, e.latlng.lng);
 });
 
 let userMarker = null;
@@ -1348,6 +1439,18 @@ function saveCarPosition() {
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
 }
 async function savePoiPosition(forceLat, forceLng) {
+    const hasForcedCoords = forceLat !== undefined && forceLng !== undefined;
+    if (!hasForcedCoords) {
+        if (cancelPoiMapPickMode(true)) return;
+        const saveSource = await appChoosePoiSaveSource('Come vuoi aggiungere il nuovo punto di interesse?');
+        if (saveSource === 'map') {
+            activatePoiMapPickMode();
+            return;
+        }
+        if (saveSource !== 'gps') return;
+    } else {
+        cancelPoiMapPickMode();
+    }
     const pos = resolvePoiCoords(forceLat, forceLng, userMarker);
     if (pos) {
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
