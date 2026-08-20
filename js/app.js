@@ -988,6 +988,7 @@ function beginMapLongPress(latlng, originalEvent) {
         resetMapLongPressState();
         return;
     }
+    if (_mapLongPressTimer && _mapLongPressStartPoint && !_mapLongPressMoved) return;
     _mapLongPressMoved = false;
     _mapLongPressStartPoint = extractPointerClientPoint(originalEvent);
     scheduleMapLongPress(latlng);
