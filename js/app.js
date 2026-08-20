@@ -3941,7 +3941,7 @@ function visualizzaRicevutaSalvata(index) {
                     </tr>
                     <tr style="background:#f0f4ff;">
                         <td style="${f24LabelCellStyle}">Codice Tributo</td>
-                        <td style="${f24ValueCellStyle} font-weight:bold; color:#1a56db;">1040</td>
+                        <td style="${f24ValueCellStyle}; font-weight:bold; color:#1a56db;">1040</td>
                     </tr>
                     <tr>
                         <td style="${f24LabelCellStyle}">Descrizione Tributo</td>
@@ -3965,11 +3965,11 @@ function visualizzaRicevutaSalvata(index) {
                     </tr>
                     <tr style="background:#f0f4ff;">
                         <td style="${f24LabelCellStyle}">Importo a Debito (Ritenuta 23%)</td>
-                        <td style="${f24ValueCellStyle} font-weight:bold; color:#c0392b;">€ ${ritenutaImportoF24}</td>
+                        <td style="${f24ValueCellStyle}; font-weight:bold; color:#c0392b;">€ ${ritenutaImportoF24}</td>
                     </tr>
                     <tr>
                         <td style="${f24LabelCellStyle}">Scadenza Versamento</td>
-                        <td style="${f24ValueCellStyle} font-weight:bold;">Entro il ${scadenzaF24Testo} (salvo proroghe)</td>
+                        <td style="${f24ValueCellStyle}; font-weight:bold;">Entro il ${scadenzaF24Testo} (salvo proroghe)</td>
                     </tr>
                     <tr style="background:#f0f4ff;">
                         <td style="${f24LabelCellStyle}">Contribuente (Acquirente — Sostituto d'imposta)</td>
