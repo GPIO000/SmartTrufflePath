@@ -3909,7 +3909,7 @@ function visualizzaRicevutaSalvata(index) {
         <div id="ricevuta-${index}">
             <h2>RICEVUTA VENDITA OCCASIONALE N. ${index + 1}</h2>
             <p>Conforme a Legge 145/2018, Reg. CE 178/02 & DPR 633/1972</p>
-            <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px;">
+            <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px; page-break-after:${isRitenuta ? 'always' : 'auto'};">
                 <p style="font-size: 0.72rem; color: #444; text-align: justify; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 8px; line-height: 1.3;">
                     <strong>DICHIARAZIONE DI CESSIONE OCCASIONALE E TRACCIABILITÀ:</strong> 
                     Operazione effettuata nell'ambito della raccolta hobbistica/occasionale dei tartufi, esonerata dall'obbligo di emissione di fattura elettronica e di certificazione fiscale ai sensi dell'art. 34, comma 6, del DPR n. 633/1972 e s.m.i., nonché in conformità alle disposizioni di cui alla Legge 30 dicembre 2018, n. 145. Si attesta inoltre la piena tracciabilità del prodotto alimentare ai sensi degli artt. 18 e 19 del Regolamento (CE) n. 178/2002.
@@ -3950,6 +3950,7 @@ function visualizzaRicevutaSalvata(index) {
                     </div>
                 </div>
             </div>
+            ${isRitenuta ? generaPaginaDiCortesiaRitenuta(safeReceipt, dettagliRitenutaRicevuta) : ''}
         </div>
         <button class="overlay-btn btn-primary btn-full mt-15" ${actionAttrs('printPage')}>🖨️ Stampa / Salva PDF Conforme</button>
         <button class="overlay-btn btn-info btn-full" style="margin-top:10px;" ${actionAttrs('condividiRicevuta', [index])}>📤 Condividi Ricevuta (WhatsApp)</button>
@@ -4170,6 +4171,100 @@ async function condividiRicevuta(index) {
         const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(testoMessaggio)}`;
         window.location.href = whatsappUrl;
     }
+}
+
+function generaPaginaDiCortesiaRitenuta(safeReceipt, dettagliRitenutaRicevuta) {
+    const lordo = parseFloat(safeReceipt.importo) || 0;
+    const ritenuta = safeReceipt.ritenuta ? parseFloat(safeReceipt.ritenuta) : dettagliRitenutaRicevuta.ritenuta;
+    const baseImponibile = dettagliRitenutaRicevuta.baseImponibile;
+
+    // Calcola l'anno dalla data della ricevuta (formato GG/MM/AAAA)
+    const dataRicevuta = parseDataItaliana(safeReceipt.data);
+    const annoRicevuta = dataRicevuta ? dataRicevuta.getFullYear() : new Date().getFullYear();
+    const annoSuccessivo = annoRicevuta + 1;
+
+    // Scadenza versamento F24: 16 del mese successivo al pagamento
+    let scadenzaF24 = '';
+    if (dataRicevuta) {
+        const mesiItaliani = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+        const dataScadenza = new Date(dataRicevuta.getFullYear(), dataRicevuta.getMonth() + 1, 16);
+        scadenzaF24 = `16 ${mesiItaliani[dataScadenza.getMonth()]} ${dataScadenza.getFullYear()}`;
+    } else {
+        scadenzaF24 = '16 del mese successivo al pagamento';
+    }
+
+    const sectionStyle = 'margin-bottom: 14px; padding: 10px 12px; border-left: 3px solid #1e40af; background: #f0f4ff; border-radius: 0 4px 4px 0;';
+    const titleStyle = 'font-size: 0.88rem; font-weight: bold; color: #1e3a8a; margin: 0 0 6px 0;';
+    const textStyle = 'font-size: 0.8rem; color: #1e293b; margin: 3px 0; line-height: 1.4;';
+    const noteStyle = 'font-size: 0.75rem; color: #6b7280; margin-top: 5px; font-style: italic;';
+    const warningStyle = 'font-size: 0.8rem; color: #b91c1c; font-weight: bold; margin: 4px 0;';
+
+    return `
+        <div style="page-break-before: always; background: #fff; color: #000; padding: 20px; border-radius: 8px; margin-top: 0; font-family: Arial, sans-serif;">
+            <div style="text-align: center; border-bottom: 2px solid #1e40af; padding-bottom: 10px; margin-bottom: 16px;">
+                <p style="font-size: 0.72rem; color: #6b7280; margin: 0 0 4px 0;">PAGINA DI CORTESIA PER L'ACQUIRENTE</p>
+                <h3 style="font-size: 1rem; color: #1e3a8a; margin: 0 0 4px 0;">⚠️ ADEMPIMENTI FISCALI DELL'ACQUIRENTE</h3>
+                <p style="font-size: 0.75rem; color: #374151; margin: 0;">Ricevuta con Ritenuta d'Acconto — ${safeReceipt.acquirente} — Data: ${safeReceipt.data}</p>
+            </div>
+
+            <div style="${sectionStyle}">
+                <p style="${titleStyle}">1. COSA DEVE FARE L'ACQUIRENTE</p>
+                <p style="${textStyle}">In qualità di acquirente soggetto passivo IVA (impresa o professionista), sei il <strong>sostituto d'imposta</strong>. Hai l'obbligo di:</p>
+                <p style="${textStyle}">• Trattenere la ritenuta d'acconto (23% sul 78% del lordo) al momento del pagamento;</p>
+                <p style="${textStyle}">• Versare la ritenuta all'Erario tramite modello F24 entro il <strong>16 del mese successivo</strong> al pagamento;</p>
+                <p style="${textStyle}">• Emettere e conservare un'<strong>autofattura</strong> per documentare l'acquisto;</p>
+                <p style="${textStyle}">• Rilasciare al venditore la <strong>Certificazione Unica (CU)</strong> entro il 31 marzo dell'anno successivo;</p>
+                <p style="${textStyle}">• Dichiarare i compensi corrisposti nel <strong>Modello 770</strong>.</p>
+            </div>
+
+            <div style="${sectionStyle}">
+                <p style="${titleStyle}">2. AUTOFATTURA (TD20)</p>
+                <p style="${textStyle}">L'acquirente deve emettere un'autofattura elettronica tramite il Sistema di Interscambio (SDI) con <strong>tipo documento TD20</strong> (acquisto da soggetti non titolari di P.IVA con ritenuta).</p>
+                <p style="${textStyle}">• Riferimento normativo: art. 17, comma 2, DPR 633/1972 e Provvedimento AdE del 28/02/2020;</p>
+                <p style="${textStyle}">• L'autofattura deve riportare: i dati del venditore (CF: ${safeReceipt.venditoreCf}), l'importo lordo (€ ${lordo.toFixed(2)}), la base imponibile (€ ${baseImponibile.toFixed(2)}) e la ritenuta applicata (€ ${ritenuta.toFixed(2)}).</p>
+                <p style="${noteStyle}">Conservare l'autofattura per 10 anni insieme alla presente ricevuta.</p>
+            </div>
+
+            <div style="${sectionStyle}">
+                <p style="${titleStyle}">3. VERSAMENTO F24 — RITENUTA D'ACCONTO</p>
+                <p style="${textStyle}">La ritenuta trattenuta deve essere versata tramite <strong>modello F24</strong> entro il:</p>
+                <p style="${warningStyle}">📅 SCADENZA VERSAMENTO: ${scadenzaF24}</p>
+                <p style="${textStyle}"><strong>Come compilare il modello F24 (sezione ERARIO):</strong></p>
+                <p style="${textStyle}">• <strong>Codice Tributo:</strong> <u>1040</u> — Ritenute su redditi di lavoro autonomo occasionale;</p>
+                <p style="${textStyle}">• <strong>Anno di riferimento:</strong> ${annoRicevuta};</p>
+                <p style="${textStyle}">• <strong>Importo da versare:</strong> € ${ritenuta.toFixed(2)};</p>
+                <p style="${textStyle}">• <strong>Rateazione/Regione/Prov.:</strong> lasciare in bianco (non compilare);</p>
+                <p style="${textStyle}">• Il pagamento può essere effettuato tramite home banking, sportello bancario o Agenzia delle Entrate.</p>
+                <p style="${noteStyle}">Riferimento normativo: art. 25 DPR 600/1973 — DLgs 241/1997.</p>
+            </div>
+
+            <div style="${sectionStyle}">
+                <p style="${titleStyle}">4. CERTIFICAZIONE UNICA (CU) — SCADENZE</p>
+                <p style="${textStyle}">L'acquirente (sostituto d'imposta) è obbligato a:</p>
+                <p style="${textStyle}">• Trasmettere la CU all'<strong>Agenzia delle Entrate</strong> entro il <strong>31 marzo ${annoSuccessivo}</strong>;</p>
+                <p style="${warningStyle}">📋 CONSEGNARE LA CU AL VENDITORE (${safeReceipt.venditoreNome}) ENTRO IL 31 MARZO ${annoSuccessivo}</p>
+                <p style="${textStyle}">La CU attesta le ritenute operate e deve essere consegnata al tartufaio per consentirgli di presentare la propria dichiarazione dei redditi e recuperare le ritenute subite.</p>
+                <p style="${noteStyle}">Riferimento normativo: art. 4 DPR 322/1998. Sanzione per omessa trasmissione: € 100 per certificazione.</p>
+            </div>
+
+            <div style="${sectionStyle}">
+                <p style="${titleStyle}">5. MODELLO 770 — DICHIARAZIONE DEI SOSTITUTI D'IMPOSTA</p>
+                <p style="${textStyle}">I dati relativi alle ritenute operate nel ${annoRicevuta} devono essere dichiarati nel:</p>
+                <p style="${warningStyle}">📅 SCADENZA MODELLO 770: 31 ottobre ${annoSuccessivo}</p>
+                <p style="${textStyle}">Il Modello 770 deve riportare i dati del venditore (CF: ${safeReceipt.venditoreCf}), i compensi corrisposti e le ritenute operate.</p>
+                <p style="${noteStyle}">Il modello va trasmesso telematicamente all'Agenzia delle Entrate. Riferimento normativo: art. 4 DPR 322/1998.</p>
+            </div>
+
+            <div style="margin-top: 14px; padding: 10px; border: 1px solid #f59e0b; background: #fffbeb; border-radius: 4px;">
+                <p style="font-size: 0.8rem; color: #92400e; font-weight: bold; margin: 0 0 4px 0;">⚠️ RIEPILOGO SCADENZE — Anno ${annoRicevuta}</p>
+                <p style="font-size: 0.78rem; color: #78350f; margin: 2px 0;">• Versamento F24 (cod. 1040): <strong>${scadenzaF24}</strong> — € ${ritenuta.toFixed(2)}</p>
+                <p style="font-size: 0.78rem; color: #78350f; margin: 2px 0;">• Consegna CU al venditore ${safeReceipt.venditoreNome}: <strong>31 marzo ${annoSuccessivo}</strong></p>
+                <p style="font-size: 0.78rem; color: #78350f; margin: 2px 0;">• Trasmissione CU all'Agenzia delle Entrate: <strong>31 marzo ${annoSuccessivo}</strong></p>
+                <p style="font-size: 0.78rem; color: #78350f; margin: 2px 0;">• Presentazione Modello 770: <strong>31 ottobre ${annoSuccessivo}</strong></p>
+                <p style="font-size: 0.72rem; color: #6b7280; margin-top: 6px; font-style: italic;">Questa pagina ha valore puramente informativo e non sostituisce la consulenza di un professionista fiscale.</p>
+            </div>
+        </div>
+    `;
 }
 
 function chiudiDettaglioRicevuta() {
