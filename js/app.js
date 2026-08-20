@@ -421,15 +421,16 @@ function waitForNextUiFrame() {
     });
 }
 
-const MAX_DIALOG_SETTLE_FRAMES = 12;
+const MAX_DIALOG_SETTLE_FRAMES = 12; // ~200ms at 60fps to let the browser finish closing the previous dialog.
 
 async function waitForDialogToSettle(dialog) {
     if (!dialog) return;
-    let remainingFrames = MAX_DIALOG_SETTLE_FRAMES;
-    do {
+    await waitForNextUiFrame();
+    let remainingFrames = MAX_DIALOG_SETTLE_FRAMES - 1;
+    while (dialog.open && remainingFrames > 0) {
         await waitForNextUiFrame();
         remainingFrames -= 1;
-    } while (dialog.open && remainingFrames > 0);
+    }
 }
 
 function appSelect(message, options = [], defaultValue = '') {
