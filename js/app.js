@@ -1475,34 +1475,34 @@ async function savePoiPosition(forceLat, forceLng) {
     if (_isSavePoiPositionFlowActive) return;
     _isSavePoiPositionFlowActive = true;
     try {
-    const hasForcedCoords = forceLat !== undefined && forceLng !== undefined;
-    if (!hasForcedCoords) {
-        if (_isPoiMapPickModeActive) {
-            cancelPoiMapPickMode(true);
-            return;
+        const hasForcedCoords = forceLat !== undefined && forceLng !== undefined;
+        if (!hasForcedCoords) {
+            if (_isPoiMapPickModeActive) {
+                cancelPoiMapPickMode(true);
+                return;
+            }
+            const saveSource = await appChoosePoiSaveSource('Come vuoi aggiungere il nuovo punto di interesse?');
+            await waitForDialogToSettle(document.getElementById('app-dialog'));
+            if (saveSource === 'map') {
+                activatePoiMapPickMode();
+                return;
+            }
+            if (saveSource !== 'gps') return;
         }
-        const saveSource = await appChoosePoiSaveSource('Come vuoi aggiungere il nuovo punto di interesse?');
-        await waitForDialogToSettle(document.getElementById('app-dialog'));
-        if (saveSource === 'map') {
-            activatePoiMapPickMode();
-            return;
-        }
-        if (saveSource !== 'gps') return;
-    }
-    const pos = resolvePoiCoords(forceLat, forceLng, userMarker);
-    if (pos) {
-        const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
-        if (note === null) return;
-        await waitForDialogToSettle(document.getElementById('app-dialog'));
-        const marker = await choosePoiMarker();
-        if (marker === null) return;
-        const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, marker);
-        renderAllPoiMarkers();
-        targetNavigation = `poi_${newIndex}`;
-        map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18));
-        if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
-        showToast(`${marker} Punto salvato!`, 'success');
-    } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
+        const pos = resolvePoiCoords(forceLat, forceLng, userMarker);
+        if (pos) {
+            const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
+            if (note === null) return;
+            await waitForDialogToSettle(document.getElementById('app-dialog'));
+            const marker = await choosePoiMarker();
+            if (marker === null) return;
+            const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, marker);
+            renderAllPoiMarkers();
+            targetNavigation = `poi_${newIndex}`;
+            map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18));
+            if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
+            showToast(`${marker} Punto salvato!`, 'success');
+        } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
     } finally {
         _isSavePoiPositionFlowActive = false;
     }
