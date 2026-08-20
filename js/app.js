@@ -490,7 +490,7 @@ function appChoosePoiSaveSource(message) {
             const fallback = window.prompt(`${message}\nScrivi "mappa" per scegliere un punto sulla mappa, altrimenti "gps".`, 'gps');
             const normalized = String(fallback || '').trim().toLowerCase();
             if (normalized === 'gps') resolve('gps');
-            else if (normalized === 'mappa' || normalized === 'map') resolve('map');
+            else if (normalized === 'mappa') resolve('map');
             else resolve(null);
             return;
         }
@@ -1036,7 +1036,7 @@ function updatePoiMapPickButtonState() {
     if (!button) return;
     button.classList.toggle('btn-info', _isPoiMapPickModeActive);
     button.setAttribute('aria-pressed', _isPoiMapPickModeActive ? 'true' : 'false');
-    button.textContent = _isPoiMapPickModeActive ? '✕ Annulla Punto' : '📍 Segna Punto';
+    button.textContent = _isPoiMapPickModeActive ? '✕ Annulla punto' : '📍 Segna Punto';
 }
 
 function setPoiMapPickMode(active) {
@@ -1441,7 +1441,10 @@ function saveCarPosition() {
 async function savePoiPosition(forceLat, forceLng) {
     const hasForcedCoords = forceLat !== undefined && forceLng !== undefined;
     if (!hasForcedCoords) {
-        if (cancelPoiMapPickMode(true)) return;
+        if (_isPoiMapPickModeActive) {
+            cancelPoiMapPickMode(true);
+            return;
+        }
         const saveSource = await appChoosePoiSaveSource('Come vuoi aggiungere il nuovo punto di interesse?');
         if (saveSource === 'map') {
             activatePoiMapPickMode();
