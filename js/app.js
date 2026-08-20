@@ -3919,62 +3919,65 @@ function visualizzaRicevutaSalvata(index) {
     const nomiMesi = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
     const scadenzaF24Testo = `16 ${nomiMesi[mesePagamentoScadenza - 1]} ${annoPagamentoScadenza}`;
     const periodoRiferimentoF24 = `${meseRiferimento}/${annoRiferimento}`;
+    const f24TableStyle = 'width:100%; border-collapse:collapse; table-layout:fixed; font-size:0.82rem; color:#222; margin-bottom:14px;';
+    const f24LabelCellStyle = 'padding:5px 8px; font-weight:bold; width:38%; vertical-align:top; white-space:normal; overflow-wrap:anywhere; word-break:break-word;';
+    const f24ValueCellStyle = 'padding:5px 8px; vertical-align:top; white-space:normal; overflow-wrap:anywhere; word-break:break-word;';
 
     const paginaCortesiaRitenutaHtml = isRitenuta ? `
-        <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px; margin-top:0; page-break-before:always; break-before:page;">
+        <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px; margin-top:0; width:100%; box-sizing:border-box; page-break-before:always; break-before:page;">
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Pagina di Cortesia per l'Acquirente — Adempimenti Ritenuta d'Acconto</h3>
             <p style="margin-bottom:8px;"><strong>Questa pagina è un promemoria operativo per l'acquirente.</strong> Le scadenze possono subire proroghe: verificare sempre con il proprio consulente fiscale.</p>
 
             <h4 style="margin: 12px 0 6px 0; font-size: 0.95rem; color: #1a56db;">📋 Dati per la Compilazione del Modello F24 — Ritenuta d'Acconto</h4>
-            <table style="width:100%; border-collapse:collapse; font-size:0.88rem; color:#222; margin-bottom:14px;">
+            <table style="${f24TableStyle}">
                 <tbody>
                     <tr style="background:#f0f4ff;">
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap; width:45%;">Modello</td>
-                        <td style="padding:5px 8px;">F24</td>
+                        <td style="${f24LabelCellStyle}">Modello</td>
+                        <td style="${f24ValueCellStyle}">F24</td>
                     </tr>
                     <tr>
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Sezione</td>
-                        <td style="padding:5px 8px;">Erario</td>
+                        <td style="${f24LabelCellStyle}">Sezione</td>
+                        <td style="${f24ValueCellStyle}">Erario</td>
                     </tr>
                     <tr style="background:#f0f4ff;">
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Codice Tributo</td>
-                        <td style="padding:5px 8px; font-weight:bold; color:#1a56db;">1040</td>
+                        <td style="${f24LabelCellStyle}">Codice Tributo</td>
+                        <td style="${f24ValueCellStyle} font-weight:bold; color:#1a56db;">1040</td>
                     </tr>
                     <tr>
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Descrizione Tributo</td>
-                        <td style="padding:5px 8px;">Ritenute su redditi di lavoro autonomo occasionale (art. 25 DPR 600/73)</td>
+                        <td style="${f24LabelCellStyle}">Descrizione Tributo</td>
+                        <td style="${f24ValueCellStyle}">Ritenute su redditi di lavoro autonomo occasionale (art. 25 DPR 600/73)</td>
                     </tr>
                     <tr style="background:#f0f4ff;">
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Anno di Riferimento</td>
-                        <td style="padding:5px 8px;">${annoRiferimento}</td>
+                        <td style="${f24LabelCellStyle}">Anno di Riferimento</td>
+                        <td style="${f24ValueCellStyle}">${annoRiferimento}</td>
                     </tr>
                     <tr>
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Periodo di Riferimento</td>
-                        <td style="padding:5px 8px;">${periodoRiferimentoF24}</td>
+                        <td style="${f24LabelCellStyle}">Periodo di Riferimento</td>
+                        <td style="${f24ValueCellStyle}">${periodoRiferimentoF24}</td>
                     </tr>
                     <tr style="background:#f0f4ff;">
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Compenso Lordo Erogato</td>
-                        <td style="padding:5px 8px;">€ ${safeReceipt.importo}</td>
+                        <td style="${f24LabelCellStyle}">Compenso Lordo Erogato</td>
+                        <td style="${f24ValueCellStyle}">€ ${safeReceipt.importo}</td>
                     </tr>
                     <tr>
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Base Imponibile (78%)</td>
-                        <td style="padding:5px 8px;">€ ${baseImponibileF24}</td>
+                        <td style="${f24LabelCellStyle}">Base Imponibile (78%)</td>
+                        <td style="${f24ValueCellStyle}">€ ${baseImponibileF24}</td>
                     </tr>
                     <tr style="background:#f0f4ff;">
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Importo a Debito (Ritenuta 23%)</td>
-                        <td style="padding:5px 8px; font-weight:bold; color:#c0392b;">€ ${ritenutaImportoF24}</td>
+                        <td style="${f24LabelCellStyle}">Importo a Debito (Ritenuta 23%)</td>
+                        <td style="${f24ValueCellStyle} font-weight:bold; color:#c0392b;">€ ${ritenutaImportoF24}</td>
                     </tr>
                     <tr>
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Scadenza Versamento</td>
-                        <td style="padding:5px 8px; font-weight:bold;">Entro il ${scadenzaF24Testo} (salvo proroghe)</td>
+                        <td style="${f24LabelCellStyle}">Scadenza Versamento</td>
+                        <td style="${f24ValueCellStyle} font-weight:bold;">Entro il ${scadenzaF24Testo} (salvo proroghe)</td>
                     </tr>
                     <tr style="background:#f0f4ff;">
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Contribuente (Acquirente — Sostituto d'imposta)</td>
-                        <td style="padding:5px 8px;">${safeReceipt.acquirente}${safeReceipt.acquirenteCf ? ' — CF/P.IVA: ' + safeReceipt.acquirenteCf : ''}</td>
+                        <td style="${f24LabelCellStyle}">Contribuente (Acquirente — Sostituto d'imposta)</td>
+                        <td style="${f24ValueCellStyle}">${safeReceipt.acquirente}${safeReceipt.acquirenteCf ? ' — CF/P.IVA: ' + safeReceipt.acquirenteCf : ''}</td>
                     </tr>
                     <tr>
-                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Percipiente (Venditore)</td>
-                        <td style="padding:5px 8px;">${safeReceipt.venditoreNome} — CF: ${safeReceipt.venditoreCf}</td>
+                        <td style="${f24LabelCellStyle}">Percipiente (Venditore)</td>
+                        <td style="${f24ValueCellStyle}">${safeReceipt.venditoreNome} — CF: ${safeReceipt.venditoreCf}</td>
                     </tr>
                 </tbody>
             </table>
