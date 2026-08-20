@@ -425,8 +425,7 @@ const MAX_DIALOG_SETTLE_FRAMES = 12; // ~200ms at 60fps to let the browser finis
 
 async function waitForDialogToSettle(dialog) {
     if (!dialog) return;
-    await waitForNextUiFrame();
-    let remainingFrames = MAX_DIALOG_SETTLE_FRAMES - 1;
+    let remainingFrames = MAX_DIALOG_SETTLE_FRAMES;
     while (dialog.open && remainingFrames > 0) {
         await waitForNextUiFrame();
         remainingFrames -= 1;
@@ -1468,14 +1467,13 @@ function saveCarPosition() {
 }
 async function savePoiPosition(forceLat, forceLng) {
     const hasForcedCoords = forceLat !== undefined && forceLng !== undefined;
-    const appDialog = document.getElementById('app-dialog');
     if (!hasForcedCoords) {
         if (_isPoiMapPickModeActive) {
             cancelPoiMapPickMode(true);
             return;
         }
         const saveSource = await appChoosePoiSaveSource('Come vuoi aggiungere il nuovo punto di interesse?');
-        await waitForDialogToSettle(appDialog);
+        await waitForDialogToSettle(document.getElementById('app-dialog'));
         if (saveSource === 'map') {
             activatePoiMapPickMode();
             return;
@@ -1486,7 +1484,7 @@ async function savePoiPosition(forceLat, forceLng) {
     if (pos) {
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
         if (note === null) return;
-        await waitForDialogToSettle(appDialog);
+        await waitForDialogToSettle(document.getElementById('app-dialog'));
         const marker = await choosePoiMarker();
         if (marker === null) return;
         const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, marker);
