@@ -78,14 +78,20 @@ export function riepilogaAcquistiCliente(storicoVendite = [], nomeCliente = '') 
         riepilogo.numeroAcquisti += 1;
 
         if (regime === 'ritenuta') {
-            const dettagliRitenuta = calcolaDettaglioRitenuta(importoLordo);
+            let dettagliRitenuta = null;
+            const getDettagliRitenuta = () => {
+                if (!dettagliRitenuta) {
+                    dettagliRitenuta = calcolaDettaglioRitenuta(importoLordo);
+                }
+                return dettagliRitenuta;
+            };
             riepilogo.totaleRitenutaAcconto += importoLordo;
             riepilogo.nettoAcquistiRitenutaAcconto += vendita && vendita.netto !== undefined
                 ? parseFloat(vendita.netto) || 0
-                : dettagliRitenuta.netto;
+                : getDettagliRitenuta().netto;
             riepilogo.ritenuteDaVersare += vendita && vendita.ritenuta !== undefined
                 ? parseFloat(vendita.ritenuta) || 0
-                : dettagliRitenuta.ritenuta;
+                : getDettagliRitenuta().ritenuta;
         } else {
             riepilogo.totaleImpostaSostitutiva += importoLordo;
             riepilogo.nettoAcquistiImpostaSostitutiva += importoLordo;

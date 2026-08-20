@@ -2672,7 +2672,7 @@ function openModule(moduleName, editMode = false) {
             if (!Number.isInteger(originalIndex) || originalIndex < 0) return;
 
             const safeCliente = sanitizeRenderable(clienteData);
-            const riepilogoAcquisti = clienteData.riepilogoAcquisti || riepilogaAcquistiCliente(storicoVenditeRubrica, clienteData.nome);
+            const riepilogoAcquisti = clienteData.riepilogoAcquisti;
             const totaleAcquistiFormattato = riepilogoAcquisti.totaleAcquisti.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
             const nettoSostitutivaFormattato = riepilogoAcquisti.nettoAcquistiImpostaSostitutiva.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
             const nettoRitenutaFormattato = riepilogoAcquisti.nettoAcquistiRitenutaAcconto.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
