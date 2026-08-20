@@ -5,6 +5,7 @@ import {
   calcolaImportoTotale,
   calcolaStatoSogliaVendite,
   parseDataItaliana,
+  riepilogaAcquistiCliente,
   sommaVenditeAnno
 } from '../js/fiscal-utils.js';
 
@@ -48,5 +49,37 @@ describe('fiscal-utils', () => {
     expect(stato.superato).toBe(true);
     expect(stato.quantoManca).toBe(0);
     expect(SOGLIA_VENDITE_ANNUE).toBe(7000);
+  });
+
+  it('riepiloga gli acquisti cliente per regime fiscale', () => {
+    const storico = [
+      { acquirente: 'Cliente Uno', data: '10/01/2026', importo: '100.00', regime: 'sostitutiva' },
+      { acquirente: 'cliente uno', data: '15/02/2026', importo: '200.00', regime: 'ritenuta', netto: '164.12', ritenuta: '35.88' },
+      { acquirente: 'Cliente Due', data: '20/03/2026', importo: '50.00', regime: 'ritenuta' }
+    ];
+
+    const riepilogo = riepilogaAcquistiCliente(storico, 'Cliente Uno');
+
+    expect(riepilogo.totaleAcquisti).toBeCloseTo(300, 5);
+    expect(riepilogo.totaleImpostaSostitutiva).toBeCloseTo(100, 5);
+    expect(riepilogo.nettoAcquistiImpostaSostitutiva).toBeCloseTo(100, 5);
+    expect(riepilogo.totaleRitenutaAcconto).toBeCloseTo(200, 5);
+    expect(riepilogo.nettoAcquistiRitenutaAcconto).toBeCloseTo(164.12, 5);
+    expect(riepilogo.ritenuteDaVersare).toBeCloseTo(35.88, 5);
+    expect(riepilogo.numeroAcquisti).toBe(2);
+    expect(riepilogo.dataUltimoAcquisto).toBe('15/02/2026');
+  });
+
+  it('calcola il riepilogo cliente anche senza netto e ritenuta salvati', () => {
+    const storico = [
+      { acquirente: 'Cliente Uno', data: '2026-03-20', importo: '100.00', regime: 'ritenuta' }
+    ];
+
+    const riepilogo = riepilogaAcquistiCliente(storico, 'Cliente Uno');
+
+    expect(riepilogo.totaleAcquisti).toBeCloseTo(100, 5);
+    expect(riepilogo.nettoAcquistiRitenutaAcconto).toBeCloseTo(82.06, 5);
+    expect(riepilogo.ritenuteDaVersare).toBeCloseTo(17.94, 5);
+    expect(riepilogo.dataUltimoAcquisto).toBe('2026-03-20');
   });
 });
