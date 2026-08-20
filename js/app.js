@@ -336,19 +336,25 @@ function appAlert(message) {
     });
 }
 
-function appConfirm(message) {
+async function appConfirm(message) {
+    const dialog = document.getElementById('app-dialog');
+    const msg = document.getElementById('app-dialog-message');
+    const inputField = document.getElementById('app-dialog-input');
+    const cancelBtn = document.getElementById('app-dialog-cancel');
+    const okBtn = document.getElementById('app-dialog-ok');
+    if (!dialog || !msg || !inputField || !cancelBtn || !okBtn) { return window.confirm(message); }
+
+    // Yield to the event loop so any deferred 'close' event queued by the browser
+    // from a previously closed dialog fires before we attach new listeners.
+    await new Promise(r => setTimeout(r, 0));
+
+    msg.textContent = message;
+    inputField.style.display = 'none';
+    cancelBtn.style.display = '';
+    cancelBtn.textContent = 'Annulla';
+    okBtn.textContent = 'OK';
+
     return new Promise((resolve) => {
-        const dialog = document.getElementById('app-dialog');
-        const msg = document.getElementById('app-dialog-message');
-        const inputField = document.getElementById('app-dialog-input');
-        const cancelBtn = document.getElementById('app-dialog-cancel');
-        const okBtn = document.getElementById('app-dialog-ok');
-        if (!dialog) { resolve(window.confirm(message)); return; }
-        msg.textContent = message;
-        inputField.style.display = 'none';
-        cancelBtn.style.display = '';
-        cancelBtn.textContent = 'Annulla';
-        okBtn.textContent = 'OK';
         let resolved = false;
         const cleanup = () => {
             okBtn.removeEventListener('click', onOk);
