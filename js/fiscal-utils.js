@@ -79,12 +79,13 @@ export function riepilogaAcquistiCliente(storicoVendite = [], nomeCliente = '') 
         if (regime === 'ritenuta') {
             const nettoSalvato = vendita && vendita.netto !== undefined;
             const ritenutaSalvata = vendita && vendita.ritenuta !== undefined;
-            const dettagliRitenuta = nettoSalvato && ritenutaSalvata ? null : calcolaDettaglioRitenuta(importoLordo);
+            const dettagliSalvati = nettoSalvato && ritenutaSalvata;
+            const dettagliRitenuta = dettagliSalvati ? null : calcolaDettaglioRitenuta(importoLordo);
             riepilogo.totaleRitenutaAcconto += importoLordo;
-            riepilogo.nettoAcquistiRitenutaAcconto += nettoSalvato && ritenutaSalvata
+            riepilogo.nettoAcquistiRitenutaAcconto += dettagliSalvati
                 ? parseFloat(vendita.netto) || 0
                 : dettagliRitenuta.netto;
-            riepilogo.ritenuteDaVersare += nettoSalvato && ritenutaSalvata
+            riepilogo.ritenuteDaVersare += dettagliSalvati
                 ? parseFloat(vendita.ritenuta) || 0
                 : dettagliRitenuta.ritenuta;
         } else {
