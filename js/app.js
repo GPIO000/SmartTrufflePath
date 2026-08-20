@@ -40,7 +40,13 @@ let shouldReloadOnNextServiceWorkerControllerChange = false;
 function monitorInstallingServiceWorker(worker) {
     if (!worker || typeof worker.addEventListener !== 'function') return;
     worker.addEventListener('statechange', () => {
-        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+        const state = worker.state;
+        // Controlla sia 'installed' che 'activating': quando skipWaiting() è chiamato
+        // nell'evento install, la transizione installed→activating può avvenire così
+        // rapidamente che l'handler riceve il statechange già con state='activating'.
+        // Verificare entrambi gli stati garantisce che il flag venga impostato prima
+        // che clients.claim() nell'evento activate faccia scattare 'controllerchange'.
+        if ((state === 'installed' || state === 'activating') && navigator.serviceWorker.controller) {
             shouldReloadOnNextServiceWorkerControllerChange = true;
         }
     });
@@ -342,15 +348,24 @@ function appConfirm(message) {
         cancelBtn.style.display = '';
         cancelBtn.textContent = 'Annulla';
         okBtn.textContent = 'OK';
+        let resolved = false;
         const cleanup = () => {
-            dialog.close();
             okBtn.removeEventListener('click', onOk);
             cancelBtn.removeEventListener('click', onCancel);
+            dialog.removeEventListener('close', onDialogClose);
         };
-        const onOk = () => { cleanup(); resolve(true); };
-        const onCancel = () => { cleanup(); resolve(false); };
+        const settle = (value) => {
+            if (resolved) return;
+            resolved = true;
+            cleanup();
+            resolve(value);
+        };
+        const onOk = () => { settle(true); dialog.close(); };
+        const onCancel = () => { settle(false); dialog.close(); };
+        const onDialogClose = () => { settle(false); };
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
+        dialog.addEventListener('close', onDialogClose);
         dialog.showModal();
     });
 }
@@ -363,9 +378,9 @@ function appPrompt(message, defaultValue = '') {
         const cancelBtn = document.getElementById('app-dialog-cancel');
         const okBtn = document.getElementById('app-dialog-ok');
         if (!dialog) { resolve(window.prompt(message, defaultValue)); return; }
+        if (dialog.open) { resolve(null); return; }
         msg.textContent = message;
-        const previousInputDisplay = inputField.style.display;
-        inputField.style.display = '';
+        inputField.style.display = 'block';
         inputField.value = defaultValue;
         cancelBtn.style.display = '';
         cancelBtn.textContent = 'Annulla';
@@ -375,7 +390,7 @@ function appPrompt(message, defaultValue = '') {
             okBtn.removeEventListener('click', onOk);
             cancelBtn.removeEventListener('click', onCancel);
             dialog.removeEventListener('close', onDialogClose);
-            inputField.style.display = previousInputDisplay;
+            inputField.style.display = 'none';
         };
         const settle = (value) => {
             if (resolved) return;
