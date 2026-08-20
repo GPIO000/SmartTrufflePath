@@ -1165,7 +1165,10 @@ async function confirmPoiFromMapLongPress(latlng) {
         return;
     }
     const ok = await appConfirm(`📍 Vuoi segnalare un nuovo punto in questa posizione?\n(${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)})`);
-    if (ok) savePoiPosition(latlng.lat, latlng.lng);
+    if (ok) {
+        await waitForDialogToSettle(document.getElementById('app-dialog'));
+        await savePoiPosition(latlng.lat, latlng.lng);
+    }
 }
 
 map.on('mousedown', (e) => {
