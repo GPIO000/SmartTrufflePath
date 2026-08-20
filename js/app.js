@@ -1024,6 +1024,13 @@ function getMapLatLngFromPointerEvent(originalEvent) {
     return { lat: latlng.lat, lng: latlng.lng };
 }
 
+function isMouseLongPressEvent(originalEvent) {
+    if (!originalEvent) return false;
+    if (originalEvent.pointerType) return originalEvent.pointerType === 'mouse';
+    if (originalEvent.sourceCapabilities?.firesTouchEvents) return false;
+    return originalEvent.type === 'mousedown';
+}
+
 async function confirmPoiFromMapLongPress(latlng) {
     if (!latlng) return;
     const handledAt = Date.now();
@@ -1034,10 +1041,12 @@ async function confirmPoiFromMapLongPress(latlng) {
 }
 
 map.on('mousedown', (e) => {
+    if (!isMouseLongPressEvent(e.originalEvent)) return;
     beginMapLongPress({ lat: e.latlng.lat, lng: e.latlng.lng }, e.originalEvent);
 });
 
 map.on('mousemove', (e) => {
+    if (!isMouseLongPressEvent(e.originalEvent)) return;
     updateMapLongPressMovement(e.originalEvent);
 });
 
