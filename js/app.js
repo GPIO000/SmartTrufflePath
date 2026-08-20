@@ -1036,7 +1036,7 @@ function updatePoiMapPickButtonState() {
     if (!button) return;
     button.classList.toggle('btn-info', _isPoiMapPickModeActive);
     button.setAttribute('aria-pressed', _isPoiMapPickModeActive ? 'true' : 'false');
-    button.textContent = _isPoiMapPickModeActive ? '✕ Annulla punto' : '📍 Segna Punto';
+    button.textContent = _isPoiMapPickModeActive ? '✕ Annulla punto' : '📍 Segna punto';
 }
 
 function setPoiMapPickMode(active) {
@@ -1451,8 +1451,6 @@ async function savePoiPosition(forceLat, forceLng) {
             return;
         }
         if (saveSource !== 'gps') return;
-    } else {
-        cancelPoiMapPickMode();
     }
     const pos = resolvePoiCoords(forceLat, forceLng, userMarker);
     if (pos) {
