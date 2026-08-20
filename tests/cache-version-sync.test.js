@@ -8,17 +8,18 @@ function extractMatch(source, regex, label) {
 }
 
 describe('cache version sync', () => {
-  it('defines cache version suffix only in sw.js', () => {
+  it('loads cache version from the shared version file', () => {
     const swSource = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
-    const appSource = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+    const versionSource = readFileSync(new URL('../js/cache-version.js', import.meta.url), 'utf8');
 
-    const swVersion = extractMatch(
-      swSource,
-      /const CACHE_NAME = 'smarttruffle-path-' \+ '([^']+)'/,
-      'sw.js cache version'
+    const sharedVersion = extractMatch(
+      versionSource,
+      /globalThis\.SMARTTRUFFLE_CACHE_VERSION = '([^']+)'/,
+      'shared cache version'
     );
 
-    expect(swVersion).toMatch(/^\d{4}-\d{2}-\d{2}[a-z]+$/);
-    expect(appSource).not.toMatch(/const APP_CACHE_NAME_CURRENT =/);
+    expect(sharedVersion).toMatch(/^\d{4}-\d{2}-\d{2}[a-z]+$/);
+    expect(swSource).toMatch(/importScripts\('\.\/js\/cache-version\.js'\)/);
+    expect(swSource).toMatch(/const CACHE_NAME = 'smarttruffle-path-' \+ CACHE_VERSION/);
   });
 });
