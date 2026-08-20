@@ -487,7 +487,7 @@ function appChoosePoiSaveSource(message) {
         const altBtn = document.getElementById('app-dialog-alt');
         const okBtn = document.getElementById('app-dialog-ok');
         if (!dialog || !altBtn) {
-            const fallback = window.prompt(`${message}\nScrivi "mappa" per scegliere un punto sulla mappa, altrimenti "gps".`, 'mappa');
+            const fallback = window.prompt(`${message}\nScrivi "mappa" per scegliere un punto sulla mappa, altrimenti "gps".`, 'gps');
             const normalized = String(fallback || '').trim().toLowerCase();
             if (normalized === 'gps') resolve('gps');
             else if (normalized === 'mappa' || normalized === 'map') resolve('map');
@@ -1129,14 +1129,14 @@ function isMouseLongPressEvent(originalEvent) {
 
 async function confirmPoiFromMapLongPress(latlng) {
     if (!latlng) return;
+    const handledAt = Date.now();
+    if (isDuplicateMapLongPress(_lastHandledMapLongPress, latlng, handledAt, DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS)) return;
+    _lastHandledMapLongPress = { lat: latlng.lat, lng: latlng.lng, timestamp: handledAt };
     if (_isPoiMapPickModeActive) {
         cancelPoiMapPickMode();
         await savePoiPosition(latlng.lat, latlng.lng);
         return;
     }
-    const handledAt = Date.now();
-    if (isDuplicateMapLongPress(_lastHandledMapLongPress, latlng, handledAt, DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS)) return;
-    _lastHandledMapLongPress = { lat: latlng.lat, lng: latlng.lng, timestamp: handledAt };
     const ok = await appConfirm(`📍 Vuoi segnalare un nuovo punto in questa posizione?\n(${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)})`);
     if (ok) savePoiPosition(latlng.lat, latlng.lng);
 }
