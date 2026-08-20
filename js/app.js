@@ -342,15 +342,24 @@ function appConfirm(message) {
         cancelBtn.style.display = '';
         cancelBtn.textContent = 'Annulla';
         okBtn.textContent = 'OK';
+        let resolved = false;
         const cleanup = () => {
-            dialog.close();
             okBtn.removeEventListener('click', onOk);
             cancelBtn.removeEventListener('click', onCancel);
+            dialog.removeEventListener('close', onDialogClose);
         };
-        const onOk = () => { cleanup(); resolve(true); };
-        const onCancel = () => { cleanup(); resolve(false); };
+        const settle = (value) => {
+            if (resolved) return;
+            resolved = true;
+            cleanup();
+            resolve(value);
+        };
+        const onOk = () => { settle(true); dialog.close(); };
+        const onCancel = () => { settle(false); dialog.close(); };
+        const onDialogClose = () => { settle(false); };
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
+        dialog.addEventListener('close', onDialogClose);
         dialog.showModal();
     });
 }
@@ -363,9 +372,9 @@ function appPrompt(message, defaultValue = '') {
         const cancelBtn = document.getElementById('app-dialog-cancel');
         const okBtn = document.getElementById('app-dialog-ok');
         if (!dialog) { resolve(window.prompt(message, defaultValue)); return; }
+        if (dialog.open) { resolve(null); return; }
         msg.textContent = message;
-        const previousInputDisplay = inputField.style.display;
-        inputField.style.display = '';
+        inputField.style.display = 'block';
         inputField.value = defaultValue;
         cancelBtn.style.display = '';
         cancelBtn.textContent = 'Annulla';
@@ -375,7 +384,7 @@ function appPrompt(message, defaultValue = '') {
             okBtn.removeEventListener('click', onOk);
             cancelBtn.removeEventListener('click', onCancel);
             dialog.removeEventListener('close', onDialogClose);
-            inputField.style.display = previousInputDisplay;
+            inputField.style.display = 'none';
         };
         const settle = (value) => {
             if (resolved) return;
