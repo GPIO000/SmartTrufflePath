@@ -53,6 +53,7 @@ function parseDataVendita(dataStringa) {
 
 export function riepilogaAcquistiCliente(storicoVendite = [], nomeCliente = '') {
     const nomeClienteNormalizzato = String(nomeCliente || '').trim().toLowerCase();
+    const filtraPerCliente = Boolean(nomeClienteNormalizzato);
     const riepilogo = {
         totaleAcquisti: 0,
         totaleImpostaSostitutiva: 0,
@@ -64,13 +65,11 @@ export function riepilogaAcquistiCliente(storicoVendite = [], nomeCliente = '') 
         dataUltimoAcquisto: ''
     };
 
-    if (!nomeClienteNormalizzato) return riepilogo;
-
     let timestampUltimoAcquisto = null;
 
     storicoVendite.forEach((vendita) => {
         const nomeAcquirente = String(vendita && vendita.acquirente ? vendita.acquirente : '').trim().toLowerCase();
-        if (nomeAcquirente !== nomeClienteNormalizzato) return;
+        if (filtraPerCliente && nomeAcquirente !== nomeClienteNormalizzato) return;
 
         const importoLordo = parseFloat(vendita && vendita.importo) || 0;
         const regime = vendita && vendita.regime ? vendita.regime : 'sostitutiva';
@@ -80,15 +79,12 @@ export function riepilogaAcquistiCliente(storicoVendite = [], nomeCliente = '') 
         if (regime === 'ritenuta') {
             const nettoSalvato = vendita && vendita.netto !== undefined;
             const ritenutaSalvata = vendita && vendita.ritenuta !== undefined;
-            let dettagliRitenuta;
-            if (!nettoSalvato || !ritenutaSalvata) {
-                dettagliRitenuta = calcolaDettaglioRitenuta(importoLordo);
-            }
+            const dettagliRitenuta = nettoSalvato && ritenutaSalvata ? null : calcolaDettaglioRitenuta(importoLordo);
             riepilogo.totaleRitenutaAcconto += importoLordo;
-            riepilogo.nettoAcquistiRitenutaAcconto += nettoSalvato
+            riepilogo.nettoAcquistiRitenutaAcconto += nettoSalvato && ritenutaSalvata
                 ? parseFloat(vendita.netto) || 0
                 : dettagliRitenuta.netto;
-            riepilogo.ritenuteDaVersare += ritenutaSalvata
+            riepilogo.ritenuteDaVersare += nettoSalvato && ritenutaSalvata
                 ? parseFloat(vendita.ritenuta) || 0
                 : dettagliRitenuta.ritenuta;
         } else {

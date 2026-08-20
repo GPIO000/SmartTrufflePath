@@ -2665,8 +2665,7 @@ function openModule(moduleName, editMode = false) {
             ...cliente,
             originalIndex,
             riepilogoAcquisti: riepilogaAcquistiCliente(
-                storicoVenditePerCliente.get((cliente.nome || '').trim().toLowerCase()) || [],
-                cliente.nome
+                storicoVenditePerCliente.get((cliente.nome || '').trim().toLowerCase()) || []
             )
         }))
         .sort((a, b) => (b.riepilogoAcquisti?.totaleAcquisti || 0) - (a.riepilogoAcquisti?.totaleAcquisti || 0));

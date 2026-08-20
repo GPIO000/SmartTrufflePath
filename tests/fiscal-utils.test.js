@@ -82,4 +82,16 @@ describe('fiscal-utils', () => {
     expect(riepilogo.ritenuteDaVersare).toBeCloseTo(17.94, 5);
     expect(riepilogo.dataUltimoAcquisto).toBe('2026-03-20');
   });
+
+  it('riepiloga una lista già filtrata anche senza nome cliente', () => {
+    const storicoFiltrato = [
+      { acquirente: 'Cliente Uno', data: '10/01/2026', importo: '100.00', regime: 'sostitutiva' },
+      { acquirente: 'Cliente Uno', data: '15/02/2026', importo: '200.00', regime: 'ritenuta' }
+    ];
+
+    const riepilogo = riepilogaAcquistiCliente(storicoFiltrato);
+
+    expect(riepilogo.totaleAcquisti).toBeCloseTo(300, 5);
+    expect(riepilogo.numeroAcquisti).toBe(2);
+  });
 });
