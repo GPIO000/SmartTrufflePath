@@ -3901,15 +3901,88 @@ function visualizzaRicevutaSalvata(index) {
         </div>
     ` : `<p style="margin-top: 8px;"><strong>Modalità di Pagamento:</strong> ${metodoPagamentoLabel}</p>`;
 
+    const ritenutaImportoF24 = safeReceipt.ritenuta ? parseFloat(safeReceipt.ritenuta).toFixed(2) : dettagliRitenutaRicevuta.ritenuta.toFixed(2);
+    const baseImponibileF24 = safeReceipt.importo
+        ? (parseFloat(safeReceipt.importo) * 0.78).toFixed(2)
+        : dettagliRitenutaRicevuta.baseImponibile.toFixed(2);
+    const dataVenditaF24 = (() => {
+        try {
+            const parts = (v.data || '').split('/');
+            if (parts.length === 3) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        } catch (_e) { /* ignore */ }
+        return new Date();
+    })();
+    const meseRiferimento = String(dataVenditaF24.getMonth() + 1).padStart(2, '0');
+    const annoRiferimento = String(dataVenditaF24.getFullYear());
+    const mesePagamentoScadenza = dataVenditaF24.getMonth() + 1 === 12 ? 1 : dataVenditaF24.getMonth() + 2;
+    const annoPagamentoScadenza = dataVenditaF24.getMonth() + 1 === 12 ? dataVenditaF24.getFullYear() + 1 : dataVenditaF24.getFullYear();
+    const nomiMesi = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+    const scadenzaF24Testo = `16 ${nomiMesi[mesePagamentoScadenza - 1]} ${annoPagamentoScadenza}`;
+    const periodoRiferimentoF24 = `${meseRiferimento}/${annoRiferimento}`;
+
     const paginaCortesiaRitenutaHtml = isRitenuta ? `
         <div class="module-card" style="background:#fff; color:#000; padding:20px; border-radius:8px; margin-top:0; page-break-before:always; break-before:page;">
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px; font-size: 1rem; color: #333;">Pagina di Cortesia per l'Acquirente — Adempimenti Ritenuta d'Acconto</h3>
             <p style="margin-bottom:8px;"><strong>Questa pagina è un promemoria operativo per l'acquirente.</strong> Le scadenze possono subire proroghe: verificare sempre con il proprio consulente fiscale.</p>
+
+            <h4 style="margin: 12px 0 6px 0; font-size: 0.95rem; color: #1a56db;">📋 Dati per la Compilazione del Modello F24 — Ritenuta d'Acconto</h4>
+            <table style="width:100%; border-collapse:collapse; font-size:0.88rem; color:#222; margin-bottom:14px;">
+                <tbody>
+                    <tr style="background:#f0f4ff;">
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap; width:45%;">Modello</td>
+                        <td style="padding:5px 8px;">F24</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Sezione</td>
+                        <td style="padding:5px 8px;">Erario</td>
+                    </tr>
+                    <tr style="background:#f0f4ff;">
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Codice Tributo</td>
+                        <td style="padding:5px 8px; font-weight:bold; color:#1a56db;">1040</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Descrizione Tributo</td>
+                        <td style="padding:5px 8px;">Ritenute su redditi di lavoro autonomo occasionale (art. 25 DPR 600/73)</td>
+                    </tr>
+                    <tr style="background:#f0f4ff;">
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Anno di Riferimento</td>
+                        <td style="padding:5px 8px;">${annoRiferimento}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Periodo di Riferimento</td>
+                        <td style="padding:5px 8px;">${periodoRiferimentoF24}</td>
+                    </tr>
+                    <tr style="background:#f0f4ff;">
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Compenso Lordo Erogato</td>
+                        <td style="padding:5px 8px;">€ ${safeReceipt.importo}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Base Imponibile (78%)</td>
+                        <td style="padding:5px 8px;">€ ${baseImponibileF24}</td>
+                    </tr>
+                    <tr style="background:#f0f4ff;">
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Importo a Debito (Ritenuta 23%)</td>
+                        <td style="padding:5px 8px; font-weight:bold; color:#c0392b;">€ ${ritenutaImportoF24}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Scadenza Versamento</td>
+                        <td style="padding:5px 8px; font-weight:bold;">Entro il ${scadenzaF24Testo} (salvo proroghe)</td>
+                    </tr>
+                    <tr style="background:#f0f4ff;">
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Contribuente (Acquirente — Sostituto d'imposta)</td>
+                        <td style="padding:5px 8px;">${safeReceipt.acquirente}${safeReceipt.acquirenteCf ? ' — CF/P.IVA: ' + safeReceipt.acquirenteCf : ''}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:5px 8px; font-weight:bold; white-space:nowrap;">Percipiente (Venditore)</td>
+                        <td style="padding:5px 8px;">${safeReceipt.venditoreNome} — CF: ${safeReceipt.venditoreCf}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4 style="margin: 12px 0 6px 0; font-size: 0.95rem; color: #333;">Adempimenti Successivi</h4>
             <ol style="padding-left:18px; line-height:1.45;">
                 <li style="margin-bottom:8px;"><strong>Autofattura / documento di acquisto da privato:</strong> registrare correttamente l'acquisto del tartufo da raccoglitore occasionale con i dati della ricevuta.</li>
-                <li style="margin-bottom:8px;"><strong>Pagamento ritenuta con F24:</strong> versare la ritenuta d'acconto del 23% trattenuta sul corrispettivo imponibile.</li>
-                <li style="margin-bottom:8px;"><strong>Compilazione F24:</strong> indicare codice tributo, periodo di riferimento, importo ritenuta e dati anagrafici/fiscali dell'acquirente secondo le istruzioni fiscali vigenti.</li>
-                <li style="margin-bottom:8px;"><strong>Scadenza versamento F24:</strong> entro il giorno 16 del mese successivo al pagamento del corrispettivo (salvo proroghe).</li>
+                <li style="margin-bottom:8px;"><strong>Pagamento ritenuta con F24:</strong> versare la ritenuta d'acconto (€ ${ritenutaImportoF24}) utilizzando i dati della tabella sopra, entro il ${scadenzaF24Testo}.</li>
                 <li style="margin-bottom:8px;"><strong>Certificazione Unica (CU):</strong> predisporre e rilasciare al tartufaio la CU dei compensi/ritenute entro il 16 marzo dell'anno successivo (salvo proroghe).</li>
                 <li style="margin-bottom:8px;"><strong>Modello 770:</strong> includere i dati delle ritenute operate nel modello 770 con invio telematico entro la scadenza annuale prevista (tipicamente 31 ottobre, salvo proroghe).</li>
                 <li style="margin-bottom:0;"><strong>Promemoria consegna CU al tartufaio:</strong> ricordare la consegna della certificazione unica al venditore entro i termini, conservando prova della trasmissione.</li>
