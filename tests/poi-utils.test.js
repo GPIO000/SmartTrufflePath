@@ -14,6 +14,7 @@ import {
     normalizePoiMarker,
     parseLegacyDateToTimestamp,
     resolvePoiCoords,
+    toMapContainerPoint,
 } from '../js/poi-utils.js';
 
 // ---------------------------------------------------------------------------
@@ -109,6 +110,21 @@ describe('hasMapLongPressExceededTolerance', () => {
         expect(hasMapLongPressExceededTolerance(null, { x: 1, y: 1 })).toBe(false);
         expect(hasMapLongPressExceededTolerance({ x: 1, y: 1 }, null)).toBe(false);
         expect(hasMapLongPressExceededTolerance({ x: 1, y: 1 }, { x: 5, y: 5 }, -1)).toBe(false);
+    });
+});
+
+describe('toMapContainerPoint', () => {
+    it('converte un clientPoint nelle coordinate relative al contenitore', () => {
+        expect(toMapContainerPoint(
+            { x: 150, y: 90 },
+            { left: 100, top: 40 }
+        )).toEqual({ x: 50, y: 50 });
+    });
+
+    it('restituisce null quando i dati in ingresso non sono validi', () => {
+        expect(toMapContainerPoint(null, { left: 0, top: 0 })).toBeNull();
+        expect(toMapContainerPoint({ x: 10, y: 10 }, null)).toBeNull();
+        expect(toMapContainerPoint({ x: 'a', y: 10 }, { left: 0, top: 0 })).toBeNull();
     });
 });
 

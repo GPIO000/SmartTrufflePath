@@ -110,6 +110,16 @@ export function extractPointerClientPoint(event) {
     return { x: clientX, y: clientY };
 }
 
+export function toMapContainerPoint(clientPoint, containerRect) {
+    if (!clientPoint || !containerRect) return null;
+    const left = Number(containerRect.left);
+    const top = Number(containerRect.top);
+    const x = Number(clientPoint.x) - left;
+    const y = Number(clientPoint.y) - top;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { x, y };
+}
+
 export function hasMapLongPressExceededTolerance(startPoint, currentPoint, tolerancePx = DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX) {
     if (!startPoint || !currentPoint) return false;
     const tolerance = Number(tolerancePx);
