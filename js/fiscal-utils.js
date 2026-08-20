@@ -78,14 +78,17 @@ export function riepilogaAcquistiCliente(storicoVendite = [], nomeCliente = '') 
         riepilogo.numeroAcquisti += 1;
 
         if (regime === 'ritenuta') {
-            const dettagliRitenuta = vendita && vendita.netto !== undefined && vendita.ritenuta !== undefined
-                ? null
-                : calcolaDettaglioRitenuta(importoLordo);
+            const nettoSalvato = vendita && vendita.netto !== undefined;
+            const ritenutaSalvata = vendita && vendita.ritenuta !== undefined;
+            let dettagliRitenuta;
+            if (!nettoSalvato || !ritenutaSalvata) {
+                dettagliRitenuta = calcolaDettaglioRitenuta(importoLordo);
+            }
             riepilogo.totaleRitenutaAcconto += importoLordo;
-            riepilogo.nettoAcquistiRitenutaAcconto += vendita && vendita.netto !== undefined
+            riepilogo.nettoAcquistiRitenutaAcconto += nettoSalvato
                 ? parseFloat(vendita.netto) || 0
                 : dettagliRitenuta.netto;
-            riepilogo.ritenuteDaVersare += vendita && vendita.ritenuta !== undefined
+            riepilogo.ritenuteDaVersare += ritenutaSalvata
                 ? parseFloat(vendita.ritenuta) || 0
                 : dettagliRitenuta.ritenuta;
         } else {
