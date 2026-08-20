@@ -5867,7 +5867,12 @@ async function getOfflineMapCachedUrlsSet({ includeLegacy = false, validateSize 
         return cachedUrls;
     }
 
-    const legacyCacheNames = cacheNames.filter((name) => name.startsWith(APP_CACHE_NAME_PREFIX));
+    const appCacheNames = cacheNames.filter((name) => name.startsWith(APP_CACHE_NAME_PREFIX));
+    if (appCacheNames.length <= 1) {
+        return cachedUrls;
+    }
+    const currentAppCacheName = [...appCacheNames].sort().at(-1);
+    const legacyCacheNames = appCacheNames.filter((name) => name !== currentAppCacheName);
     for (const legacyCacheName of legacyCacheNames) {
         let legacyCache;
         try {
