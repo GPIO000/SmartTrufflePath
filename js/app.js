@@ -1001,12 +1001,15 @@ map.on('mouseup touchend', () => {
     _mapLongPressStartPoint = null;
     const latlng = _pendingMapLongPressLatLng;
     _pendingMapLongPressLatLng = null;
-    if (!_mapLongPressMoved && latlng) void confirmPoiFromMapLongPress(latlng);
+    const shouldConfirmLongPress = !_mapLongPressMoved && latlng;
+    _mapLongPressMoved = false;
+    if (shouldConfirmLongPress) void confirmPoiFromMapLongPress(latlng);
 });
 
 map.on('touchcancel', () => {
     clearTimeout(_mapLongPressTimer);
     _mapLongPressStartPoint = null;
+    _mapLongPressMoved = false;
     _pendingMapLongPressLatLng = null;
 });
 
