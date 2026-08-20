@@ -26,6 +26,7 @@ import {
     normalizePoiMarker,
     parseLegacyDateToTimestamp,
     resolvePoiCoords,
+    shouldConfirmMapLongPressOnTimeout,
     toMapContainerPoint,
 } from './poi-utils.js';
 
@@ -408,6 +409,27 @@ function appPrompt(message, defaultValue = '') {
         dialog.showModal();
         requestAnimationFrame(() => inputField.focus());
     });
+}
+
+function waitForNextUiFrame() {
+    return new Promise((resolve) => {
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(() => resolve());
+            return;
+        }
+        setTimeout(resolve, 0);
+    });
+}
+
+const MAX_DIALOG_SETTLE_FRAMES = 12; // ~200ms at 60fps to let the browser finish closing the previous dialog.
+
+async function waitForDialogToSettle(dialog) {
+    if (!dialog) return;
+    let remainingFrames = MAX_DIALOG_SETTLE_FRAMES;
+    while (dialog.open && remainingFrames > 0) {
+        await waitForNextUiFrame();
+        remainingFrames -= 1;
+    }
 }
 
 function appSelect(message, options = [], defaultValue = '') {
@@ -1068,11 +1090,16 @@ function resetMapLongPressState() {
     _pendingMapLongPressLatLng = null;
 }
 
-function scheduleMapLongPress(latlng) {
+function scheduleMapLongPress(latlng, originalEvent) {
     _pendingMapLongPressLatLng = null;
     clearMapLongPressTimer();
     _mapLongPressTimer = setTimeout(() => {
         if (_mapLongPressMoved) return;
+        if (shouldConfirmMapLongPressOnTimeout(originalEvent)) {
+            resetMapLongPressState();
+            void confirmPoiFromMapLongPress(latlng);
+            return;
+        }
         _pendingMapLongPressLatLng = latlng;
     }, MAP_LONG_PRESS_MS);
 }
@@ -1086,7 +1113,7 @@ function beginMapLongPress(latlng, originalEvent) {
     if (_mapLongPressTimer && _mapLongPressStartPoint && !_mapLongPressMoved) return;
     _mapLongPressMoved = false;
     _mapLongPressStartPoint = extractPointerClientPoint(originalEvent);
-    scheduleMapLongPress(latlng);
+    scheduleMapLongPress(latlng, originalEvent);
 }
 
 function updateMapLongPressMovement(originalEvent) {
@@ -1446,6 +1473,7 @@ async function savePoiPosition(forceLat, forceLng) {
             return;
         }
         const saveSource = await appChoosePoiSaveSource('Come vuoi aggiungere il nuovo punto di interesse?');
+        await waitForDialogToSettle(document.getElementById('app-dialog'));
         if (saveSource === 'map') {
             activatePoiMapPickMode();
             return;
@@ -1456,6 +1484,7 @@ async function savePoiPosition(forceLat, forceLng) {
     if (pos) {
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
         if (note === null) return;
+        await waitForDialogToSettle(document.getElementById('app-dialog'));
         const marker = await choosePoiMarker();
         if (marker === null) return;
         const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, marker);

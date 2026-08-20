@@ -14,6 +14,7 @@ import {
     normalizePoiMarker,
     parseLegacyDateToTimestamp,
     resolvePoiCoords,
+    shouldConfirmMapLongPressOnTimeout,
     toMapContainerPoint,
 } from '../js/poi-utils.js';
 
@@ -86,6 +87,31 @@ describe('extractPointerClientPoint', () => {
     it('restituisce null quando le coordinate non sono disponibili', () => {
         expect(extractPointerClientPoint(null)).toBeNull();
         expect(extractPointerClientPoint({})).toBeNull();
+    });
+});
+
+describe('shouldConfirmMapLongPressOnTimeout', () => {
+    it('conferma subito la pressione lunga per eventi touch', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({
+            type: 'touchstart',
+            touches: [{ clientX: 33, clientY: 44 }]
+        })).toBe(true);
+    });
+
+    it('conferma subito la pressione lunga per pointer event touch', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({ pointerType: 'touch' })).toBe(true);
+    });
+
+    it('attende il rilascio per eventi mouse', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({
+            type: 'mousedown',
+            clientX: 120,
+            clientY: 45
+        })).toBe(false);
+    });
+
+    it('restituisce false quando l\'evento non è disponibile', () => {
+        expect(shouldConfirmMapLongPressOnTimeout(null)).toBe(false);
     });
 });
 

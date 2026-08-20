@@ -110,6 +110,14 @@ export function extractPointerClientPoint(event) {
     return { x: clientX, y: clientY };
 }
 
+export function shouldConfirmMapLongPressOnTimeout(event) {
+    if (!event) return false;
+    if (event.pointerType) return event.pointerType === 'touch';
+    if (event.sourceCapabilities?.firesTouchEvents) return true;
+    if (typeof event.type === 'string' && event.type.startsWith('touch')) return true;
+    return Array.isArray(event.touches) || Array.isArray(event.changedTouches);
+}
+
 export function toMapContainerPoint(clientPoint, containerRect) {
     if (!clientPoint || !containerRect) return null;
     const left = Number(containerRect.left);
