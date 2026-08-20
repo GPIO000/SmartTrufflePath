@@ -2651,11 +2651,22 @@ function openModule(moduleName, editMode = false) {
        case 'clienti':
     const rubricaClienti = readStorageJSON('rubrica_clienti', []);
     const storicoVenditeRubrica = readStorageJSON('storico_vendite', []);
+    const storicoVenditePerCliente = new Map();
+    storicoVenditeRubrica.forEach((vendita) => {
+        const nomeAcquirente = String(vendita && vendita.acquirente ? vendita.acquirente : '').trim().toLowerCase();
+        if (!nomeAcquirente) return;
+        const venditeCliente = storicoVenditePerCliente.get(nomeAcquirente) || [];
+        venditeCliente.push(vendita);
+        storicoVenditePerCliente.set(nomeAcquirente, venditeCliente);
+    });
     const clientiOrdinati = rubricaClienti
         .map((cliente, originalIndex) => ({
             ...cliente,
             originalIndex,
-            riepilogoAcquisti: riepilogaAcquistiCliente(storicoVenditeRubrica, cliente.nome)
+            riepilogoAcquisti: riepilogaAcquistiCliente(
+                storicoVenditePerCliente.get((cliente.nome || '').trim().toLowerCase()) || [],
+                cliente.nome
+            )
         }))
         .sort((a, b) => (b.riepilogoAcquisti?.totaleAcquisti || 0) - (a.riepilogoAcquisti?.totaleAcquisti || 0));
 
