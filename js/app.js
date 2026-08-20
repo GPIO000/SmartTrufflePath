@@ -411,6 +411,25 @@ function appPrompt(message, defaultValue = '') {
     });
 }
 
+function waitForNextUiFrame() {
+    return new Promise((resolve) => {
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(() => resolve());
+            return;
+        }
+        setTimeout(resolve, 0);
+    });
+}
+
+async function waitForDialogToSettle(dialog = document.getElementById('app-dialog')) {
+    if (!dialog) return;
+    let attempts = 0;
+    while (dialog.open && attempts < 4) {
+        await waitForNextUiFrame();
+        attempts += 1;
+    }
+}
+
 function appSelect(message, options = [], defaultValue = '') {
     return new Promise((resolve) => {
         if (!Array.isArray(options) || options.length === 0) {
@@ -1446,12 +1465,14 @@ function saveCarPosition() {
 }
 async function savePoiPosition(forceLat, forceLng) {
     const hasForcedCoords = forceLat !== undefined && forceLng !== undefined;
+    const appDialog = document.getElementById('app-dialog');
     if (!hasForcedCoords) {
         if (_isPoiMapPickModeActive) {
             cancelPoiMapPickMode(true);
             return;
         }
         const saveSource = await appChoosePoiSaveSource('Come vuoi aggiungere il nuovo punto di interesse?');
+        await waitForDialogToSettle(appDialog);
         if (saveSource === 'map') {
             activatePoiMapPickMode();
             return;
@@ -1462,6 +1483,7 @@ async function savePoiPosition(forceLat, forceLng) {
     if (pos) {
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
         if (note === null) return;
+        await waitForDialogToSettle(appDialog);
         const marker = await choosePoiMarker();
         if (marker === null) return;
         const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, marker);
