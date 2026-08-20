@@ -40,7 +40,13 @@ let shouldReloadOnNextServiceWorkerControllerChange = false;
 function monitorInstallingServiceWorker(worker) {
     if (!worker || typeof worker.addEventListener !== 'function') return;
     worker.addEventListener('statechange', () => {
-        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+        const state = worker.state;
+        // Controlla sia 'installed' che 'activating': quando skipWaiting() è chiamato
+        // nell'evento install, la transizione installed→activating può avvenire così
+        // rapidamente che l'handler riceve il statechange già con state='activating'.
+        // Verificare entrambi gli stati garantisce che il flag venga impostato prima
+        // che clients.claim() nell'evento activate faccia scattare 'controllerchange'.
+        if ((state === 'installed' || state === 'activating') && navigator.serviceWorker.controller) {
             shouldReloadOnNextServiceWorkerControllerChange = true;
         }
     });
