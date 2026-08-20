@@ -8,7 +8,7 @@ function extractMatch(source, regex, label) {
 }
 
 describe('cache version sync', () => {
-  it('keeps app.js and sw.js on the same cache version suffix', () => {
+  it('defines cache version suffix only in sw.js', () => {
     const swSource = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
     const appSource = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
 
@@ -17,13 +17,8 @@ describe('cache version sync', () => {
       /const CACHE_NAME = 'smarttruffle-path-' \+ '([^']+)'/,
       'sw.js cache version'
     );
-    const appVersion = extractMatch(
-      appSource,
-      /const APP_CACHE_NAME_CURRENT = `\$\{APP_CACHE_NAME_PREFIX\}([^`]+)`/,
-      'app.js cache version'
-    );
 
-    expect(swVersion).toBe(appVersion);
     expect(swVersion).toMatch(/^\d{4}-\d{2}-\d{2}[a-z]+$/);
+    expect(appSource).not.toMatch(/const APP_CACHE_NAME_CURRENT =/);
   });
 });

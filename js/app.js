@@ -33,7 +33,6 @@ window.TruffleStorage = TruffleStorage;
 const SERVICE_WORKER_SCOPE = new URL('./', window.location.href).pathname;
 const SERVICE_WORKER_URL = `${SERVICE_WORKER_SCOPE}sw.js`;
 const APP_CACHE_NAME_PREFIX = 'smarttruffle-path-';
-const APP_CACHE_NAME_CURRENT = `${APP_CACHE_NAME_PREFIX}2026-08-20c`;
 let lastServiceWorkerRegistrationError = null;
 let shouldReloadOnNextServiceWorkerControllerChange = false;
 
@@ -5868,9 +5867,7 @@ async function getOfflineMapCachedUrlsSet({ includeLegacy = false, validateSize 
         return cachedUrls;
     }
 
-    const legacyCacheNames = cacheNames.filter((name) =>
-        name.startsWith(APP_CACHE_NAME_PREFIX) && name !== APP_CACHE_NAME_CURRENT
-    );
+    const legacyCacheNames = cacheNames.filter((name) => name.startsWith(APP_CACHE_NAME_PREFIX));
     for (const legacyCacheName of legacyCacheNames) {
         let legacyCache;
         try {
