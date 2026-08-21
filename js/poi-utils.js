@@ -71,10 +71,8 @@ export function buildGoogleMapsUrl(lat, lng) {
 export function buildAppleMapsUrl(lat, lng, label = '') {
     const coords = buildMapCoordinatePair(lat, lng);
     if (!coords) return '';
-    const params = new URLSearchParams({ ll: coords });
     const trimmedLabel = typeof label === 'string' ? label.trim() : '';
-    if (trimmedLabel) params.set('q', trimmedLabel);
-    return `https://maps.apple.com/?${params.toString()}`;
+    return `https://maps.apple.com/?ll=${coords}${trimmedLabel ? `&q=${encodeURIComponent(trimmedLabel)}` : ''}`;
 }
 
 export function buildMapsLinksText(lat, lng, label = '') {
@@ -94,7 +92,7 @@ export function buildSharedPoiMessage(poi, senderName = '') {
     const senderLine = sender ? `\nDa: ${sender}` : '';
     const dateLine = date ? `\nData: ${date}` : '';
     const mapLinks = buildMapsLinksText(poi.lat, poi.lng, note);
-    return `📍 TARTUFAIA CONDIVISA${senderLine}\nNota: ${note}${dateLine}\n${mapLinks}`;
+    return `📍 TARTUFAIA CONDIVISA${senderLine}\nNota: ${note}${dateLine}${mapLinks ? `\n${mapLinks}` : ''}`;
 }
 
 export function buildEmergencyLocationMessage(title, lat, lng, senderName = '', label = '') {
@@ -102,9 +100,9 @@ export function buildEmergencyLocationMessage(title, lat, lng, senderName = '', 
     const sender = typeof senderName === 'string' ? senderName.trim() : '';
     const formattedLat = formatMapLinkCoordinate(lat);
     const formattedLng = formatMapLinkCoordinate(lng);
-    const senderLine = sender ? ` Da: ${sender}.` : '';
+    const intro = sender ? `${heading} Da: ${sender}.` : heading;
     const mapLinks = buildMapsLinksText(lat, lng, label || heading);
-    return `${heading}${senderLine} Coordinate GPS: Lat: ${formattedLat}, Lng: ${formattedLng}.\n${mapLinks}`;
+    return `${intro} Coordinate GPS: Lat: ${formattedLat}, Lng: ${formattedLng}.${mapLinks ? `\n${mapLinks}` : ''}`;
 }
 
 export function normalizePoiList(rawPoiList) {

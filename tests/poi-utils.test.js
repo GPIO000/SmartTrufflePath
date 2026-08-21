@@ -875,13 +875,13 @@ describe('map share helpers', () => {
     });
 
     it('genera un link Apple Maps con label', () => {
-        expect(buildAppleMapsUrl(43.1234, 11.5678, 'Quercia grande')).toBe('https://maps.apple.com/?ll=43.123400%2C11.567800&q=Quercia+grande');
+        expect(buildAppleMapsUrl(43.1234, 11.5678, 'Quercia grande')).toBe('https://maps.apple.com/?ll=43.123400,11.567800&q=Quercia%20grande');
     });
 
     it('compone entrambe le righe Google Maps e Apple Maps', () => {
         expect(buildMapsLinksText(43.1234, 11.5678, 'Quercia grande')).toBe(
             'Google Maps: https://maps.google.com/?q=43.123400,11.567800\n'
-            + 'Apple Maps: https://maps.apple.com/?ll=43.123400%2C11.567800&q=Quercia+grande'
+            + 'Apple Maps: https://maps.apple.com/?ll=43.123400,11.567800&q=Quercia%20grande'
         );
     });
 
@@ -897,7 +897,7 @@ describe('map share helpers', () => {
             + 'Nota: Quercia grande\n'
             + 'Data: 21/08/2026 15:30\n'
             + 'Google Maps: https://maps.google.com/?q=43.123400,11.567800\n'
-            + 'Apple Maps: https://maps.apple.com/?ll=43.123400%2C11.567800&q=Quercia+grande'
+            + 'Apple Maps: https://maps.apple.com/?ll=43.123400,11.567800&q=Quercia%20grande'
         );
     });
 
@@ -911,7 +911,7 @@ describe('map share helpers', () => {
         )).toBe(
             'EMERGENZA VETERINARIA! Da: Mario Rossi. Coordinate GPS: Lat: 43.123400, Lng: 11.567800.\n'
             + 'Google Maps: https://maps.google.com/?q=43.123400,11.567800\n'
-            + 'Apple Maps: https://maps.apple.com/?ll=43.123400%2C11.567800&q=Emergenza+veterinaria'
+            + 'Apple Maps: https://maps.apple.com/?ll=43.123400,11.567800&q=Emergenza%20veterinaria'
         );
     });
 });
@@ -925,7 +925,7 @@ describe('extractCoordsFromSharedMessage', () => {
     });
 
     it('estrae le coordinate da un link Apple Maps con ll=', () => {
-        expect(extractCoordsFromSharedMessage('Apple Maps: https://maps.apple.com/?ll=43.123400%2C11.567800&q=Quercia+grande')).toEqual({
+        expect(extractCoordsFromSharedMessage('Apple Maps: https://maps.apple.com/?ll=43.123400,11.567800&q=Quercia%20grande')).toEqual({
             lat: 43.1234,
             lng: 11.5678
         });
