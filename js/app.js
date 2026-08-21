@@ -134,6 +134,7 @@ let offlineMapRecoveryResumeTimerId = null;
 let isOfflineMapRecoveryRunning = false;
 let offlineMapStatusRenderRequestId = 0;
 let offlineMapDownloadAbortController = null;
+let offlineMapLastProgressText = '';
 
 function isOfflineMapModeActive() {
     return !navigator.onLine || isTileNetworkUnavailable;
@@ -3229,6 +3230,10 @@ function openModule(moduleName, editMode = false) {
         if (isOfflineMapRecoveryRunning) {
             const progressArea = document.getElementById('offline-progress-area');
             if (progressArea) progressArea.style.display = 'block';
+            const progressText = document.getElementById('offline-progress-text');
+            if (progressText && offlineMapLastProgressText) progressText.textContent = offlineMapLastProgressText;
+            const stopBtn = document.getElementById('offline-stop-btn');
+            if (stopBtn) stopBtn.style.display = 'block';
         }
     }
     if (moduleName === 'vet') {
@@ -6458,7 +6463,9 @@ async function runOfflineMapRecovery({
                         ? ` • ritmo ridotto (${formatOfflineDelayMs(adaptivePauseMs)})`
                         : '';
                     const throttleNote = summary.throttledErrors > 0 ? ' • server in attesa' : '';
-                    pt.textContent = `Scaricate: ${totals.downloaded} / ${missingTotal} (${pct}%)… z${level.zoom}${slowdownNote}${throttleNote}`;
+                    const msg = `Scaricate: ${totals.downloaded} / ${missingTotal} (${pct}%)… z${level.zoom}${slowdownNote}${throttleNote}`;
+                    pt.textContent = msg;
+                    offlineMapLastProgressText = msg;
                 }
             }
         });
@@ -6554,6 +6561,7 @@ async function runOfflineMapRecovery({
         if (paFinal) paFinal.style.display = 'none';
         updateStopButtonVisibility(false);
         offlineMapDownloadAbortController = null;
+        offlineMapLastProgressText = '';
         aggiornaStatoCacheRegioni();
         updateOfflineMapRuntimeStatusIndicator();
         isOfflineMapRecoveryRunning = false;
