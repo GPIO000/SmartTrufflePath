@@ -3229,6 +3229,10 @@ function openModule(moduleName, editMode = false) {
         if (isOfflineMapRecoveryRunning) {
             const progressArea = document.getElementById('offline-progress-area');
             if (progressArea) progressArea.style.display = 'block';
+            const progressText = document.getElementById('offline-progress-text');
+            if (progressText && !progressText.textContent.trim()) progressText.textContent = 'Download in corso…';
+            const stopBtn = document.getElementById('offline-stop-btn');
+            if (stopBtn) stopBtn.style.display = 'block';
         }
     }
     if (moduleName === 'vet') {
