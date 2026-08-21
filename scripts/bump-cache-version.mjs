@@ -25,7 +25,7 @@ export function incrementAlphabeticSuffix(suffix) {
 export function computeNextCacheVersion(currentVersion, now = new Date()) {
   const match = currentVersion.match(/^(\d{4}-\d{2}-\d{2})([a-z]+)$/);
   if (!match) {
-    throw new Error(`Formato cache version non valido: ${currentVersion}`);
+    throw new Error(`Invalid cache version format: ${currentVersion}`);
   }
 
   const [, currentDate, currentSuffix] = match;
@@ -37,7 +37,7 @@ export function computeNextCacheVersion(currentVersion, now = new Date()) {
 export function updateCacheVersionSource(source, now = new Date()) {
   const match = source.match(CACHE_VERSION_PATTERN);
   if (!match) {
-    throw new Error('SMARTTRUFFLE_CACHE_VERSION non trovata nel file.');
+    throw new Error('SMARTTRUFFLE_CACHE_VERSION not found in file.');
   }
 
   const previousVersion = match[1];
@@ -68,5 +68,5 @@ if (isDirectExecution()) {
   const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const cacheVersionPath = resolve(repositoryRoot, 'js/cache-version.js');
   const { previousVersion, nextVersion } = bumpCacheVersionFile(cacheVersionPath);
-  console.log(`Cache version aggiornata: ${previousVersion} -> ${nextVersion}`);
+  console.log(`Cache version updated: ${previousVersion} -> ${nextVersion}`);
 }
