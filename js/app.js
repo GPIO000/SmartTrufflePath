@@ -5318,6 +5318,7 @@ function updateDrawerVersionDisplay() {
     if (!el) return;
     const version = globalThis.SMARTTRUFFLE_CACHE_VERSION;
     if (version) el.textContent = `v ${version}`;
+    else el.textContent = 'v –';
 }
 
 if (document.readyState === 'loading') {
