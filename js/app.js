@@ -1641,12 +1641,24 @@ function importSharedPoint() {
     openModule('poilist');
 }
 
+function buildEmergencyLocationDetails(position) {
+    const lat = Number(position?.lat).toFixed(6);
+    const lng = Number(position?.lng).toFixed(6);
+    const coords = `${lat},${lng}`;
+    return {
+        coordinateText: `Lat: ${lat}, Lng: ${lng}`,
+        googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${coords}`,
+        appleMapsUrl: `https://maps.apple.com/?ll=${coords}&q=${coords}`
+    };
+}
+
 async function triggerSOS() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
         const senderName = getSavedSenderName();
         const senderLine = senderName ? ` Da: ${senderName}.` : '';
-        const msg = `EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO.${senderLine} Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
+        const { coordinateText, googleMapsUrl, appleMapsUrl } = buildEmergencyLocationDetails(pos);
+        const msg = `EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO.${senderLine} Coordinate GPS: ${coordinateText}. Google Maps: ${googleMapsUrl} Apple Maps: ${appleMapsUrl}`;
         const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
         if (method === 'sms') { window.location.href = `sms:?body=${encodeURIComponent(msg)}`; }
         else if (method === 'whatsapp') { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
@@ -5020,7 +5032,8 @@ async function shareLocationToVet(telNumber) {
         const pos = userMarker.getLatLng();
         const senderName = getSavedSenderName();
         const senderLine = senderName ? ` Da: ${senderName}.` : '';
-        const msg = `EMERGENZA VETERINARIA!${senderLine} Coordinate GPS: Lat: ${pos.lat.toFixed(6)}, Lng: ${pos.lng.toFixed(6)}`;
+        const { coordinateText, googleMapsUrl, appleMapsUrl } = buildEmergencyLocationDetails(pos);
+        const msg = `EMERGENZA VETERINARIA!${senderLine} Coordinate GPS: ${coordinateText}. Google Maps: ${googleMapsUrl} Apple Maps: ${appleMapsUrl}`;
         const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
         if (method === 'sms') { window.location.href = `sms:${telNumber}?body=${encodeURIComponent(msg)}`; }
         else if (method === 'whatsapp') { window.location.href = `whatsapp://send?phone=${encodeURIComponent(telNumber)}&text=${encodeURIComponent(msg)}`; }
