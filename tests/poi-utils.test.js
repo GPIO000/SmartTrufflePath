@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+    buildAppleMapsUrl,
+    buildEmergencyLocationMessage,
+    buildGoogleMapsUrl,
+    buildMapsLinksText,
+    buildSharedPoiMessage,
     CUSTOM_POI_MARKERS,
     DEFAULT_GENERIC_POI_MARKER,
     DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
     DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX,
     DEFAULT_SHARED_POI_MARKER,
+    extractCoordsFromSharedMessage,
     extractPointerClientPoint,
     formatPoiDisplayDate,
     getDefaultMarkerForPoiType,
@@ -860,5 +866,75 @@ describe('flusso long press mouse completo', () => {
 
         // Secondo press quasi immediato (es. touchend + contextmenu combinati): duplicato
         expect(isDuplicateMapLongPress(lastHandled, latlng, firstPressAt + 50)).toBe(true);
+    });
+});
+
+describe('map share helpers', () => {
+    it('genera un link Google Maps con coordinate arrotondate', () => {
+        expect(buildGoogleMapsUrl(43.1234, 11.5678)).toBe('https://maps.google.com/?q=43.123400,11.567800');
+    });
+
+    it('genera un link Apple Maps con label', () => {
+        expect(buildAppleMapsUrl(43.1234, 11.5678, 'Quercia grande')).toBe('https://maps.apple.com/?ll=43.123400,11.567800&q=Quercia%20grande');
+    });
+
+    it('compone entrambe le righe Google Maps e Apple Maps', () => {
+        expect(buildMapsLinksText(43.1234, 11.5678, 'Quercia grande')).toBe(
+            'Google Maps: https://maps.google.com/?q=43.123400,11.567800\n'
+            + 'Apple Maps: https://maps.apple.com/?ll=43.123400,11.567800&q=Quercia%20grande'
+        );
+    });
+
+    it('genera il messaggio completo per un punto condiviso', () => {
+        expect(buildSharedPoiMessage({
+            lat: 43.1234,
+            lng: 11.5678,
+            note: 'Quercia grande',
+            date: '21/08/2026 15:30'
+        }, 'Mario Rossi')).toBe(
+            '📍 TARTUFAIA CONDIVISA\n'
+            + 'Da: Mario Rossi\n'
+            + 'Nota: Quercia grande\n'
+            + 'Data: 21/08/2026 15:30\n'
+            + 'Google Maps: https://maps.google.com/?q=43.123400,11.567800\n'
+            + 'Apple Maps: https://maps.apple.com/?ll=43.123400,11.567800&q=Quercia%20grande'
+        );
+    });
+
+    it('genera il messaggio completo per un SOS o emergenza veterinaria', () => {
+        expect(buildEmergencyLocationMessage(
+            'EMERGENZA VETERINARIA!',
+            43.1234,
+            11.5678,
+            'Mario Rossi',
+            'Emergenza veterinaria'
+        )).toBe(
+            'EMERGENZA VETERINARIA! Da: Mario Rossi. Coordinate GPS: Lat: 43.123400, Lng: 11.567800.\n'
+            + 'Google Maps: https://maps.google.com/?q=43.123400,11.567800\n'
+            + 'Apple Maps: https://maps.apple.com/?ll=43.123400,11.567800&q=Emergenza%20veterinaria'
+        );
+    });
+});
+
+describe('extractCoordsFromSharedMessage', () => {
+    it('estrae le coordinate da un link Google Maps con q=', () => {
+        expect(extractCoordsFromSharedMessage('Google Maps: https://maps.google.com/?q=43.123400,11.567800')).toEqual({
+            lat: 43.1234,
+            lng: 11.5678
+        });
+    });
+
+    it('estrae le coordinate da un link Apple Maps con ll=', () => {
+        expect(extractCoordsFromSharedMessage('Apple Maps: https://maps.apple.com/?ll=43.123400,11.567800&q=Quercia%20grande')).toEqual({
+            lat: 43.1234,
+            lng: 11.5678
+        });
+    });
+
+    it('continua a estrarre le coordinate dal formato Lat/Lng legacy', () => {
+        expect(extractCoordsFromSharedMessage('Coordinate GPS: Lat: 43.123400, Lng: 11.567800.')).toEqual({
+            lat: 43.1234,
+            lng: 11.5678
+        });
     });
 });

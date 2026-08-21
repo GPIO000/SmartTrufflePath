@@ -7,6 +7,7 @@ export const DEFAULT_SHARED_POI_MARKER = '📩';
 export const DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX = 12;
 export const DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS = 1500;
 export const DEFAULT_MAP_LONG_PRESS_DUPLICATE_COORD_TOLERANCE = 0.00001;
+const MAP_LINK_COORD_DECIMALS = 6;
 
 export function parseLegacyDateToTimestamp(dateText) {
     if (typeof dateText !== 'string') return null;
@@ -47,6 +48,61 @@ export function normalizePoiMarker(marker, type) {
     if (type === 'auto' || type === 'sos') return getDefaultMarkerForPoiType(type);
     if (typeof marker === 'string' && CUSTOM_POI_MARKERS.includes(marker.trim())) return marker.trim();
     return getDefaultMarkerForPoiType(type);
+}
+
+function formatMapLinkCoordinate(value) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return '';
+    return numericValue.toFixed(MAP_LINK_COORD_DECIMALS);
+}
+
+function buildMapCoordinatePair(lat, lng) {
+    const formattedLat = formatMapLinkCoordinate(lat);
+    const formattedLng = formatMapLinkCoordinate(lng);
+    if (!formattedLat || !formattedLng) return '';
+    return `${formattedLat},${formattedLng}`;
+}
+
+export function buildGoogleMapsUrl(lat, lng) {
+    const coords = buildMapCoordinatePair(lat, lng);
+    return coords ? `https://maps.google.com/?q=${coords}` : '';
+}
+
+export function buildAppleMapsUrl(lat, lng, label = '') {
+    const coords = buildMapCoordinatePair(lat, lng);
+    if (!coords) return '';
+    const trimmedLabel = typeof label === 'string' ? label.trim() : '';
+    return `https://maps.apple.com/?ll=${coords}${trimmedLabel ? `&q=${encodeURIComponent(trimmedLabel)}` : ''}`;
+}
+
+export function buildMapsLinksText(lat, lng, label = '') {
+    const googleMapsUrl = buildGoogleMapsUrl(lat, lng);
+    const appleMapsUrl = buildAppleMapsUrl(lat, lng, label);
+    return [
+        googleMapsUrl ? `Google Maps: ${googleMapsUrl}` : '',
+        appleMapsUrl ? `Apple Maps: ${appleMapsUrl}` : ''
+    ].filter(Boolean).join('\n');
+}
+
+export function buildSharedPoiMessage(poi, senderName = '') {
+    if (!poi) return '';
+    const note = typeof poi.note === 'string' && poi.note.trim() ? poi.note.trim() : 'Punto di interesse';
+    const date = typeof poi.date === 'string' ? poi.date.trim() : '';
+    const sender = typeof senderName === 'string' ? senderName.trim() : '';
+    const senderLine = sender ? `\nDa: ${sender}` : '';
+    const dateLine = date ? `\nData: ${date}` : '';
+    const mapLinks = buildMapsLinksText(poi.lat, poi.lng, note);
+    return `📍 TARTUFAIA CONDIVISA${senderLine}\nNota: ${note}${dateLine}${mapLinks ? `\n${mapLinks}` : ''}`;
+}
+
+export function buildEmergencyLocationMessage(title, lat, lng, senderName = '', label = '') {
+    const heading = typeof title === 'string' && title.trim() ? title.trim() : 'EMERGENZA!';
+    const sender = typeof senderName === 'string' ? senderName.trim() : '';
+    const formattedLat = formatMapLinkCoordinate(lat);
+    const formattedLng = formatMapLinkCoordinate(lng);
+    const intro = sender ? `${heading} Da: ${sender}.` : heading;
+    const mapLinks = buildMapsLinksText(lat, lng, label || heading);
+    return `${intro} Coordinate GPS: Lat: ${formattedLat}, Lng: ${formattedLng}.${mapLinks ? `\n${mapLinks}` : ''}`;
 }
 
 export function normalizePoiList(rawPoiList) {
@@ -164,4 +220,31 @@ export function isDuplicateMapLongPress(lastHandled, latlng, now = Date.now(), d
     const elapsed = currentTimestamp - timestamp;
     if (elapsed < 0 || elapsed >= windowMs) return false;
     return Math.abs(lastLat - nextLat) <= tolerance && Math.abs(lastLng - nextLng) <= tolerance;
+}
+
+export function extractCoordsFromSharedMessage(text) {
+    if (typeof text !== 'string') return null;
+    let match;
+    match = text.match(/[?&](?:q|ll|sll)=(-?\d+\.?\d*)(?:,|%2C)(-?\d+\.?\d*)/i);
+    if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+    match = text.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+    match = text.match(/lat(?:itudine)?[:\s]+(-?\d+[.,]\d*)[,\s]+l(?:on|ng|ong)(?:itudine)?[:\s]+(-?\d+[.,]\d*)/i);
+    if (match) return { lat: parseFloat(match[1].replace(',', '.')), lng: parseFloat(match[2].replace(',', '.')) };
+    const dmsToDecimal = (deg, min, sec, dir) => {
+        let decimal = parseFloat(deg) + parseFloat(min || 0) / 60 + parseFloat(sec || 0) / 3600;
+        if (/[SW]/i.test(dir)) decimal = -decimal;
+        return decimal;
+    };
+    match = text.match(/(\d{1,3})[°º]\s*(\d{1,2})['′]\s*(\d{1,2}(?:[.,]\d+)?)["""″]\s*([NS])[,\s]+(\d{1,3})[°º]\s*(\d{1,2})['′]\s*(\d{1,2}(?:[.,]\d+)?)["""″]\s*([EWO])/i);
+    if (match) return { lat: dmsToDecimal(match[1], match[2], match[3], match[4]), lng: dmsToDecimal(match[5], match[6], match[7], match[8]) };
+    match = text.match(/(\d{1,3})[°º]\s*(\d{1,2}(?:[.,]\d+)?)[′']?\s*([NS])[,\s]+(\d{1,3})[°º]\s*(\d{1,2}(?:[.,]\d+)?)[′']?\s*([EWO])/i);
+    if (match) return { lat: dmsToDecimal(match[1], match[2].replace(',', '.'), 0, match[3]), lng: dmsToDecimal(match[4], match[5].replace(',', '.'), 0, match[6]) };
+    match = text.match(/([NS])\s*(\d{1,3})[°º\s]\s*(\d{1,2}(?:[.,]\d+)?)[,\s]+([EWO])\s*(\d{1,3})[°º\s]\s*(\d{1,2}(?:[.,]\d+)?)/i);
+    if (match) return { lat: dmsToDecimal(match[2], match[3].replace(',', '.'), 0, match[1]), lng: dmsToDecimal(match[5], match[6].replace(',', '.'), 0, match[4]) };
+    match = text.match(/(-?\d{1,3},\d{4,})\s*[,;]\s*(-?\d{1,3},\d{4,})/);
+    if (match) return { lat: parseFloat(match[1].replace(/,/g, '.')), lng: parseFloat(match[2].replace(/,/g, '.')) };
+    match = text.match(/(-?\d{1,3}\.\d{4,})[,\s]+(-?\d{1,3}\.\d{4,})/);
+    if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+    return null;
 }
