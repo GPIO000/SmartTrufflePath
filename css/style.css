@@ -766,3 +766,135 @@ textarea:focus-visible {
 .offline-region-label:hover span {
     color: #f6f1e6;
 }
+
+/* ── Widget Meteo + Fase Lunare ───────────────────────────────────────────── */
+#weather-moon-widget {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 900;
+    max-width: 300px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    pointer-events: auto;
+    user-select: none;
+}
+
+#wm-compact {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(20, 30, 18, 0.82);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 5px 10px;
+    cursor: pointer;
+    color: #f6f1e6;
+    line-height: 1.3;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+    transition: background 0.2s;
+    outline: none;
+}
+#wm-compact:hover,
+#wm-compact:focus-visible {
+    background: rgba(34, 50, 28, 0.92);
+}
+
+.wm-location-label {
+    font-size: 0.72rem;
+    color: #86efac;
+    max-width: 90px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 2px;
+}
+.wm-cur-icon  { font-size: 1.15rem; }
+.wm-cur-temp  { font-weight: 700; color: #fde68a; }
+.wm-moon-icon { font-size: 1rem; }
+.wm-expand-arrow { font-size: 0.65rem; color: rgba(255,255,255,0.5); margin-left: 2px; }
+
+#wm-panel {
+    background: rgba(20, 30, 18, 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    margin-top: 4px;
+    padding: 10px 12px;
+    color: #f6f1e6;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wm-cur-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 7px;
+}
+.wm-cur-big { font-size: 0.9rem; font-weight: 600; }
+.wm-cur-pill {
+    font-size: 0.75rem;
+    background: rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 2px 6px;
+}
+
+.wm-days-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.wm-day-row {
+    display: grid;
+    grid-template-columns: 42px 22px 1fr 60px;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 0;
+}
+.wm-day-row.wm-today {
+    background: rgba(255,255,255,0.05);
+    border-radius: 6px;
+    padding: 3px 4px;
+}
+.wm-day-name  { font-weight: 700; font-size: 0.78rem; color: #86efac; }
+.wm-day-icon  { font-size: 1rem; text-align: center; }
+.wm-day-desc  { font-size: 0.72rem; color: #d1fae5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wm-day-temps { font-size: 0.78rem; font-weight: 600; text-align: right; color: #fde68a; }
+.wm-day-details {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+}
+.wm-extra-pill {
+    font-size: 0.68rem;
+    background: rgba(255,255,255,0.07);
+    border-radius: 5px;
+    padding: 1px 5px;
+    color: #bfdbfe;
+}
+
+.wm-moon-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 7px;
+    font-size: 0.8rem;
+}
+.wm-moon-pct { color: #fde68a; font-size: 0.75rem; }
+
+.wm-source-label {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.35);
+    text-align: right;
+}
