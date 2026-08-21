@@ -1,4 +1,5 @@
 import * as TruffleStorage from './storage-sync.js';
+import { updateWeatherMoon } from './weather-moon.js';
 import {
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
@@ -1377,6 +1378,7 @@ if (navigator.geolocation) {
             renderAllPoiMarkers();
         } else { userMarker.setLatLng([lat, lng]); }
         updateCompass(lat, lng);
+        updateWeatherMoon(lat, lng);
     }, (error) => {
         console.warn("Errore GPS: " + error.message);
         const dot = document.getElementById('gps-status-dot');
@@ -1393,6 +1395,7 @@ function renderAllPoiMarkers() {
         const fromInfo = poi.from ? `<br><small>Da: ${escapeHtml(safePoi.from || '')}</small>` : '';
         const poiMarker = L.marker([poi.lat, poi.lng], { icon }).addTo(map)
             .bindPopup(`<b>${popupTitle}</b><br>Nota: ${safePoi.note || 'Nessuna nota'}<br><small>${safePoi.date || ''}</small>${fromInfo}`);
+        poiMarker.on('popupopen', () => updateWeatherMoon(poi.lat, poi.lng, safePoi.note || popupTitle, true));
         poiMapMarkers[index] = poiMarker;
     });
 }
