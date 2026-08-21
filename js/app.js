@@ -133,6 +133,7 @@ let isTileNetworkUnavailable = false;
 let offlineMapRecoveryResumeTimerId = null;
 let isOfflineMapRecoveryRunning = false;
 let offlineMapStatusRenderRequestId = 0;
+let offlineMapDownloadAbortController = null;
 
 function isOfflineMapModeActive() {
     return !navigator.onLine || isTileNetworkUnavailable;
@@ -955,6 +956,7 @@ const ACTION_HANDLERS = {
         closeActiveModule();
     },
     scaricaRegioniOffline: () => scaricaRegioniOffline(),
+    fermaDownloadOffline: () => fermaDownloadOffline(),
     verificaCoperturaMappaOffline: () => verificaCoperturaMappaOffline(),
     salvaPreferenzeMappaOffline: () => salvaPreferenzeMappaOffline(),
     eliminaCacheMappaOffline: () => eliminaCacheMappaOffline(),
@@ -3177,6 +3179,7 @@ function openModule(moduleName, editMode = false) {
                             <div id="offline-progress-bar" style="height:100%; width:0%; background:#22c55e; border-radius:6px; transition:width 0.3s;"></div>
                         </div>
                     </div>
+                    <button id="offline-stop-btn" class="overlay-btn btn-danger" style="width:100%; margin-bottom:10px; display:none;" ${actionAttrs('fermaDownloadOffline')}>⏹ Ferma Download</button>
                     <button class="overlay-btn btn-neutral" style="width:100%; margin-bottom:10px;" ${actionAttrs('verificaCoperturaMappaOffline')}>🔎 Verifica Tile Necessarie</button>
                     <button class="overlay-btn btn-primary" style="width:100%; margin-bottom:10px;" ${actionAttrs('scaricaRegioniOffline')}>📥 Scarica Regioni Selezionate</button>
                     <button class="overlay-btn btn-danger" style="width:100%;" ${actionAttrs('eliminaCacheMappaOffline')}>🗑️ Elimina Tutta la Cache Mappa</button>
@@ -6366,7 +6369,13 @@ async function runOfflineMapRecovery({
     }
 
     isOfflineMapRecoveryRunning = true;
+    offlineMapDownloadAbortController = new AbortController();
     clearOfflineMapRecoveryResumeTimer();
+
+    const updateStopButtonVisibility = (visible) => {
+        const stopBtn = document.getElementById('offline-stop-btn');
+        if (stopBtn) stopBtn.style.display = visible ? 'block' : 'none';
+    };
 
     const getProgressEls = showProgress
         ? () => ({
@@ -6380,6 +6389,7 @@ async function runOfflineMapRecovery({
     if (progressArea) progressArea.style.display = 'block';
     if (progressBar) progressBar.style.width = '0%';
     if (progressText) progressText.textContent = 'Recupero tile mancanti: 0 / 0…';
+    if (showProgress) updateStopButtonVisibility(true);
 
     try {
         if (startToastMessage) showToast(startToastMessage, 'info');
@@ -6437,22 +6447,31 @@ async function runOfflineMapRecovery({
             batchPauseJitterMs: OFFLINE_DOWNLOAD_BATCH_PAUSE_JITTER_MS,
             providerCooldownBaseMs: OFFLINE_DOWNLOAD_PROVIDER_COOLDOWN_BASE_MS,
             providerCooldownMaxMs: OFFLINE_DOWNLOAD_PROVIDER_COOLDOWN_MAX_MS,
+            abortSignal: offlineMapDownloadAbortController?.signal,
             onBatchComplete: ({ level, totals, adaptivePauseMs, state, summary }) => {
                 const { progressArea: pa, progressBar: pb, progressText: pt } = getProgressEls();
                 if (pa) pa.style.display = 'block';
-                const pct = Math.round((totals.done / missingTotal) * 100);
+                const pct = Math.min(100, Math.round((totals.done / missingTotal) * 100));
                 if (pb) pb.style.width = pct + '%';
                 if (pt) {
                     const slowdownNote = state.consecutiveProviderErrors > 0
                         ? ` • ritmo ridotto (${formatOfflineDelayMs(adaptivePauseMs)})`
                         : '';
                     const throttleNote = summary.throttledErrors > 0 ? ' • server in attesa' : '';
-                    pt.textContent = `Recupero tile mancanti: ${totals.done} / ${missingTotal} (${pct}%)… z${level.zoom}${slowdownNote}${throttleNote}`;
+                    pt.textContent = `Scaricate: ${totals.downloaded} / ${missingTotal} (${pct}%)… z${level.zoom}${slowdownNote}${throttleNote}`;
                 }
             }
         });
 
         const nonQuotaErrors = Math.max(0, result.nonQuotaErrors);
+
+        if (result.abortedByUser) {
+            const updatedCoverageAfterStop = await analyzeOfflineSelectionCoverage(preferenze).catch(() => null);
+            if (updatedCoverageAfterStop) renderOfflineSelectionCoverage(updatedCoverageAfterStop);
+            showToast(`⏹ Download fermato: ${result.downloaded ?? 0} tile scaricate.`, 'info');
+            return { status: 'stopped_by_user', result, updatedCoverage: updatedCoverageAfterStop };
+        }
+
         const updatedCoverage = await analyzeOfflineSelectionCoverage(preferenze).catch(() => null);
         if (updatedCoverage) renderOfflineSelectionCoverage(updatedCoverage);
         const remainingMissing = updatedCoverage ? updatedCoverage.missing : null;
@@ -6533,6 +6552,8 @@ async function runOfflineMapRecovery({
     } finally {
         const { progressArea: paFinal } = getProgressEls();
         if (paFinal) paFinal.style.display = 'none';
+        updateStopButtonVisibility(false);
+        offlineMapDownloadAbortController = null;
         aggiornaStatoCacheRegioni();
         updateOfflineMapRuntimeStatusIndicator();
         isOfflineMapRecoveryRunning = false;
@@ -6567,6 +6588,14 @@ async function scaricaRegioniOffline() {
             );
         }
     }
+}
+
+function fermaDownloadOffline() {
+    if (!offlineMapDownloadAbortController) {
+        showToast('Nessun download in corso.', 'info');
+        return;
+    }
+    offlineMapDownloadAbortController.abort();
 }
 
 async function aggiornaStatoCacheRegioni() {
