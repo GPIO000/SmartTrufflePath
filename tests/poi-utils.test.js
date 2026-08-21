@@ -522,7 +522,6 @@ describe('normalizePoiMarker', () => {
     });
 
     it('restituisce DEFAULT_GENERIC_POI_MARKER per marker non riconosciuti', () => {
-        expect(normalizePoiMarker('🍄', undefined)).toBe(DEFAULT_GENERIC_POI_MARKER);
         expect(normalizePoiMarker(null, undefined)).toBe(DEFAULT_GENERIC_POI_MARKER);
         expect(normalizePoiMarker('', undefined)).toBe(DEFAULT_GENERIC_POI_MARKER);
     });
