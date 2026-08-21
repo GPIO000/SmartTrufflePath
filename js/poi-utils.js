@@ -161,6 +161,7 @@ export function isDuplicateMapLongPress(lastHandled, latlng, now = Date.now(), d
         return false;
     }
 
-    if (currentTimestamp - timestamp > windowMs) return false;
+    const elapsed = currentTimestamp - timestamp;
+    if (elapsed < 0 || elapsed >= windowMs) return false;
     return Math.abs(lastLat - nextLat) <= tolerance && Math.abs(lastLng - nextLng) <= tolerance;
 }

@@ -209,6 +209,277 @@ describe('isDuplicateMapLongPress', () => {
 });
 
 // ---------------------------------------------------------------------------
+// extractPointerClientPoint — casi limite
+// ---------------------------------------------------------------------------
+
+describe('extractPointerClientPoint — casi limite', () => {
+    it('restituisce {x:0, y:0} quando clientX e clientY valgono 0 (coordinate di origine valide)', () => {
+        expect(extractPointerClientPoint({ clientX: 0, clientY: 0 })).toEqual({ x: 0, y: 0 });
+    });
+
+    it('usa changedTouches quando touches è un array vuoto', () => {
+        expect(extractPointerClientPoint({
+            touches: [],
+            changedTouches: [{ clientX: 10, clientY: 20 }]
+        })).toEqual({ x: 10, y: 20 });
+    });
+
+    it('restituisce null quando touches[0].clientX è NaN', () => {
+        expect(extractPointerClientPoint({
+            touches: [{ clientX: NaN, clientY: 5 }]
+        })).toBeNull();
+    });
+
+    it('restituisce null quando touches è un array vuoto e non ci sono altri dati', () => {
+        expect(extractPointerClientPoint({ touches: [] })).toBeNull();
+    });
+
+    it('restituisce coordinate negative valide', () => {
+        expect(extractPointerClientPoint({ clientX: -10, clientY: -20 })).toEqual({ x: -10, y: -20 });
+    });
+
+    it('dà priorità a touches[0] rispetto ai campi clientX diretti sull\'evento', () => {
+        expect(extractPointerClientPoint({
+            touches: [{ clientX: 5, clientY: 8 }],
+            clientX: 100,
+            clientY: 200
+        })).toEqual({ x: 5, y: 8 });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// shouldConfirmMapLongPressOnTimeout — casi limite
+// ---------------------------------------------------------------------------
+
+describe('shouldConfirmMapLongPressOnTimeout — casi limite', () => {
+    it('restituisce false per pointer event mouse', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({ pointerType: 'mouse' })).toBe(false);
+    });
+
+    it('restituisce false per pointer event pen (trattato come non-touch)', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({ pointerType: 'pen' })).toBe(false);
+    });
+
+    it('ignora pointerType stringa vuota e valuta gli altri segnali', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({
+            pointerType: '',
+            type: 'touchstart'
+        })).toBe(true);
+    });
+
+    it('restituisce true quando sourceCapabilities.firesTouchEvents è true', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({
+            sourceCapabilities: { firesTouchEvents: true }
+        })).toBe(true);
+    });
+
+    it('non si ferma a sourceCapabilities false ma prosegue al controllo del type', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({
+            sourceCapabilities: { firesTouchEvents: false },
+            type: 'touchstart'
+        })).toBe(true);
+    });
+
+    it('restituisce true per type=touchend (qualsiasi tipo che inizia con "touch")', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({ type: 'touchend' })).toBe(true);
+    });
+
+    it('restituisce true quando è presente solo changedTouches (senza type)', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({
+            changedTouches: [{ clientX: 10, clientY: 20 }]
+        })).toBe(true);
+    });
+
+    it('restituisce false per un oggetto evento senza alcun indicatore touch', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({ clientX: 10, clientY: 20 })).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// hasMapLongPressExceededTolerance — casi limite
+// ---------------------------------------------------------------------------
+
+describe('hasMapLongPressExceededTolerance — casi limite', () => {
+    it('annulla la pressione lunga con soglia zero per qualsiasi movimento', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 101, y: 100 },
+            0
+        )).toBe(true);
+    });
+
+    it('non supera la soglia se start e current coincidono con soglia zero', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 100, y: 100 },
+            0
+        )).toBe(false);
+    });
+
+    it('non annulla la pressione esattamente al confine della soglia (usa > non >=)', () => {
+        // distanza esatta = tolerance px lungo l'asse X: non supera la soglia
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 100 + DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX, y: 100 },
+            DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX
+        )).toBe(false);
+    });
+
+    it('annulla la pressione di un pixel oltre il confine della soglia', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 100 + DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX + 1, y: 100 },
+            DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX
+        )).toBe(true);
+    });
+
+    it('gestisce correttamente i delta negativi (spostamento verso l\'alto o sinistra)', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 80, y: 80 },
+            DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX
+        )).toBe(true);
+    });
+
+    it('restituisce false per soglia NaN', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 0, y: 0 },
+            { x: 100, y: 100 },
+            NaN
+        )).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// toMapContainerPoint — casi limite
+// ---------------------------------------------------------------------------
+
+describe('toMapContainerPoint — casi limite', () => {
+    it('restituisce coordinate negative valide per punti fuori dal contenitore', () => {
+        expect(toMapContainerPoint(
+            { x: 50, y: 30 },
+            { left: 100, top: 40 }
+        )).toEqual({ x: -50, y: -10 });
+    });
+
+    it('gestisce correttamente left=0 e top=0 senza trattarli come valori mancanti', () => {
+        expect(toMapContainerPoint(
+            { x: 20, y: 15 },
+            { left: 0, top: 0 }
+        )).toEqual({ x: 20, y: 15 });
+    });
+
+    it('restituisce null quando left è mancante nel rettangolo del contenitore', () => {
+        expect(toMapContainerPoint(
+            { x: 10, y: 10 },
+            { top: 5 }
+        )).toBeNull();
+    });
+
+    it('restituisce null quando top è mancante nel rettangolo del contenitore', () => {
+        expect(toMapContainerPoint(
+            { x: 10, y: 10 },
+            { left: 5 }
+        )).toBeNull();
+    });
+
+    it('restituisce null quando y del clientPoint è Infinity', () => {
+        expect(toMapContainerPoint(
+            { x: 10, y: Infinity },
+            { left: 0, top: 0 }
+        )).toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// isDuplicateMapLongPress — casi limite
+// ---------------------------------------------------------------------------
+
+describe('isDuplicateMapLongPress — casi limite', () => {
+    it('[BUG] non considera duplicato un evento con timestamp futuro (now < timestamp)', () => {
+        // now=500 è anteriore al timestamp=1000 salvato: un timestamp futuro non può indicare
+        // un duplicato valido — la funzione deve restituire false
+        expect(isDuplicateMapLongPress(
+            { lat: 44.123456, lng: 11.654321, timestamp: 1000 },
+            { lat: 44.123456, lng: 11.654321 },
+            500
+        )).toBe(false);
+    });
+
+    it('non considera duplicato un evento esattamente al confine della finestra temporale', () => {
+        // elapsed = windowMs: l'evento è al limite della finestra, non dentro
+        expect(isDuplicateMapLongPress(
+            { lat: 44.123456, lng: 11.654321, timestamp: 1000 },
+            { lat: 44.123456, lng: 11.654321 },
+            1000 + DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS
+        )).toBe(false);
+    });
+
+    it('considera duplicato un evento a timestamp identico a now (elapsed=0)', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1000
+        )).toBe(true);
+    });
+
+    it('non considera duplicato quando coordTolerance è 0 e le coordinate differiscono minimamente', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.000001, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1200,
+            DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
+            0
+        )).toBe(false);
+    });
+
+    it('considera duplicato con coordTolerance=0 e coordinate identiche', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1200,
+            DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
+            0
+        )).toBe(true);
+    });
+
+    it('restituisce false con windowMs=0 quando anche un solo ms è trascorso', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1001,
+            0
+        )).toBe(false);
+    });
+
+    it('restituisce false per coordTolerance negativa', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1200,
+            DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
+            -1
+        )).toBe(false);
+    });
+
+    it('restituisce false per lng non finito nell\'evento corrente', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: Infinity },
+            1200
+        )).toBe(false);
+    });
+
+    it('restituisce false per timestamp NaN', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: NaN },
+            { lat: 44.0, lng: 11.0 },
+            1200
+        )).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // normalizePoiMarker
 // ---------------------------------------------------------------------------
 
