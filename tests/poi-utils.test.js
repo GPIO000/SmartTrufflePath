@@ -209,6 +209,288 @@ describe('isDuplicateMapLongPress', () => {
 });
 
 // ---------------------------------------------------------------------------
+// extractPointerClientPoint — casi limite
+// ---------------------------------------------------------------------------
+
+describe('extractPointerClientPoint — casi limite', () => {
+    it('restituisce {x:0, y:0} quando clientX e clientY valgono 0 (coordinate di origine valide)', () => {
+        expect(extractPointerClientPoint({ clientX: 0, clientY: 0 })).toEqual({ x: 0, y: 0 });
+    });
+
+    it('usa changedTouches quando touches è un array vuoto', () => {
+        expect(extractPointerClientPoint({
+            touches: [],
+            changedTouches: [{ clientX: 10, clientY: 20 }]
+        })).toEqual({ x: 10, y: 20 });
+    });
+
+    it('restituisce null quando touches[0].clientX è NaN', () => {
+        expect(extractPointerClientPoint({
+            touches: [{ clientX: NaN, clientY: 5 }]
+        })).toBeNull();
+    });
+
+    it('restituisce null quando touches è un array vuoto e non ci sono altri dati', () => {
+        expect(extractPointerClientPoint({ touches: [] })).toBeNull();
+    });
+
+    it('restituisce coordinate negative valide', () => {
+        expect(extractPointerClientPoint({ clientX: -10, clientY: -20 })).toEqual({ x: -10, y: -20 });
+    });
+
+    it('dà priorità a touches[0] rispetto ai campi clientX diretti sull\'evento', () => {
+        expect(extractPointerClientPoint({
+            touches: [{ clientX: 5, clientY: 8 }],
+            clientX: 100,
+            clientY: 200
+        })).toEqual({ x: 5, y: 8 });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// shouldConfirmMapLongPressOnTimeout — casi limite
+// ---------------------------------------------------------------------------
+
+describe('shouldConfirmMapLongPressOnTimeout — casi limite', () => {
+    it('restituisce false per pointer event mouse', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({ pointerType: 'mouse' })).toBe(false);
+    });
+
+    it('restituisce false per pointer event pen (trattato come non-touch)', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({ pointerType: 'pen' })).toBe(false);
+    });
+
+    it('ignora pointerType stringa vuota e valuta gli altri segnali', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({
+            pointerType: '',
+            type: 'touchstart'
+        })).toBe(true);
+    });
+
+    it('restituisce true quando sourceCapabilities.firesTouchEvents è true', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({
+            sourceCapabilities: { firesTouchEvents: true }
+        })).toBe(true);
+    });
+
+    it('non si ferma a sourceCapabilities false ma prosegue al controllo del type', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({
+            sourceCapabilities: { firesTouchEvents: false },
+            type: 'touchstart'
+        })).toBe(true);
+    });
+
+    it('restituisce true per type=touchend (qualsiasi tipo che inizia con "touch")', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({ type: 'touchend' })).toBe(true);
+    });
+
+    it('restituisce true quando è presente solo changedTouches (senza type)', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({
+            changedTouches: [{ clientX: 10, clientY: 20 }]
+        })).toBe(true);
+    });
+
+    it('restituisce false per un oggetto evento senza alcun indicatore touch', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({ clientX: 10, clientY: 20 })).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// hasMapLongPressExceededTolerance — casi limite
+// ---------------------------------------------------------------------------
+
+describe('hasMapLongPressExceededTolerance — casi limite', () => {
+    it('annulla la pressione lunga con soglia zero per qualsiasi movimento', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 101, y: 100 },
+            0
+        )).toBe(true);
+    });
+
+    it('non supera la soglia se start e current coincidono con soglia zero', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 100, y: 100 },
+            0
+        )).toBe(false);
+    });
+
+    it('non annulla la pressione esattamente al confine della soglia (usa > non >=)', () => {
+        // distanza esatta = tolerance px lungo l'asse X: non supera la soglia
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 100 + DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX, y: 100 },
+            DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX
+        )).toBe(false);
+    });
+
+    it('annulla la pressione di un pixel oltre il confine della soglia', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 100 + DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX + 1, y: 100 },
+            DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX
+        )).toBe(true);
+    });
+
+    it('gestisce correttamente i delta negativi (spostamento verso l\'alto o sinistra)', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 80, y: 80 },
+            DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX
+        )).toBe(true);
+    });
+
+    it('restituisce false per soglia NaN', () => {
+        expect(hasMapLongPressExceededTolerance(
+            { x: 0, y: 0 },
+            { x: 100, y: 100 },
+            NaN
+        )).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// toMapContainerPoint — casi limite
+// ---------------------------------------------------------------------------
+
+describe('toMapContainerPoint — casi limite', () => {
+    it('restituisce coordinate negative valide per punti fuori dal contenitore', () => {
+        expect(toMapContainerPoint(
+            { x: 50, y: 30 },
+            { left: 100, top: 40 }
+        )).toEqual({ x: -50, y: -10 });
+    });
+
+    it('gestisce correttamente left=0 e top=0 senza trattarli come valori mancanti', () => {
+        expect(toMapContainerPoint(
+            { x: 20, y: 15 },
+            { left: 0, top: 0 }
+        )).toEqual({ x: 20, y: 15 });
+    });
+
+    it('restituisce null quando left è mancante nel rettangolo del contenitore', () => {
+        expect(toMapContainerPoint(
+            { x: 10, y: 10 },
+            { top: 5 }
+        )).toBeNull();
+    });
+
+    it('restituisce null quando top è mancante nel rettangolo del contenitore', () => {
+        expect(toMapContainerPoint(
+            { x: 10, y: 10 },
+            { left: 5 }
+        )).toBeNull();
+    });
+
+    it('restituisce null quando y del clientPoint è Infinity', () => {
+        expect(toMapContainerPoint(
+            { x: 10, y: Infinity },
+            { left: 0, top: 0 }
+        )).toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// isDuplicateMapLongPress — casi limite
+// ---------------------------------------------------------------------------
+
+describe('isDuplicateMapLongPress — casi limite', () => {
+    it('restituisce false per timestamp futuro (now < timestamp salvato)', () => {
+        // now=500 è anteriore al timestamp=1000 salvato: un timestamp futuro non può indicare
+        // un duplicato valido — la funzione deve restituire false
+        expect(isDuplicateMapLongPress(
+            { lat: 44.123456, lng: 11.654321, timestamp: 1000 },
+            { lat: 44.123456, lng: 11.654321 },
+            500
+        )).toBe(false);
+    });
+
+    it('non considera duplicato un evento esattamente al confine della finestra temporale', () => {
+        // elapsed = windowMs: l'evento è al limite della finestra, non dentro
+        expect(isDuplicateMapLongPress(
+            { lat: 44.123456, lng: 11.654321, timestamp: 1000 },
+            { lat: 44.123456, lng: 11.654321 },
+            1000 + DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS
+        )).toBe(false);
+    });
+
+    it('considera duplicato un evento a timestamp identico a now (elapsed=0)', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1000
+        )).toBe(true);
+    });
+
+    it('non considera duplicato quando coordTolerance è 0 e le coordinate differiscono minimamente', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.000001, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1200,
+            DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
+            0
+        )).toBe(false);
+    });
+
+    it('considera duplicato con coordTolerance=0 e coordinate identiche', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1200,
+            DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
+            0
+        )).toBe(true);
+    });
+
+    it('restituisce false con windowMs=0 quando anche un solo ms è trascorso', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1001,
+            0
+        )).toBe(false);
+    });
+
+    it('restituisce false per coordTolerance negativa', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1200,
+            DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
+            -1
+        )).toBe(false);
+    });
+
+    it('restituisce false per lng non finito nell\'evento corrente', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: Infinity },
+            1200
+        )).toBe(false);
+    });
+
+    it('restituisce false per timestamp NaN', () => {
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: NaN },
+            { lat: 44.0, lng: 11.0 },
+            1200
+        )).toBe(false);
+    });
+
+    it('restituisce false con windowMs=0 e elapsed=0 (finestra nulla: nessuna deduplicazione)', () => {
+        // windowMs=0 → nessun press è mai duplicato, nemmeno con elapsed=0
+        // perché elapsed >= windowMs → 0 >= 0 = true → esce subito
+        expect(isDuplicateMapLongPress(
+            { lat: 44.0, lng: 11.0, timestamp: 1000 },
+            { lat: 44.0, lng: 11.0 },
+            1000,
+            0
+        )).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // normalizePoiMarker
 // ---------------------------------------------------------------------------
 
@@ -373,5 +655,210 @@ describe('formatPoiDisplayDate', () => {
     it('restituisce stringa vuota per input non valido', () => {
         expect(formatPoiDisplayDate('non-una-data')).toBe('');
         expect(formatPoiDisplayDate('')).toBe('');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// extractPointerClientPoint — ulteriori casi limite
+// ---------------------------------------------------------------------------
+
+describe('extractPointerClientPoint — changedTouches casi limite', () => {
+    it('restituisce null quando changedTouches è un array vuoto e non ci sono altre coordinate', () => {
+        // changedTouches vuoto: nessun punto di contatto terminato disponibile,
+        // nessun clientX/Y sull'evento → null
+        expect(extractPointerClientPoint({ changedTouches: [] })).toBeNull();
+    });
+
+    it('restituisce null quando changedTouches[0].clientX è NaN', () => {
+        expect(extractPointerClientPoint({
+            changedTouches: [{ clientX: NaN, clientY: 5 }]
+        })).toBeNull();
+    });
+
+    it('restituisce null quando changedTouches[0].clientY è NaN', () => {
+        expect(extractPointerClientPoint({
+            changedTouches: [{ clientX: 10, clientY: NaN }]
+        })).toBeNull();
+    });
+
+    it('usa changedTouches[0] quando touches è un array vuoto e changedTouches ha un punto', () => {
+        // Scenario touchend: touches=[] (dito sollevato), changedTouches=[punto]
+        expect(extractPointerClientPoint({
+            touches: [],
+            changedTouches: [{ clientX: 55, clientY: 77 }]
+        })).toEqual({ x: 55, y: 77 });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// shouldConfirmMapLongPressOnTimeout — touches array vuoto
+// ---------------------------------------------------------------------------
+
+describe('shouldConfirmMapLongPressOnTimeout — touches array vuoto', () => {
+    it('restituisce true con touches array vuoto (evento touchend: array presente ma dito già sollevato)', () => {
+        // In un evento touchend nativo touches=[] e changedTouches=[touch].
+        // La presenza dell'array touches indica comunque un TouchEvent.
+        expect(shouldConfirmMapLongPressOnTimeout({ touches: [] })).toBe(true);
+    });
+
+    it('restituisce true con touches e changedTouches entrambi array vuoti', () => {
+        expect(shouldConfirmMapLongPressOnTimeout({ touches: [], changedTouches: [] })).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// hasMapLongPressExceededTolerance — diagonale esatta alla soglia
+// ---------------------------------------------------------------------------
+
+describe('hasMapLongPressExceededTolerance — diagonale esatta', () => {
+    it('non annulla la pressione lunga con spostamento diagonale esattamente alla soglia (usa > non >=)', () => {
+        // delta = (t/√2, t/√2) → distanza² = t²/2 + t²/2 = t² → non supera (non strettamente maggiore)
+        const t = DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX;
+        const delta = t / Math.SQRT2;
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 100 + delta, y: 100 + delta },
+            t
+        )).toBe(false);
+    });
+
+    it('annulla la pressione lunga con spostamento diagonale di un epsilon oltre la soglia', () => {
+        const t = DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX;
+        const delta = t / Math.SQRT2 + 0.01;
+        expect(hasMapLongPressExceededTolerance(
+            { x: 100, y: 100 },
+            { x: 100 + delta, y: 100 + delta },
+            t
+        )).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// toMapContainerPoint — left o top NaN
+// ---------------------------------------------------------------------------
+
+describe('toMapContainerPoint — valori NaN nel rettangolo', () => {
+    it('restituisce null quando containerRect.left è NaN', () => {
+        expect(toMapContainerPoint({ x: 10, y: 10 }, { left: NaN, top: 0 })).toBeNull();
+    });
+
+    it('restituisce null quando containerRect.top è NaN', () => {
+        expect(toMapContainerPoint({ x: 10, y: 10 }, { left: 0, top: NaN })).toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Simulazioni di flusso completo del long press
+// ---------------------------------------------------------------------------
+
+describe('flusso long press touch completo', () => {
+    it('simula un press touch: shouldConfirmMapLongPressOnTimeout restituisce true → nessun duplicato al primo press', () => {
+        const touchstartEvent = {
+            type: 'touchstart',
+            touches: [{ clientX: 200, clientY: 300 }],
+        };
+
+        // 1. Estrai il punto di partenza
+        const startPoint = extractPointerClientPoint(touchstartEvent);
+        expect(startPoint).toEqual({ x: 200, y: 300 });
+
+        // 2. Verifica che il timeout debba confermare immediatamente (touch)
+        expect(shouldConfirmMapLongPressOnTimeout(touchstartEvent)).toBe(true);
+
+        // 3. Primo press: nessun duplicato (lastHandled=null)
+        const latlng = { lat: 44.5, lng: 11.3 };
+        const now = 1000;
+        expect(isDuplicateMapLongPress(null, latlng, now)).toBe(false);
+
+        // 4. Salva l'ultimo press gestito
+        const lastHandled = { lat: latlng.lat, lng: latlng.lng, timestamp: now };
+
+        // 5. Secondo press ravvicinato nello stesso punto: duplicato
+        expect(isDuplicateMapLongPress(lastHandled, latlng, now + 200)).toBe(true);
+
+        // 6. Press dopo la finestra temporale: non duplicato
+        expect(isDuplicateMapLongPress(lastHandled, latlng, now + DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS + 1)).toBe(false);
+    });
+
+    it('simula il touchend: pending latlng confermato perché il dito non si è mosso', () => {
+        const touchstartEvent = {
+            type: 'touchstart',
+            touches: [{ clientX: 150, clientY: 250 }],
+        };
+        const touchendEvent = {
+            type: 'touchend',
+            touches: [],
+            changedTouches: [{ clientX: 151, clientY: 250 }],
+        };
+
+        const startPoint = extractPointerClientPoint(touchstartEvent);
+        // Verifica che il movimento tra start e end non superi la soglia
+        const endPoint = extractPointerClientPoint(touchendEvent);
+        expect(endPoint).toEqual({ x: 151, y: 250 });
+
+        const moved = hasMapLongPressExceededTolerance(startPoint, endPoint);
+        expect(moved).toBe(false);
+
+        // Il touchend event è un evento touch → l'array touches è vuoto ma presente
+        expect(shouldConfirmMapLongPressOnTimeout({ touches: [] })).toBe(true);
+    });
+
+    it('simula il touchmove che cancella il long press per spostamento eccessivo', () => {
+        const touchstartEvent = {
+            touches: [{ clientX: 100, clientY: 100 }],
+        };
+        const touchmoveEvent = {
+            touches: [{ clientX: 140, clientY: 140 }],
+        };
+
+        const startPoint = extractPointerClientPoint(touchstartEvent);
+        const movedPoint = extractPointerClientPoint(touchmoveEvent);
+
+        // Lo spostamento di 40px supera la soglia di DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX (12px)
+        expect(hasMapLongPressExceededTolerance(startPoint, movedPoint)).toBe(true);
+    });
+});
+
+describe('flusso long press mouse completo', () => {
+    it('simula un press mouse: shouldConfirmMapLongPressOnTimeout restituisce false → aspetta mouseup', () => {
+        const mousedownEvent = {
+            type: 'mousedown',
+            pointerType: 'mouse',
+            clientX: 400,
+            clientY: 300,
+        };
+
+        // 1. Estrai il punto di partenza
+        const startPoint = extractPointerClientPoint(mousedownEvent);
+        expect(startPoint).toEqual({ x: 400, y: 300 });
+
+        // 2. Il mouse non deve confermare immediatamente al timeout
+        expect(shouldConfirmMapLongPressOnTimeout(mousedownEvent)).toBe(false);
+    });
+
+    it('simula mousemove entro la soglia: il long press non viene cancellato', () => {
+        const startPoint = { x: 400, y: 300 };
+        const movedPoint = { x: 405, y: 302 }; // spostamento 5.4px < 12px
+
+        expect(hasMapLongPressExceededTolerance(startPoint, movedPoint)).toBe(false);
+    });
+
+    it('simula mousemove oltre la soglia: il long press viene cancellato', () => {
+        const startPoint = { x: 400, y: 300 };
+        const movedPoint = { x: 420, y: 320 }; // spostamento ~28px > 12px
+
+        expect(hasMapLongPressExceededTolerance(startPoint, movedPoint)).toBe(true);
+    });
+
+    it('simula deduplicazione dopo contextmenu (right-click): secondo press ravvicinato ignorato', () => {
+        const latlng = { lat: 44.123456, lng: 11.654321 };
+        const firstPressAt = 5000;
+
+        // Primo press (right-click/contextmenu): nessun duplicato
+        expect(isDuplicateMapLongPress(null, latlng, firstPressAt)).toBe(false);
+        const lastHandled = { lat: latlng.lat, lng: latlng.lng, timestamp: firstPressAt };
+
+        // Secondo press quasi immediato (es. touchend + contextmenu combinati): duplicato
+        expect(isDuplicateMapLongPress(lastHandled, latlng, firstPressAt + 50)).toBe(true);
     });
 });

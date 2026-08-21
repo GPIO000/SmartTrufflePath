@@ -347,6 +347,7 @@ async function appConfirm(message) {
     // Yield to the event loop so any deferred 'close' event queued by the browser
     // from a previously closed dialog fires before we attach new listeners.
     await new Promise(r => setTimeout(r, 0));
+    if (dialog.open) return false;
 
     msg.textContent = message;
     inputField.style.display = 'none';
@@ -377,15 +378,18 @@ async function appConfirm(message) {
     });
 }
 
-function appPrompt(message, defaultValue = '') {
+async function appPrompt(message, defaultValue = '') {
+    const dialog = document.getElementById('app-dialog');
+    const msg = document.getElementById('app-dialog-message');
+    const inputField = document.getElementById('app-dialog-input');
+    const cancelBtn = document.getElementById('app-dialog-cancel');
+    const okBtn = document.getElementById('app-dialog-ok');
+    if (!dialog) { return window.prompt(message, defaultValue); }
+    // Yield to the event loop so any deferred 'close' event queued by the browser
+    // from a previously closed dialog updates dialog.open before we check it.
+    await new Promise(r => setTimeout(r, 0));
+    if (dialog.open) { return null; }
     return new Promise((resolve) => {
-        const dialog = document.getElementById('app-dialog');
-        const msg = document.getElementById('app-dialog-message');
-        const inputField = document.getElementById('app-dialog-input');
-        const cancelBtn = document.getElementById('app-dialog-cancel');
-        const okBtn = document.getElementById('app-dialog-ok');
-        if (!dialog) { resolve(window.prompt(message, defaultValue)); return; }
-        if (dialog.open) { resolve(null); return; }
         msg.textContent = message;
         inputField.style.display = 'block';
         inputField.value = defaultValue;
@@ -438,27 +442,22 @@ async function waitForDialogToSettle(dialog) {
     }
 }
 
-function appSelect(message, options = [], defaultValue = '') {
+async function appSelect(message, options = [], defaultValue = '') {
+    if (!Array.isArray(options) || options.length === 0) { return null; }
+    const dialog = document.getElementById('app-dialog');
+    const msg = document.getElementById('app-dialog-message');
+    const inputField = document.getElementById('app-dialog-input');
+    const cancelBtn = document.getElementById('app-dialog-cancel');
+    const okBtn = document.getElementById('app-dialog-ok');
+    if (!dialog) {
+        const fallbackMessage = `${message}\n${options.join(' ')}`;
+        return window.prompt(fallbackMessage, defaultValue);
+    }
+    // Yield to the event loop so any deferred 'close' event queued by the browser
+    // from a previously closed dialog updates dialog.open before we check it.
+    await new Promise(r => setTimeout(r, 0));
+    if (dialog.open) { return null; }
     return new Promise((resolve) => {
-        if (!Array.isArray(options) || options.length === 0) {
-            resolve(null);
-            return;
-        }
-        const dialog = document.getElementById('app-dialog');
-        const msg = document.getElementById('app-dialog-message');
-        const inputField = document.getElementById('app-dialog-input');
-        const cancelBtn = document.getElementById('app-dialog-cancel');
-        const okBtn = document.getElementById('app-dialog-ok');
-        if (!dialog) {
-            const fallbackMessage = `${message}\n${options.join(' ')}`;
-            resolve(window.prompt(fallbackMessage, defaultValue));
-            return;
-        }
-        if (dialog.open) {
-            resolve(null);
-            return;
-        }
-
         msg.textContent = message;
         const previousInputDisplay = inputField.style.display;
         inputField.style.display = 'none';
@@ -506,26 +505,25 @@ function appSelect(message, options = [], defaultValue = '') {
     });
 }
 
-function appChoosePoiSaveSource(message) {
+async function appChoosePoiSaveSource(message) {
+    const dialog = document.getElementById('app-dialog');
+    const msg = document.getElementById('app-dialog-message');
+    const inputField = document.getElementById('app-dialog-input');
+    const cancelBtn = document.getElementById('app-dialog-cancel');
+    const altBtn = document.getElementById('app-dialog-alt');
+    const okBtn = document.getElementById('app-dialog-ok');
+    if (!dialog || !altBtn) {
+        const fallback = window.prompt(`${message}\nScrivi "mappa" per scegliere un punto sulla mappa, altrimenti "gps".`, 'gps');
+        const normalized = String(fallback || '').trim().toLowerCase();
+        if (normalized === 'gps') return 'gps';
+        if (normalized === 'mappa') return 'map';
+        return null;
+    }
+    // Yield to the event loop so any deferred 'close' event queued by the browser
+    // from a previously closed dialog updates dialog.open before we check it.
+    await new Promise(r => setTimeout(r, 0));
+    if (dialog.open) { return null; }
     return new Promise((resolve) => {
-        const dialog = document.getElementById('app-dialog');
-        const msg = document.getElementById('app-dialog-message');
-        const inputField = document.getElementById('app-dialog-input');
-        const cancelBtn = document.getElementById('app-dialog-cancel');
-        const altBtn = document.getElementById('app-dialog-alt');
-        const okBtn = document.getElementById('app-dialog-ok');
-        if (!dialog || !altBtn) {
-            const fallback = window.prompt(`${message}\nScrivi "mappa" per scegliere un punto sulla mappa, altrimenti "gps".`, 'gps');
-            const normalized = String(fallback || '').trim().toLowerCase();
-            if (normalized === 'gps') resolve('gps');
-            else if (normalized === 'mappa') resolve('map');
-            else resolve(null);
-            return;
-        }
-        if (dialog.open) {
-            resolve(null);
-            return;
-        }
         msg.textContent = message;
         inputField.style.display = 'none';
         cancelBtn.style.display = '';
