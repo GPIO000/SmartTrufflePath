@@ -91,7 +91,7 @@ export function normalizePoiList(rawPoiList) {
  * @returns {{ lat: number, lng: number }|null}
  */
 export function resolvePoiCoords(forceLat, forceLng, userMarker) {
-    const hasForced = forceLat !== undefined && forceLng !== undefined;
+    const hasForced = Number.isFinite(forceLat) && Number.isFinite(forceLng);
     if (hasForced) return { lat: forceLat, lng: forceLng };
     if (userMarker) {
         const latlng = userMarker.getLatLng();

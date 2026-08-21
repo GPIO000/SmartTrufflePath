@@ -60,6 +60,28 @@ describe('resolvePoiCoords', () => {
         const result = resolvePoiCoords(undefined, 11.0, userMarker);
         expect(result).toEqual({ lat: 43.5, lng: 10.2 });
     });
+
+    it('cade sul marker GPS quando forceLat è NaN (coordinata non valida)', () => {
+        const userMarker = { getLatLng: () => ({ lat: 43.5, lng: 10.2 }) };
+        const result = resolvePoiCoords(NaN, 11.0, userMarker);
+        expect(result).toEqual({ lat: 43.5, lng: 10.2 });
+    });
+
+    it('cade sul marker GPS quando forceLng è NaN (coordinata non valida)', () => {
+        const userMarker = { getLatLng: () => ({ lat: 43.5, lng: 10.2 }) };
+        const result = resolvePoiCoords(44.0, NaN, userMarker);
+        expect(result).toEqual({ lat: 43.5, lng: 10.2 });
+    });
+
+    it('cade sul marker GPS quando forceLat è null', () => {
+        const userMarker = { getLatLng: () => ({ lat: 43.5, lng: 10.2 }) };
+        const result = resolvePoiCoords(null, 11.0, userMarker);
+        expect(result).toEqual({ lat: 43.5, lng: 10.2 });
+    });
+
+    it('restituisce null quando forceLat è Infinity e non c\'è marker GPS', () => {
+        expect(resolvePoiCoords(Infinity, 11.0, null)).toBeNull();
+    });
 });
 
 // ---------------------------------------------------------------------------
