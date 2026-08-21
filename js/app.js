@@ -13,9 +13,12 @@ import {
 import { downloadTileBatchesWithRecovery, downloadTileWithRetry, isValidCachedTileResponse } from './offline-map-download-utils.js';
 import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite, riepilogaAcquistiCliente } from './fiscal-utils.js';
 import {
+    buildEmergencyLocationMessage,
+    buildSharedPoiMessage,
     CUSTOM_POI_MARKERS,
     DEFAULT_MAP_LONG_PRESS_DUPLICATE_WINDOW_MS,
     extractPointerClientPoint,
+    extractCoordsFromSharedMessage,
     hasMapLongPressExceededTolerance,
     isDuplicateMapLongPress,
     DEFAULT_GENERIC_POI_MARKER,
@@ -1437,12 +1440,6 @@ function getSavedSenderName() {
     return typeof tData.nome === 'string' ? tData.nome.trim() : '';
 }
 
-function buildSharedPoiMessage(poi) {
-    const senderName = getSavedSenderName();
-    const senderLine = senderName ? `\nDa: ${senderName}` : '';
-    return `📍 TARTUFAIA CONDIVISA${senderLine}\nNota: ${poi.note}\nData: ${poi.date}\nGoogle Maps: https://maps.google.com/?q=${poi.lat},${poi.lng}`;
-}
-
 function addPoi(lat, lng, note, type, from, marker) {
     const savedAt = new Date().toISOString();
     const id = `poi-${savedAt}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1521,7 +1518,7 @@ function stopNavigation() {
 function sharePoi(index) {
     if (poiList[index]) {
         const p = poiList[index];
-        const msg = buildSharedPoiMessage(p);
+        const msg = buildSharedPoiMessage(p, getSavedSenderName());
         if (navigator.share) { navigator.share({ title: 'Tartufaia', text: msg }).catch(() => {}); }
         else { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
     }
@@ -1565,40 +1562,6 @@ function savePoiEdit(index) {
     showToast(`${updatedMarker} Punto aggiornato!`, 'success');
     openModule('poilist');
 }
-function extractCoordsFromMessage(text) {
-    let m;
-    // Try Google Maps URL: ?q=lat,lng or @lat,lng
-    m = text.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-    m = text.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-    // Try "Lat: X, Lng: Y" or "Lat: X Lng: Y" (with dot or comma decimals)
-    m = text.match(/lat(?:itudine)?[:\s]+(-?\d+[.,]\d*)[,\s]+l(?:on|ng|ong)(?:itudine)?[:\s]+(-?\d+[.,]\d*)/i);
-    if (m) return { lat: parseFloat(m[1].replace(',', '.')), lng: parseFloat(m[2].replace(',', '.')) };
-    // Try "N 43° 12.345' E 11° 34.567'" or "43°12'34.5"N 11°34'56.7"E" (DMS)
-    const dmsToDecimal = (deg, min, sec, dir) => {
-        let d = parseFloat(deg) + parseFloat(min || 0) / 60 + parseFloat(sec || 0) / 3600;
-        if (/[SW]/i.test(dir)) d = -d;
-        return d;
-    };
-    // DMS with symbols: 43°12'34.5"N 11°34'56.7"E (seconds required)
-    m = text.match(/(\d{1,3})[°º]\s*(\d{1,2})['′]\s*(\d{1,2}(?:[.,]\d+)?)["""″]\s*([NS])[,\s]+(\d{1,3})[°º]\s*(\d{1,2})['′]\s*(\d{1,2}(?:[.,]\d+)?)["""″]\s*([EWO])/i);
-    if (m) return { lat: dmsToDecimal(m[1], m[2], m[3], m[4]), lng: dmsToDecimal(m[5], m[6], m[7], m[8]) };
-    // Degrees and decimal minutes: 43°12.345'N 11°34.567'E
-    m = text.match(/(\d{1,3})[°º]\s*(\d{1,2}(?:[.,]\d+)?)[′']?\s*([NS])[,\s]+(\d{1,3})[°º]\s*(\d{1,2}(?:[.,]\d+)?)[′']?\s*([EWO])/i);
-    if (m) return { lat: dmsToDecimal(m[1], m[2].replace(',', '.'), 0, m[3]), lng: dmsToDecimal(m[4], m[5].replace(',', '.'), 0, m[6]) };
-    // N 43 12.345 E 11 34.567 (no symbols)
-    m = text.match(/([NS])\s*(\d{1,3})[°º\s]\s*(\d{1,2}(?:[.,]\d+)?)[,\s]+([EWO])\s*(\d{1,3})[°º\s]\s*(\d{1,2}(?:[.,]\d+)?)/i);
-    if (m) return { lat: dmsToDecimal(m[2], m[3].replace(',', '.'), 0, m[1]), lng: dmsToDecimal(m[5], m[6].replace(',', '.'), 0, m[4]) };
-    // Decimal comma format like "41,0290515, 14,6805400"
-    m = text.match(/(-?\d{1,3},\d{4,})\s*[,;]\s*(-?\d{1,3},\d{4,})/);
-    if (m) return { lat: parseFloat(m[1].replace(/,/g, '.')), lng: parseFloat(m[2].replace(/,/g, '.')) };
-    // GPS coordinate pairs like "43.1234, 11.5678" or "43.1234,11.5678"
-    m = text.match(/(-?\d{1,3}\.\d{4,})[,\s]+(-?\d{1,3}\.\d{4,})/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-    return null;
-}
-
 function extractSenderNameFromMessage(text) {
     const match = text.match(/(?:^|[\n\r]|[.!?]\s)(?:da|mittente)[:\s]+([^\n\r.]+)/i);
     return match ? match[1].trim().slice(0, 80) : '';
@@ -1611,7 +1574,7 @@ function importSharedPoint() {
     if (!msgEl) return;
     const text = msgEl.value.trim();
     if (!text) { showToast("Incolla prima il messaggio ricevuto.", 'error'); return; }
-    const coords = extractCoordsFromMessage(text);
+    const coords = extractCoordsFromSharedMessage(text);
     if (!coords) {
         showToast("Nessuna coordinata GPS trovata nel messaggio.", 'error');
         return;
@@ -1644,9 +1607,12 @@ function importSharedPoint() {
 async function triggerSOS() {
     if (userMarker) {
         const pos = userMarker.getLatLng();
-        const senderName = getSavedSenderName();
-        const senderLine = senderName ? ` Da: ${senderName}.` : '';
-        const msg = `EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO.${senderLine} Coordinate GPS: Lat: ${pos.lat}, Lng: ${pos.lng}.`;
+        const msg = buildEmergencyLocationMessage(
+            'EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO.',
+            pos.lat,
+            pos.lng,
+            getSavedSenderName()
+        );
         const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
         if (method === 'sms') { window.location.href = `sms:?body=${encodeURIComponent(msg)}`; }
         else if (method === 'whatsapp') { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
@@ -1736,7 +1702,7 @@ function openModule(moduleName, editMode = false) {
                 <p>Incolla qui il messaggio ricevuto da un altro utente (punto condiviso o SOS). Il sistema estrarrà automaticamente le coordinate e, se presente, anche il nome del mittente.</p>
                 <div class="module-card">
                     <label for="condiviso-msg-input" style="display:block; margin-bottom:8px; font-weight:bold;">Messaggio ricevuto:</label>
-                    <textarea id="condiviso-msg-input" class="mod-input" rows="6" placeholder="Incolla qui il messaggio ricevuto...&#10;&#10;Esempio:&#10;📍 TARTUFAIA CONDIVISA&#10;Da: Mario Rossi&#10;Nota: Quercia grande&#10;Google Maps: https://maps.google.com/?q=43.1234,11.5678&#10;&#10;oppure:&#10;EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO. Da: Mario Rossi. Coordinate GPS: Lat: 43.1234, Lng: 11.5678." style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
+                    <textarea id="condiviso-msg-input" class="mod-input" rows="6" placeholder="Incolla qui il messaggio ricevuto...&#10;&#10;Esempio:&#10;📍 TARTUFAIA CONDIVISA&#10;Da: Mario Rossi&#10;Nota: Quercia grande&#10;Google Maps: https://maps.google.com/?q=43.123400,11.567800&#10;Apple Maps: https://maps.apple.com/?ll=43.123400%2C11.567800&amp;q=Quercia+grande&#10;&#10;oppure:&#10;EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO. Da: Mario Rossi. Coordinate GPS: Lat: 43.123400, Lng: 11.567800.&#10;Google Maps: https://maps.google.com/?q=43.123400,11.567800&#10;Apple Maps: https://maps.apple.com/?ll=43.123400%2C11.567800&amp;q=EMERGENZA+SONO+IN+DIFFICOLT%C3%80+HO+BISOGNO+DI+AIUTO." style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
                     <label for="condiviso-from-input" style="display:block; margin:12px 0 6px; font-weight:bold;">Da (mittente, opzionale solo per messaggi vecchi):</label>
                     <input type="text" id="condiviso-from-input" class="mod-input" placeholder="Es. Mario Rossi" style="width:100%; box-sizing:border-box;">
                     <label for="condiviso-marker-select" style="display:block; margin:12px 0 6px; font-weight:bold;">Marker (solo punti non SOS):</label>
@@ -5018,9 +4984,13 @@ async function deleteVetClinic(index) {
 async function shareLocationToVet(telNumber) {
     if (userMarker) {
         const pos = userMarker.getLatLng();
-        const senderName = getSavedSenderName();
-        const senderLine = senderName ? ` Da: ${senderName}.` : '';
-        const msg = `EMERGENZA VETERINARIA!${senderLine} Coordinate GPS: Lat: ${pos.lat.toFixed(6)}, Lng: ${pos.lng.toFixed(6)}`;
+        const msg = buildEmergencyLocationMessage(
+            'EMERGENZA VETERINARIA!',
+            pos.lat,
+            pos.lng,
+            getSavedSenderName(),
+            'Emergenza veterinaria'
+        );
         const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
         if (method === 'sms') { window.location.href = `sms:${telNumber}?body=${encodeURIComponent(msg)}`; }
         else if (method === 'whatsapp') { window.location.href = `whatsapp://send?phone=${encodeURIComponent(telNumber)}&text=${encodeURIComponent(msg)}`; }
@@ -5937,7 +5907,7 @@ function importaCalendariJSON(event) {
 async function mostraInfoModulo(moduleName) {
     const guideTesti = {
         'poilist': "ℹ️ Guida - Elenco Punti & Tartufaie\n\nQui puoi visualizzare tutti i punti di interesse e le tartufaie salvate con coordinate e note. Il tasto '🧭 Vai' imposta una navigazione basata su GPS: l'app calcola la distanza e la direzione geografica del punto rispetto al Nord.\n\nQuesta navigazione non usa il magnetometro / la bussola hardware del telefono, quindi non indica dove stai guardando con il dispositivo. Per orientarti devi confrontare la mappa con i tuoi spostamenti reali.\n\nPuoi anche condividere la posizione o eliminare i punti non più utili.",
-        'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS, rileva il nome del mittente quando presente nel testo e salva il punto nell'elenco: per i SOS usa sempre 🆘, mentre per gli altri puoi scegliere il marker.",
+        'punti_condivisi': "ℹ️ **Guida - Importa Punti Condivisi / SOS**\n\nIncolla il messaggio ricevuto da un altro utente (punto tartufaia o SOS di emergenza). Il sistema estrae automaticamente le coordinate GPS, rileva il nome del mittente quando presente nel testo e salva il punto nell'elenco: per i SOS usa sempre 🆘, mentre per gli altri puoi scegliere il marker. I nuovi messaggi condivisi includono sia il link diretto a Google Maps sia quello ad Apple Maps.",
         'tesserino': "ℹ️ **Guida - Anagrafica & Tesserino Digitale**\n\nInserisci e archivia i dati del tuo tesserino regionale di raccolta tartufi e carica una foto del documento (max 1.5MB). Consigliate immagini leggere.",
         'pagopa': "ℹ️ **Guida - Ricevuta PagoPA**\n\nRegistra la quietanza di pagamento della tassa regionale annuale obbligatoria caricando un'immagine. Questo dato è indispensabile per sbloccare la registrazione delle vendite.",
         'archivio_documenti': "ℹ️ **Guida - Archivio Altri Documenti**\n\nSalva altri documenti (es. carta d'identità o autorizzazione funghi) indicando numero documento, scadenza e immagine del documento. Puoi anche allegare l'immagine della ricevuta di rinnovo.",
@@ -5952,7 +5922,7 @@ async function mostraInfoModulo(moduleName) {
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
         'export': `ℹ️ Guida - Report & Backup Dati\n\nEsporta i dati contabili in formato CSV.\n\nIl backup automatico ti guida a scegliere la cartella Download del dispositivo e poi crea/usa sempre il percorso ${buildAutomaticBackupPathLabel('Download')} per salvare backup_truffle_automatico.json. Usa '📁 Imposta Cartella Backup' per registrare o cambiare il percorso, poi '💾 Salva Backup Ora' per forzarlo manualmente.\n\nSe il browser non supporta la scelta guidata della cartella, l'app usa il normale download del file JSON.`,
-        'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza.",
+        'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza, includendo link apribili direttamente in Google Maps e Apple Maps.",
         'clienti': "ℹ️ **Guida - Rubrica Clienti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico, aggiungi nuovi nominativi e gestisci modifiche, note ed eliminazioni.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
         'calendario': "ℹ️ **Guida - Calendario Raccolta (GPS)**\n\nVerifica in base alla tua posizione GPS attuale quali specie di tartufo hanno il periodo di raccolta attualmente aperto o chiuso.",
