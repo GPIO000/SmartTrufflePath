@@ -1495,7 +1495,6 @@ async function savePoiPosition(forceLat, forceLng) {
         if (marker === null) return;
         const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, marker);
         renderAllPoiMarkers();
-        targetNavigation = `poi_${newIndex}`;
         map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
         showToast(`${marker} Punto salvato!`, 'success');
