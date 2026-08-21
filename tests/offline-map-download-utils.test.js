@@ -161,7 +161,7 @@ describe('downloadTileWithRetry', () => {
 
     const result = await downloadTileWithRetry(cache, 'https://a.tile.openstreetmap.org/8/1/1.png', { fetchImpl });
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, fromCache: true });
     expect(cache.delete).not.toHaveBeenCalled();
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(cache.put).not.toHaveBeenCalled();

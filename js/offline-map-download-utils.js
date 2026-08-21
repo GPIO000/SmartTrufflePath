@@ -245,7 +245,8 @@ async function downloadTileBatchesWithRecovery(levels = [], {
   randomFn = Math.random,
   sleepImpl = globalThis.setTimeout,
   onBatchComplete,
-  downloadOptions = {}
+  downloadOptions = {},
+  abortSignal
 } = {}) {
   const safeLevels = Array.isArray(levels) ? levels : [];
   const state = {
@@ -254,6 +255,7 @@ async function downloadTileBatchesWithRecovery(levels = [], {
   };
   const totals = {
     done: 0,
+    downloaded: 0,
     errors: 0,
     quotaErrors: 0,
     networkErrors: 0,
@@ -261,6 +263,7 @@ async function downloadTileBatchesWithRecovery(levels = [], {
     throttledErrors: 0,
     pausedForProvider: false,
     abortedByQuota: false,
+    abortedByUser: false,
     cooldownMs: 0,
     state
   };
@@ -269,6 +272,10 @@ async function downloadTileBatchesWithRecovery(levels = [], {
     const level = safeLevels[levelIndex];
     const sourceUrls = Array.isArray(level?.missingUrls) ? level.missingUrls : Array.isArray(level?.urls) ? level.urls : [];
     for (let batchIndex = 0; batchIndex < sourceUrls.length; batchIndex += batchSize) {
+      if (abortSignal?.aborted) {
+        totals.abortedByUser = true;
+        return totals;
+      }
       const batch = sourceUrls.slice(batchIndex, batchIndex + batchSize);
       const results = await Promise.all(batch.map((url) => downloadTileFn(cache, url, downloadOptions)));
       const summary = summarizeTileDownloadResults(results);
@@ -284,7 +291,10 @@ async function downloadTileBatchesWithRecovery(levels = [], {
         state.consecutiveThrottledErrors = 0;
       }
 
+      // `downloaded` counts only tiles actually fetched from the network (not cache hits).
+      const downloadedInBatch = results.filter((r) => r?.ok && !r?.fromCache).length;
       totals.done += batch.length;
+      totals.downloaded += downloadedInBatch;
       totals.errors += summary.errors;
       totals.quotaErrors += summary.quotaErrors;
       totals.networkErrors += summary.networkErrors;
@@ -359,7 +369,7 @@ async function downloadTileWithRetry(cache, url, {
   try {
     const cached = await cache.match(url, { ignoreVary: true });
     if (isValidCachedTileResponse(cached, minValidSize)) {
-      return { ok: true };
+      return { ok: true, fromCache: true };
     }
     if (cached) {
       await cache.delete(url).catch(() => {});
