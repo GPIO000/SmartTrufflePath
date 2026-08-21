@@ -128,13 +128,13 @@ async function fetchWeather(lat, lng) {
     const url = new URL('https://api.open-meteo.com/v1/forecast');
     url.searchParams.set('latitude',   lat.toFixed(4));
     url.searchParams.set('longitude',  lng.toFixed(4));
-    url.searchParams.set('current',    'temperature_2m,weathercode,windspeed_10m,relativehumidity_2m');
+    url.searchParams.set('current',    'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m');
     url.searchParams.set('daily',      [
-        'weathercode',
+        'weather_code',
         'temperature_2m_max',
         'temperature_2m_min',
         'precipitation_sum',
-        'windspeed_10m_max',
+        'wind_speed_10m_max',
         'soil_temperature_0cm',
         'et0_fao_evapotranspiration',
     ].join(','));
@@ -159,7 +159,7 @@ function renderWidget(data, label) {
     const moon    = calcMoonPhase();
     const cur     = data.current;
     const daily   = data.daily;
-    const curInfo = wmoInfo(cur.weathercode);
+    const curInfo = wmoInfo(cur.weather_code);
 
     // ── Compact bar ──────────────────────────────────────────────────────────
     const compactLabel = label ? `<span class="wm-location-label">${_esc(label)}</span>` : '';
@@ -182,11 +182,11 @@ function renderWidget(data, label) {
             const d          = new Date(today);
             d.setDate(today.getDate() + i);
             const dayLabel   = i === 0 ? 'Oggi' : i === 1 ? 'Domani' : GIORNI_IT[d.getDay()];
-            const info       = wmoInfo(daily.weathercode[i]);
+            const info       = wmoInfo(daily.weather_code[i]);
             const tMax       = Math.round(daily.temperature_2m_max[i]);
             const tMin       = Math.round(daily.temperature_2m_min[i]);
             const precip     = (daily.precipitation_sum[i] ?? 0).toFixed(1);
-            const wind       = Math.round(daily.windspeed_10m_max[i] ?? 0);
+            const wind       = Math.round(daily.wind_speed_10m_max[i] ?? 0);
             const soilT      = daily.soil_temperature_0cm?.[i] != null
                                ? `<span class="wm-extra-pill">🪱 ${Math.round(daily.soil_temperature_0cm[i])}°</span>` : '';
             const et0        = daily.et0_fao_evapotranspiration?.[i] != null
@@ -207,10 +207,10 @@ function renderWidget(data, label) {
         }
 
         // Ora corrente
-        const curHumidity = cur.relativehumidity_2m != null
-            ? `<span class="wm-cur-pill">💧${cur.relativehumidity_2m}%</span>` : '';
-        const curWind = cur.windspeed_10m != null
-            ? `<span class="wm-cur-pill">💨${Math.round(cur.windspeed_10m)}km/h</span>` : '';
+        const curHumidity = cur.relative_humidity_2m != null
+            ? `<span class="wm-cur-pill">💧${cur.relative_humidity_2m}%</span>` : '';
+        const curWind = cur.wind_speed_10m != null
+            ? `<span class="wm-cur-pill">💨${Math.round(cur.wind_speed_10m)}km/h</span>` : '';
 
         expandedHtml = `
             <div id="wm-panel" role="region" aria-label="Dettaglio meteo">

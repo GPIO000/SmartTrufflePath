@@ -769,11 +769,8 @@ textarea:focus-visible {
 
 /* ── Widget Meteo + Fase Lunare ───────────────────────────────────────────── */
 #weather-moon-widget {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    z-index: 1001;
-    max-width: 300px;
+    position: static;
+    max-width: 100%;
     font-size: 0.82rem;
     font-family: inherit;
     pointer-events: auto;
