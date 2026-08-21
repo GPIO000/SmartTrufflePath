@@ -282,20 +282,27 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
         if (km < MIN_MOVE_KM) {
             // Ri-renderizza con eventuale nuovo label senza refetch
             if (_lastData) renderWidget(_lastData, label);
+            else renderError();
             return;
         }
     }
 
     const cached = loadCache(lat, lng);
     if (cached) {
+        _lastFetchLat = lat;
+        _lastFetchLng = lng;
         _lastData  = cached;
         _lastLabel = label;
         renderWidget(cached, label);
         return;
     }
 
-    // Evita fetch paralleli sulle stesse coordinate
-    if (_fetchPromise) return;
+    // Evita fetch paralleli sulle stesse coordinate; se il label è cambiato
+    // aggiorna comunque il widget con i dati già disponibili
+    if (_fetchPromise) {
+        if (_lastData) renderWidget(_lastData, label);
+        return;
+    }
 
     try {
         _fetchPromise = fetchWeather(lat, lng);
