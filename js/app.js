@@ -5313,10 +5313,20 @@ async function installApp() {
     updateInstallCallToAction();
 }
 
+function updateDrawerVersionDisplay() {
+    const el = document.getElementById('drawer-app-version');
+    if (!el) return;
+    const version = globalThis.SMARTTRUFFLE_CACHE_VERSION;
+    if (version) el.textContent = `v ${version}`;
+    else el.textContent = 'v –';
+}
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', updateInstallCallToAction, { once: true });
+    document.addEventListener('DOMContentLoaded', updateDrawerVersionDisplay, { once: true });
 } else {
     updateInstallCallToAction();
+    updateDrawerVersionDisplay();
 }
 
 function visualizzaImmagineSalvata(base64Data, titolo, moduloProvenienza = 'tesserino') {
