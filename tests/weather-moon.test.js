@@ -34,6 +34,16 @@ function fakeWeatherResponse(overrides = {}) {
     };
 }
 
+function deferred() {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
+}
+
 // Reimporta il modulo con stato fresco (azzera le variabili di modulo)
 async function freshImport() {
     vi.resetModules();
@@ -120,7 +130,22 @@ describe('updateWeatherMoon — fetch fallito', () => {
         await updateWeatherMoon(44.0, 11.0, null, true);
 
         expect(widget.style.display).toBe('block');
-        expect(widget.innerHTML).toContain('Meteo n.d.');
+        expect(widget.innerHTML).toContain('Meteo offline');
+        expect(widget.innerHTML).toContain('Rete non disponibile');
+    });
+
+    it('mostra un messaggio specifico per errore HTTP', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: false,
+            status: 400,
+        }));
+        const { updateWeatherMoon } = await freshImport();
+
+        await updateWeatherMoon(44.0, 11.0, 'Bosco Nord', true);
+
+        expect(widget.innerHTML).toContain('Meteo non disp.');
+        expect(widget.innerHTML).toContain('Errore API 400');
+        expect(widget.innerHTML).toContain('Bosco Nord');
     });
 });
 
@@ -156,6 +181,83 @@ describe('updateWeatherMoon — cache', () => {
         await updateWeatherMoon(44.0, 11.0, null, true);
 
         expect(mockFetch).toHaveBeenCalledOnce();
+    });
+});
+
+describe('updateWeatherMoon — campi opzionali e concorrenza', () => {
+    it('renderizza anche se i campi daily extra non sono presenti', async () => {
+        const mockData = fakeWeatherResponse({
+            daily: {
+                soil_temperature_0cm: undefined,
+                et0_fao_evapotranspiration: undefined,
+            },
+        });
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(mockData),
+        }));
+        const { updateWeatherMoon } = await freshImport();
+
+        await updateWeatherMoon(44.0, 11.0, 'Pineta Sud', true);
+        widget.querySelector('#wm-compact').click();
+
+        expect(widget.innerHTML).toContain('Pineta Sud');
+        expect(widget.innerHTML).not.toContain('🪱');
+        expect(widget.innerHTML).not.toContain('ET₀');
+    });
+
+    it('consente fetch concorrenti su coordinate diverse senza bloccare la richiesta più recente', async () => {
+        const firstFetch = deferred();
+        const secondFetch = deferred();
+        const mockFetch = vi.fn((url) => {
+            if (url.includes('latitude=44.0000')) return firstFetch.promise;
+            if (url.includes('latitude=45.0000')) return secondFetch.promise;
+            throw new Error(`unexpected url ${url}`);
+        });
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoon } = await freshImport();
+
+        const firstCall = updateWeatherMoon(44.0, 11.0, 'GPS', true);
+        const secondCall = updateWeatherMoon(45.0, 12.0, 'POI', true);
+
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+
+        firstFetch.resolve({
+            ok: true,
+            json: () => Promise.resolve(fakeWeatherResponse({ current: { temperature_2m: 18 } })),
+        });
+        await firstCall;
+
+        expect(widget.innerHTML).not.toContain('GPS');
+
+        secondFetch.resolve({
+            ok: true,
+            json: () => Promise.resolve(fakeWeatherResponse({ current: { temperature_2m: 24 } })),
+        });
+        await secondCall;
+
+        expect(widget.innerHTML).toContain('POI');
+        expect(widget.innerHTML).toContain('24°');
+    });
+
+    it('mantiene i dati precedenti quando un fetch successivo fallisce', async () => {
+        const mockData = fakeWeatherResponse({ current: { temperature_2m: 19 } });
+        const mockFetch = vi.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve(mockData),
+            })
+            .mockRejectedValueOnce(new Error('network error'));
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoon } = await freshImport();
+
+        await updateWeatherMoon(44.0, 11.0, 'Prima posizione', true);
+        await updateWeatherMoon(45.0, 12.0, 'Seconda posizione', true);
+        widget.querySelector('#wm-compact').click();
+
+        expect(widget.innerHTML).toContain('19°');
+        expect(widget.innerHTML).toContain('Seconda posizione');
+        expect(widget.innerHTML).toContain('Rete non disponibile');
     });
 });
 

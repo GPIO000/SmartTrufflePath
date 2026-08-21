@@ -16,6 +16,7 @@ const WIDGET_ID        = 'weather-moon-widget';
 const CACHE_KEY_PREFIX = 'wm_cache_';
 const CACHE_TTL_MS     = 30 * 60 * 1000; // 30 minuti
 const MIN_MOVE_KM      = 5;              // soglia spostamento per nuovo fetch
+const REQUEST_TIMEOUT_MS = 8000;
 
 // Codici WMO → emoji + descrizione italiana
 const WMO_CODES = {
@@ -135,15 +136,77 @@ async function fetchWeather(lat, lng) {
         'temperature_2m_min',
         'precipitation_sum',
         'wind_speed_10m_max',
-        'soil_temperature_0cm',
-        'et0_fao_evapotranspiration',
     ].join(','));
     url.searchParams.set('forecast_days', '4');
     url.searchParams.set('timezone',      'auto');
 
-    const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
+    const resp = await fetchWithTimeout(url.toString(), REQUEST_TIMEOUT_MS);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     return resp.json();
+}
+
+function fetchWithTimeout(url, timeoutMs) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            if (controller) controller.abort();
+            reject(createWeatherError('TIMEOUT', 'Timeout richiesta meteo'));
+        }, timeoutMs);
+
+        const options = controller ? { signal: controller.signal } : undefined;
+        fetch(url, options)
+            .then((response) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(response);
+            })
+            .catch((error) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                if (error?.name === 'AbortError') {
+                    reject(createWeatherError('TIMEOUT', 'Timeout richiesta meteo', error));
+                    return;
+                }
+                reject(error);
+            });
+    });
+}
+
+function createWeatherError(code, message, cause = null) {
+    const error = new Error(message);
+    error.code = code;
+    if (cause) error.cause = cause;
+    return error;
+}
+
+function describeWeatherError(error) {
+    if (error?.code === 'TIMEOUT') {
+        return {
+            compactMessage: 'Meteo timeout',
+            detailMessage: 'Timeout dati meteo',
+            logMessage: 'timeout richiesta Open-Meteo',
+        };
+    }
+
+    if (typeof error?.message === 'string' && error.message.startsWith('HTTP ')) {
+        return {
+            compactMessage: 'Meteo non disp.',
+            detailMessage: `Errore API ${error.message.slice(5)}`,
+            logMessage: `errore API ${error.message.slice(5)}`,
+        };
+    }
+
+    return {
+        compactMessage: 'Meteo offline',
+        detailMessage: 'Rete non disponibile',
+        logMessage: error?.message || 'errore di rete',
+    };
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
@@ -152,7 +215,7 @@ function wmoInfo(code) {
     return WMO_CODES[code] ?? { icon: '🌡️', label: 'Dati meteo' };
 }
 
-function renderWidget(data, label) {
+function renderWidget(data, label, status = null) {
     const widget = document.getElementById(WIDGET_ID);
     if (!widget) return;
 
@@ -224,6 +287,7 @@ function renderWidget(data, label) {
                     <span class="wm-moon-pct">${moon.illumination}% illuminata</span>
                 </div>
                 ${label ? `<div class="wm-source-label">📍 ${_esc(label)}</div>` : ''}
+                ${status?.detailMessage ? `<div class="wm-source-label">⚠️ ${_esc(status.detailMessage)}</div>` : ''}
                 <div class="wm-source-label">Open-Meteo · aggiornato ${_timeLabel()}</div>
             </div>`;
     }
@@ -234,7 +298,7 @@ function renderWidget(data, label) {
     // Event: toggle expanded
     const compactEl = document.getElementById('wm-compact');
     if (compactEl) {
-        const toggle = () => { _expanded = !_expanded; renderWidget(data, label); };
+        const toggle = () => { _expanded = !_expanded; renderWidget(data, label, status); };
         compactEl.addEventListener('click', toggle);
         compactEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
     }
@@ -252,11 +316,20 @@ function _timeLabel() {
     return new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 }
 
-function renderError() {
+function renderError(status = null, label = null) {
     const widget = document.getElementById(WIDGET_ID);
     if (!widget) return;
     const moon = calcMoonPhase();
-    widget.innerHTML = `<div id="wm-compact" style="opacity:.6">${moon.icon} Meteo n.d.</div>`;
+    const message = status?.compactMessage || 'Meteo n.d.';
+    const details = [
+        label ? `<div class="wm-source-label">📍 ${_esc(label)}</div>` : '',
+        status?.detailMessage ? `<div class="wm-source-label">⚠️ ${_esc(status.detailMessage)}</div>` : '',
+    ].filter(Boolean).join('');
+
+    widget.innerHTML = `
+        <div id="wm-compact" style="opacity:.6">${moon.icon} ${_esc(message)}</div>
+        ${details}
+    `;
     widget.style.display = 'block';
 }
 
@@ -264,7 +337,25 @@ function renderError() {
 
 let _lastData    = null;
 let _lastLabel   = null;
-let _fetchPromise = null;
+let _lastStatus  = null;
+let _requestSeq  = 0;
+const _inFlightFetches = new Map();
+
+function requestKey(lat, lng) {
+    return `${lat.toFixed(4)}_${lng.toFixed(4)}`;
+}
+
+function getWeatherFetch(lat, lng) {
+    const key = requestKey(lat, lng);
+    let promise = _inFlightFetches.get(key);
+    if (!promise) {
+        promise = fetchWeather(lat, lng).finally(() => {
+            _inFlightFetches.delete(key);
+        });
+        _inFlightFetches.set(key, promise);
+    }
+    return promise;
+}
 
 /**
  * Aggiorna il widget meteo/luna per le coordinate fornite.
@@ -275,53 +366,53 @@ let _fetchPromise = null;
  */
 export async function updateWeatherMoon(lat, lng, label = null, force = false) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const requestSeq = ++_requestSeq;
 
     // Spostamento minimo per GPS (evita fetch continue camminando)
     if (!force && label === null && _lastFetchLat !== null) {
         const km = haversineKm(lat, lng, _lastFetchLat, _lastFetchLng);
         if (km < MIN_MOVE_KM) {
             // Ri-renderizza con eventuale nuovo label senza refetch
-            if (_lastData) renderWidget(_lastData, label);
-            else renderError();
+            if (_lastData) renderWidget(_lastData, label, _lastStatus);
+            else renderError(_lastStatus, label);
             return;
         }
     }
 
     const cached = loadCache(lat, lng);
     if (cached) {
+        if (requestSeq !== _requestSeq) return;
         _lastFetchLat = lat;
         _lastFetchLng = lng;
         _lastData  = cached;
         _lastLabel = label;
+        _lastStatus = null;
         renderWidget(cached, label);
         return;
     }
 
-    // Evita fetch paralleli sulle stesse coordinate; se il label è cambiato
-    // aggiorna comunque il widget con i dati già disponibili
-    if (_fetchPromise) {
-        if (_lastData) renderWidget(_lastData, label);
-        return;
-    }
-
     try {
-        _fetchPromise = fetchWeather(lat, lng);
-        const data    = await _fetchPromise;
+        const data = await getWeatherFetch(lat, lng);
+        if (requestSeq !== _requestSeq) return;
         _lastFetchLat = lat;
         _lastFetchLng = lng;
         _lastData     = data;
         _lastLabel    = label;
+        _lastStatus   = null;
         saveCache(lat, lng, data);
         renderWidget(data, label);
     } catch (err) {
-        console.warn('[WeatherMoon] Fetch fallito:', err.message);
+        const errorStatus = describeWeatherError(err);
+        console.warn('[WeatherMoon] Fetch fallito:', errorStatus.logMessage);
+        if (requestSeq !== _requestSeq) return;
+        _lastLabel = label;
         if (_lastData) {
-            renderWidget(_lastData, label); // mostra dati vecchi
+            _lastStatus = errorStatus;
+            renderWidget(_lastData, label, errorStatus); // mostra dati vecchi
         } else {
-            renderError();
+            _lastStatus = errorStatus;
+            renderError(errorStatus, label);
         }
-    } finally {
-        _fetchPromise = null;
     }
 }
 
@@ -330,5 +421,5 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
  * Non fa chiamate di rete.
  */
 export function refreshMoonOnly() {
-    if (_lastData) renderWidget(_lastData, _lastLabel);
+    if (_lastData) renderWidget(_lastData, _lastLabel, _lastStatus);
 }
