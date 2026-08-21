@@ -1658,7 +1658,7 @@ async function triggerSOS() {
         const senderName = getSavedSenderName();
         const senderLine = senderName ? ` Da: ${senderName}.` : '';
         const { coordinateText, googleMapsUrl, appleMapsUrl } = buildEmergencyLocationDetails(pos);
-        const msg = `EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO.${senderLine} Coordinate GPS: ${coordinateText}. Google Maps: ${googleMapsUrl} Apple Maps: ${appleMapsUrl}`;
+        const msg = `EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO.${senderLine} Coordinate GPS: ${coordinateText}. Google Maps: ${googleMapsUrl} | Apple Maps: ${appleMapsUrl}`;
         const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
         if (method === 'sms') { window.location.href = `sms:?body=${encodeURIComponent(msg)}`; }
         else if (method === 'whatsapp') { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
@@ -5033,7 +5033,7 @@ async function shareLocationToVet(telNumber) {
         const senderName = getSavedSenderName();
         const senderLine = senderName ? ` Da: ${senderName}.` : '';
         const { coordinateText, googleMapsUrl, appleMapsUrl } = buildEmergencyLocationDetails(pos);
-        const msg = `EMERGENZA VETERINARIA!${senderLine} Coordinate GPS: ${coordinateText}. Google Maps: ${googleMapsUrl} Apple Maps: ${appleMapsUrl}`;
+        const msg = `EMERGENZA VETERINARIA!${senderLine} Coordinate GPS: ${coordinateText}. Google Maps: ${googleMapsUrl} | Apple Maps: ${appleMapsUrl}`;
         const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
         if (method === 'sms') { window.location.href = `sms:${telNumber}?body=${encodeURIComponent(msg)}`; }
         else if (method === 'whatsapp') { window.location.href = `whatsapp://send?phone=${encodeURIComponent(telNumber)}&text=${encodeURIComponent(msg)}`; }
