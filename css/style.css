@@ -772,7 +772,7 @@ textarea:focus-visible {
     position: absolute;
     top: 8px;
     left: 8px;
-    z-index: 900;
+    z-index: 1001;
     max-width: 300px;
     font-size: 0.82rem;
     font-family: inherit;
