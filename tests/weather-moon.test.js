@@ -297,4 +297,156 @@ describe('refreshMoonOnly', () => {
         const { refreshMoonOnly } = await freshImport();
         expect(() => refreshMoonOnly()).not.toThrow();
     });
+
+    it('ri-renderizza il widget usando i dati precedenti', async () => {
+        const mockData = fakeWeatherResponse({ current: { temperature_2m: 17, weather_code: 0, wind_speed_10m: 5, relative_humidity_2m: 50 } });
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(mockData),
+        }));
+        const { updateWeatherMoon, refreshMoonOnly } = await freshImport();
+
+        await updateWeatherMoon(44.0, 11.0, null, true);
+        const htmlAfterFetch = widget.innerHTML;
+
+        widget.innerHTML = '';
+        refreshMoonOnly();
+
+        expect(widget.innerHTML).toBe(htmlAfterFetch);
+    });
+});
+
+describe('updateWeatherMoon — soglia spostamento GPS', () => {
+    it('non esegue un nuovo fetch se lo spostamento è < 5 km', async () => {
+        const mockFetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(fakeWeatherResponse()),
+        });
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoon } = await freshImport();
+
+        // Prima chiamata: label=null, force=true — registra le coordinate
+        await updateWeatherMoon(44.0, 11.0, null, true);
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+
+        // Seconda chiamata: coordinate quasi identiche (< 5 km), label=null → deve saltare il fetch
+        await updateWeatherMoon(44.001, 11.001, null, false);
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('esegue un nuovo fetch se lo spostamento è ≥ 5 km', async () => {
+        const mockFetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(fakeWeatherResponse()),
+        });
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoon } = await freshImport();
+
+        await updateWeatherMoon(44.0, 11.0, null, true);
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+
+        // ~110 km di distanza → supera la soglia di 5 km
+        await updateWeatherMoon(45.0, 11.0, null, false);
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('con label non null ignora la soglia di spostamento GPS e ri-renderizza con dati dalla cache', async () => {
+        const mockFetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(fakeWeatherResponse()),
+        });
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoon } = await freshImport();
+
+        // Prima chiamata: registra _lastFetchLat/Lng e salva in cache
+        await updateWeatherMoon(44.0, 11.0, null, true);
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+
+        // Seconda chiamata: stessa posizione (< 5 km), con label → il controllo
+        // spostamento GPS è saltato; la cache è valida → viene usata (no nuovo fetch)
+        await updateWeatherMoon(44.0, 11.0, 'POI', false);
+        // Il fetch non viene ripetuto perché la cache è valida, ma il widget mostra il label
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        expect(widget.innerHTML).toContain('POI');
+    });
+});
+
+describe('updateWeatherMoon — deduplicazione fetch in volo', () => {
+    it('due chiamate concorrenti con le stesse coordinate usano la stessa Promise', async () => {
+        const d = deferred();
+        const mockFetch = vi.fn().mockReturnValue(d.promise);
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoon } = await freshImport();
+
+        const p1 = updateWeatherMoon(44.0, 11.0, 'A', true);
+        const p2 = updateWeatherMoon(44.0, 11.0, 'B', true);
+
+        // fetch deve essere chiamato una sola volta
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+
+        d.resolve({
+            ok: true,
+            json: () => Promise.resolve(fakeWeatherResponse()),
+        });
+        await Promise.all([p1, p2]);
+
+        expect(widget.style.display).toBe('block');
+    });
+});
+
+describe('updateWeatherMoon — timeout fetch', () => {
+    it('mostra errore di timeout quando il fetch supera il limite', async () => {
+        vi.useFakeTimers();
+
+        const d = deferred();
+        vi.stubGlobal('fetch', vi.fn().mockReturnValue(d.promise));
+
+        const { updateWeatherMoon } = await freshImport();
+        const call = updateWeatherMoon(44.0, 11.0, null, true);
+
+        // Avanza oltre il timeout (8000 ms)
+        await vi.advanceTimersByTimeAsync(9000);
+        await call;
+
+        expect(widget.style.display).toBe('block');
+        expect(widget.innerHTML).toContain('wm-data-badge--error');
+
+        vi.useRealTimers();
+    });
+});
+
+describe('updateWeatherMoon — pannello espandibile', () => {
+    it('al click sul compact mostra il pannello espanso', async () => {
+        const mockData = fakeWeatherResponse();
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(mockData),
+        }));
+        const { updateWeatherMoon } = await freshImport();
+
+        await updateWeatherMoon(44.0, 11.0, null, true);
+
+        expect(widget.querySelector('#wm-panel')).toBeNull();
+
+        widget.querySelector('#wm-compact').click();
+
+        expect(widget.querySelector('#wm-panel')).not.toBeNull();
+        expect(widget.innerHTML).toContain('wm-days-list');
+        expect(widget.innerHTML).toContain('wm-moon-row');
+    });
+
+    it('doppio click chiude il pannello espanso', async () => {
+        const mockData = fakeWeatherResponse();
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(mockData),
+        }));
+        const { updateWeatherMoon } = await freshImport();
+
+        await updateWeatherMoon(44.0, 11.0, null, true);
+        widget.querySelector('#wm-compact').click(); // apre
+        widget.querySelector('#wm-compact').click(); // chiude
+
+        expect(widget.querySelector('#wm-panel')).toBeNull();
+    });
 });
