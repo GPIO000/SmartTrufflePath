@@ -305,7 +305,7 @@ function parsePeriodDate(rawValue, year) {
     const source = String(rawValue ?? '').toLowerCase().trim();
     if (!source) return null;
 
-    const numericMatch = source.match(/(\d{1,2})[\/\-\.\s](\d{1,2})(?:[\/\-\.\s](\d{4}))?/);
+    const numericMatch = source.match(/(\d{1,2})[/.\-\s](\d{1,2})(?:[/.\-\s](\d{4}))?/);
     if (numericMatch) {
         const day = Number.parseInt(numericMatch[1], 10);
         const month = Number.parseInt(numericMatch[2], 10) - 1;

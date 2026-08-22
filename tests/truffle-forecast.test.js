@@ -88,7 +88,7 @@ describe('buildTruffleForecastCalendar', () => {
         expect(forecast.days).toHaveLength(3);
         expect(forecast.days[0].legalOpen).toBe(true);
         expect(forecast.days[0].score).toBeGreaterThanOrEqual(70);
-        expect(forecast.days[0].reasons.join(' ')).toContain('Piogge utili');
+        expect(forecast.days[0].reasons.join(' ')).toContain('Suolo umido');
     });
 
     it('azzera i giorni fuori calendario regionale', () => {
