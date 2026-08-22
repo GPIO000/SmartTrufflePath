@@ -1,7 +1,7 @@
 // Utility functions for POI (Point of Interest) management.
 // Extracted from app.js to allow unit testing.
 
-export const CUSTOM_POI_MARKERS = ['📩', '🥔', '📍', '🚫', '🛃', '🍄'];
+export const CUSTOM_POI_MARKERS = ['📩', '🥔', '📍', '🚫', '🛃', '🍄', '🏠', '🛖', '🏪', '🏨', '🏥'];
 export const DEFAULT_GENERIC_POI_MARKER = '🥔';
 export const DEFAULT_SHARED_POI_MARKER = '📩';
 export const DEFAULT_MAP_LONG_PRESS_MOVE_TOLERANCE_PX = 12;
