@@ -2822,7 +2822,7 @@ function openModule(moduleName, editMode = false) {
                     <input type="text" id="vc-nome" class="mod-input" placeholder="Es. Clinica Centrale">
                     <label>Indirizzo:</label>
                     <input type="text" id="vc-indirizzo" class="mod-input" placeholder="Es. Via Roma 1, Campobasso">
-                    <label>Coordinate Geografiche (qualsiasi formato):</label>
+                    <label>Coordinate Geografiche (opzionale, qualsiasi formato):</label>
                     <input type="text" id="vc-coordinate" class="mod-input" placeholder="Es. 41.9028, 12.4964 oppure 41°54'10\"N 12°29'47\"E">
                     <label>Numero di Telefono:</label>
                     <input type="tel" id="vc-tel" class="mod-input" placeholder="Es. 0874123456">
@@ -5170,7 +5170,7 @@ async function editVetClinic(index) {
 
     const indirizzoInput = await appPrompt("Modifica indirizzo:", clinic.indirizzo || '');
     if (indirizzoInput === null) return;
-    const coordinateInput = await appPrompt("Modifica coordinate (qualsiasi formato):", clinic.coordinate || '');
+    const coordinateInput = await appPrompt("Modifica coordinate (opzionale, qualsiasi formato):", clinic.coordinate || '');
     if (coordinateInput === null) return;
     if (coordinateInput.trim() && !parseCoordinates(coordinateInput.trim())) {
         showToast("Formato coordinate non riconosciuto. Usa es. 41.9028, 12.4964", 'error'); return;
