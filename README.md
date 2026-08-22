@@ -30,6 +30,7 @@ SmartTruffle Path è una web app **mobile-first e PWA** per supportare il tartuf
   - Filtri per anno e specie
   - Archivio date di raccolta per regione (personalizzabile)
   - Calendario raccolta basato su regione rilevata e periodi salvati
+  - Previsione uscita tartufi con indice euristico basato su meteo 15gg, fase lunare, umidità del suolo e storico locale
 
 - **Cani e sicurezza**
   - Anagrafica cani (incluso microchip)

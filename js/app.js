@@ -1,6 +1,12 @@
 import * as TruffleStorage from './storage-sync.js';
 import { updateWeatherMoon, updateWeatherMoonComparison, calcMoonPhase } from './weather-moon.js';
 import {
+    buildTruffleForecastCalendar,
+    fetchTruffleForecastDataset,
+    getAreaProfiles,
+    TRUFFLE_SPECIES_FORECAST
+} from './truffle-forecast.js';
+import {
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
     buildAutomaticBackupPathLabel,
@@ -795,6 +801,9 @@ function getRenderableStorageJSON(key, fallbackValue) {
     return sanitizeRenderable(readStorageJSON(key, fallbackValue));
 }
 
+const TRUFFLE_FORECAST_FEEDBACK_KEY = 'truffle_forecast_feedback';
+const TRUFFLE_AREA_PROFILES = getAreaProfiles();
+
 function buildLuoghiSelectOptions(selectedValue = '') {
     const luoghi = readStorageJSON('luoghi_raccolta', []);
     const hasSelected = selectedValue && !luoghi.includes(selectedValue);
@@ -817,6 +826,235 @@ function aggiungiLuogoRaccolta(luogo) {
         lista.sort((a, b) => a.localeCompare(b, 'it'));
         localStorage.setItem('luoghi_raccolta', JSON.stringify(lista));
     }
+}
+
+function getCurrentGpsRegionName() {
+    const gpsText = document.getElementById('gps-status-text');
+    if (gpsText && gpsText.innerHTML) {
+        const matchReg = gpsText.innerHTML.match(/<b>(.*?)<\/b>/);
+        if (matchReg && matchReg[1]) return matchReg[1];
+    }
+    return 'Campania';
+}
+
+function getTruffleForecastLocationChoices() {
+    const choices = [];
+    if (userMarker && typeof userMarker.getLatLng === 'function') {
+        const currentPosition = userMarker.getLatLng();
+        if (currentPosition && Number.isFinite(currentPosition.lat) && Number.isFinite(currentPosition.lng)) {
+            choices.push({
+                id: 'current_gps',
+                label: '📍 Posizione attuale GPS',
+                lat: currentPosition.lat,
+                lng: currentPosition.lng
+            });
+        }
+    }
+
+    poiList.forEach((poi, index) => {
+        if (!Number.isFinite(Number(poi?.lat)) || !Number.isFinite(Number(poi?.lng))) return;
+        const marker = normalizePoiMarker(poi.marker, poi.type);
+        choices.push({
+            id: `poi_${index}`,
+            label: `${marker} ${poi.note || `Punto ${index + 1}`}`,
+            lat: Number(poi.lat),
+            lng: Number(poi.lng)
+        });
+    });
+
+    return choices;
+}
+
+function getStoredForecastFeedback() {
+    return readStorageJSON(TRUFFLE_FORECAST_FEEDBACK_KEY, []);
+}
+
+function findForecastFeedback(feedbackEntries, speciesName, locationLabel, date) {
+    return feedbackEntries.find((entry) => entry?.speciesName === speciesName && entry?.locationLabel === locationLabel && entry?.date === date) || null;
+}
+
+function escapeAttr(value) {
+    return escapeHtml(value).replace(/"/g, '&quot;');
+}
+
+function renderTruffleForecastResultsLoading() {
+    const results = document.getElementById('truffle-forecast-results');
+    if (!results) return;
+    results.innerHTML = `
+        <div class="module-card" style="background: rgba(29,40,30,0.96); border-left: 4px solid #2563eb;">
+            <p style="margin:0; color:#dbeafe; font-weight:bold;">⏳ Calcolo indice di uscita in corso...</p>
+            <p style="margin:8px 0 0 0; color:#b8b0a0; font-size:0.82rem;">Analizzo finestra meteo degli ultimi 15 giorni, fase lunare, umidità del suolo e storico locale.</p>
+        </div>`;
+}
+
+function renderTruffleForecastMessage(title, body, tone = '#f59e0b') {
+    const results = document.getElementById('truffle-forecast-results');
+    if (!results) return;
+    results.innerHTML = `
+        <div class="module-card" style="background: rgba(29,40,30,0.96); border-left: 4px solid ${tone};">
+            <p style="margin:0; color:${tone}; font-weight:bold;">${escapeHtml(title)}</p>
+            <p style="margin:8px 0 0 0; color:#ddd6c8; font-size:0.82rem;">${escapeHtml(body)}</p>
+        </div>`;
+}
+
+function renderTruffleForecastResults(forecast, regionName, feedbackEntries) {
+    const results = document.getElementById('truffle-forecast-results');
+    if (!results) return;
+
+    if (!forecast?.days?.length) {
+        renderTruffleForecastMessage('⚠️ Dati insufficienti', 'Non sono riuscito a costruire un calendario utile per i prossimi giorni.');
+        return;
+    }
+
+    const bestDay = forecast.bestDay;
+    const summaryHtml = bestDay
+        ? `
+            <div class="module-card" style="margin-bottom:12px; background: rgba(29,40,30,0.96); border-left:4px solid ${bestDay.score >= 70 ? '#22c55e' : bestDay.score >= 45 ? '#f59e0b' : '#ef4444'};">
+                <h3 style="margin:0 0 8px 0; color:#f6f1e6;">📈 Giorno più favorevole: ${escapeHtml(bestDay.dayLabel)} ${escapeHtml(bestDay.date)}</h3>
+                <p style="margin:0; color:#ddd6c8; font-size:0.84rem;">Indice <strong>${bestDay.score}/100</strong> · probabilità <strong>${escapeHtml(bestDay.level)}</strong> · ${escapeHtml(forecast.species.shortName)} · ${escapeHtml(forecast.areaProfile.label.toLowerCase())}</p>
+                <p style="margin:8px 0 0 0; color:#b8b0a0; font-size:0.8rem;">Periodo regionale usato: ${escapeHtml(forecast.legalPeriod)} · Regione: ${escapeHtml(regionName)}</p>
+            </div>`
+        : '';
+
+    const cardsHtml = forecast.days.map((day) => {
+        const borderColor = !day.legalOpen ? '#6b7280' : day.score >= 70 ? '#22c55e' : day.score >= 45 ? '#f59e0b' : '#ef4444';
+        const feedback = findForecastFeedback(feedbackEntries, forecast.species.name, forecast.locationLabel, day.date);
+        const feedbackHtml = feedback
+            ? `<p style="margin:10px 0 0 0; color:${feedback.found ? '#22c55e' : '#f59e0b'}; font-size:0.8rem;">🧠 Feedback salvato: ${feedback.found ? 'ritrovamento confermato' : 'nessun ritrovamento'}.</p>`
+            : '';
+        const buttonsHtml = day.legalOpen
+            ? `
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+                    <button class="overlay-btn btn-success" style="flex:1; min-width:140px; padding:8px 10px;" ${actionAttrs('saveTruffleForecastFeedback', [day.date, true])}>✅ Ho trovato</button>
+                    <button class="overlay-btn btn-neutral" style="flex:1; min-width:140px; padding:8px 10px; background:#4b5563;" ${actionAttrs('saveTruffleForecastFeedback', [day.date, false])}>➖ Nessun ritrovamento</button>
+                </div>`
+            : '';
+        return `
+            <div class="module-card" style="margin-bottom:12px; background: rgba(29,40,30,0.96); border-left:4px solid ${borderColor};">
+                <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+                    <div>
+                        <h4 style="margin:0; color:#f6f1e6;">${escapeHtml(day.dayLabel)} ${escapeHtml(day.date)} ${escapeHtml(day.moon.icon)}</h4>
+                        <p style="margin:4px 0 0 0; color:${day.legalOpen ? '#ddd6c8' : '#9ca3af'}; font-size:0.84rem;">
+                            ${day.legalOpen ? `Indice <strong>${day.score}/100</strong> · probabilità <strong>${escapeHtml(day.level)}</strong>` : 'Fuori periodo regionale'}
+                        </p>
+                    </div>
+                    <span style="padding:6px 10px; border-radius:999px; background:${day.legalOpen ? 'rgba(37,99,235,0.15)' : 'rgba(107,114,128,0.18)'}; color:${day.legalOpen ? '#bfdbfe' : '#d1d5db'}; font-size:0.78rem; font-weight:bold;">
+                        ${day.legalOpen ? escapeHtml(day.moon.name) : 'Calendario chiuso'}
+                    </span>
+                </div>
+                <ul style="margin:10px 0 0 18px; padding:0; color:#ddd6c8; font-size:0.82rem; line-height:1.45;">
+                    ${day.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}
+                </ul>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+                    <span class="wm-extra-pill">🌧️ 15gg ${escapeHtml(day.metrics.rain15)}mm</span>
+                    <span class="wm-extra-pill">🌦️ utile ${escapeHtml(day.metrics.usefulRain)}mm</span>
+                    <span class="wm-extra-pill">🪱 suolo ${escapeHtml(day.metrics.soilMoisture7)}</span>
+                    <span class="wm-extra-pill">💧 aria ${escapeHtml(day.metrics.humidity7)}%</span>
+                    <span class="wm-extra-pill">🌡️ ${escapeHtml(day.metrics.temperature7)}°</span>
+                    <span class="wm-extra-pill">💨 ${escapeHtml(day.metrics.maxWind5)}km/h</span>
+                </div>
+                ${buttonsHtml}
+                ${feedbackHtml}
+            </div>`;
+    }).join('');
+
+    results.innerHTML = `
+        ${summaryHtml}
+        <div class="module-card" style="margin-bottom:12px; background: rgba(18,22,16,0.96);">
+            <p style="margin:0; color:#f6f1e6; font-size:0.84rem;"><strong>Zona:</strong> ${escapeHtml(forecast.locationLabel)} · <strong>Profilo:</strong> ${escapeHtml(forecast.areaProfile.label)} · <strong>Regione:</strong> ${escapeHtml(regionName)}</p>
+            <p style="margin:8px 0 0 0; color:#b8b0a0; font-size:0.8rem;">Questo indice è un supporto decisionale euristico: unisce calendario regionale, piogge degli ultimi 15 giorni, umidità del suolo, stabilità termica, fase lunare e segnali dal tuo storico.</p>
+        </div>
+        ${cardsHtml}`;
+}
+
+async function loadTruffleForecastModule() {
+    const activeView = document.getElementById('active-module-view');
+    if (!activeView || activeView.dataset.activeModule !== 'previsione_tartufi') return;
+    const locationSelect = document.getElementById('truffle-forecast-location');
+    const speciesSelect = document.getElementById('truffle-forecast-species');
+    const areaSelect = document.getElementById('truffle-forecast-area');
+    if (!locationSelect || !speciesSelect || !areaSelect) return;
+
+    const locationChoices = getTruffleForecastLocationChoices();
+    if (!locationChoices.length) {
+        renderTruffleForecastMessage('📍 Posizione richiesta', 'Attiva il GPS oppure salva una tartufaia nei punti per calcolare la previsione.');
+        return;
+    }
+
+    const selectedLocation = locationChoices.find((choice) => choice.id === locationSelect.value) || locationChoices[0];
+    if (locationSelect.value !== selectedLocation.id) locationSelect.value = selectedLocation.id;
+
+    const speciesProfile = TRUFFLE_SPECIES_FORECAST.find((item) => String(item.id) === speciesSelect.value) || TRUFFLE_SPECIES_FORECAST[0];
+    const regionName = getCurrentGpsRegionName();
+    const calendari = readStorageJSON('calendari_tartufi_custom', {});
+    const periodoRegionale = calendari?.[regionName]?.[speciesProfile.id] || '';
+
+    if (!periodoRegionale) {
+        renderTruffleForecastMessage(
+            '🗓️ Periodo regionale mancante',
+            `Per ${speciesProfile.shortName} non hai ancora salvato il periodo di raccolta della regione ${regionName}. Compilalo prima nell'archivio calendari.`
+        );
+        return;
+    }
+
+    renderTruffleForecastResultsLoading();
+
+    try {
+        const dataset = await fetchTruffleForecastDataset(selectedLocation.lat, selectedLocation.lng, {
+            lookbackDays: 15,
+            forecastDays: 7
+        });
+        if (!activeView || activeView.dataset.activeModule !== 'previsione_tartufi') return;
+        const feedbackEntries = getStoredForecastFeedback();
+        const forecast = buildTruffleForecastCalendar({
+            speciesId: speciesProfile.id,
+            legalPeriod: periodoRegionale,
+            weatherSeries: dataset.days,
+            harvestHistory: readStorageJSON('storico_raccolta_giornaliera', []),
+            feedbackHistory: feedbackEntries,
+            locationLabel: selectedLocation.label,
+            areaProfile: areaSelect.value || 'equilibrato'
+        });
+        renderTruffleForecastResults(forecast, regionName, feedbackEntries);
+    } catch (error) {
+        console.warn('Previsione tartufi non disponibile:', error);
+        renderTruffleForecastMessage(
+            '⚠️ Previsione non disponibile',
+            'Impossibile recuperare la finestra meteo completa. Riprova con connessione attiva oppure scegli un punto con dati più recenti.',
+            '#ef4444'
+        );
+    }
+}
+
+function saveTruffleForecastFeedback(date, found) {
+    const locationSelect = document.getElementById('truffle-forecast-location');
+    const speciesSelect = document.getElementById('truffle-forecast-species');
+    const areaSelect = document.getElementById('truffle-forecast-area');
+    if (!locationSelect || !speciesSelect || !areaSelect || !date) return;
+
+    const locationChoice = getTruffleForecastLocationChoices().find((choice) => choice.id === locationSelect.value);
+    const speciesProfile = TRUFFLE_SPECIES_FORECAST.find((item) => String(item.id) === speciesSelect.value);
+    if (!locationChoice || !speciesProfile) return;
+
+    const feedbackEntries = getStoredForecastFeedback().filter((entry) => !(
+        entry?.date === date
+        && entry?.speciesName === speciesProfile.name
+        && entry?.locationLabel === locationChoice.label
+        && entry?.areaProfile === areaSelect.value
+    ));
+
+    feedbackEntries.push({
+        date,
+        found: Boolean(found),
+        speciesId: speciesProfile.id,
+        speciesName: speciesProfile.name,
+        locationLabel: locationChoice.label,
+        areaProfile: areaSelect.value,
+        savedAt: new Date().toISOString()
+    });
+    localStorage.setItem(TRUFFLE_FORECAST_FEEDBACK_KEY, JSON.stringify(feedbackEntries));
+    showToast(found ? 'Feedback positivo salvato.' : 'Feedback di prudenza salvato.', 'success');
+    void loadTruffleForecastModule();
 }
 
 function encodeActionArgs(args = []) {
@@ -973,6 +1211,8 @@ const ACTION_HANDLERS = {
     },
     refreshRegistroGiornaliero: () => openModule('registro_giornaliero'),
     refreshSpese: () => openModule('spese'),
+    refreshTruffleForecast: () => loadTruffleForecastModule(),
+    saveTruffleForecastFeedback: (_event, date, found) => saveTruffleForecastFeedback(date, found),
     registerRicevutaSafe: async () => {
         try {
             await registraVenditaConPrezzoKg();
@@ -3147,13 +3387,48 @@ function openModule(moduleName, editMode = false) {
             contentHTML = archivioHtml;
             break;
 
+            case 'previsione_tartufi': {
+                const locationChoices = getTruffleForecastLocationChoices();
+                const speciesOptions = TRUFFLE_SPECIES_FORECAST
+                    .map((specie) => `<option value="${specie.id}">${escapeHtml(specie.name)}</option>`)
+                    .join('');
+                const areaOptions = TRUFFLE_AREA_PROFILES
+                    .map((profile) => `<option value="${profile.id}">${escapeHtml(profile.label)}</option>`)
+                    .join('');
+                const locationOptions = locationChoices.length
+                    ? locationChoices.map((choice) => `<option value="${escapeAttr(choice.id)}">${escapeHtml(choice.label)}</option>`).join('')
+                    : '<option value="">GPS o punto salvato richiesto</option>';
+                const regionName = getCurrentGpsRegionName();
+                contentHTML = `
+                    <h2>📈 Previsione Uscita Tartufi</h2>
+                    <p>Indice probabilistico basato su 15 giorni precedenti, fase lunare, umidità del suolo, stabilità termica e segnali del tuo storico locale.</p>
+                    <div class="module-card" style="margin-bottom: 14px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
+                        <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">🎯 Parametri previsione</h3>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <div style="flex:1; min-width:180px;">
+                                <label style="font-size:0.75rem;">Zona / tartufaia:</label>
+                                <select id="truffle-forecast-location" class="mod-input" ${eventActionAttrs('change', 'refreshTruffleForecast')}>${locationOptions}</select>
+                            </div>
+                            <div style="flex:1; min-width:180px;">
+                                <label style="font-size:0.75rem;">Specie:</label>
+                                <select id="truffle-forecast-species" class="mod-input" ${eventActionAttrs('change', 'refreshTruffleForecast')}>${speciesOptions}</select>
+                            </div>
+                            <div style="flex:1; min-width:180px;">
+                                <label style="font-size:0.75rem;">Profilo area:</label>
+                                <select id="truffle-forecast-area" class="mod-input" ${eventActionAttrs('change', 'refreshTruffleForecast')}>${areaOptions}</select>
+                            </div>
+                        </div>
+                        <p style="margin:10px 0 0 0; color:#b8b0a0; font-size:0.8rem;">Regione corrente letta dal GPS: <strong style="color:#4d8a98;">${escapeHtml(regionName)}</strong>. Il punteggio è attivo solo nei periodi legali salvati nel tuo archivio regionale.</p>
+                    </div>
+                    <div class="module-card" style="margin-bottom: 14px; background: rgba(18,22,16,0.96); border-left:4px solid #4d8a98;">
+                        <p style="margin:0; color:#f6f1e6; font-size:0.84rem;"><strong>Nota importante:</strong> questo modulo non garantisce il ritrovamento. Serve a stimare una finestra favorevole, non sostituisce esperienza sul bosco, cane, microzona e rispetto delle regole regionali.</p>
+                    </div>
+                    <div id="truffle-forecast-results"></div>`;
+                break;
+            }
+
             case 'calendario': {
-    const gpsTextCal = document.getElementById('gps-status-text');
-    let regioneCal = "Campania"; 
-    if (gpsTextCal && gpsTextCal.innerHTML) {
-        const matchReg = gpsTextCal.innerHTML.match(/<b>(.*?)<\/b>/);
-        if (matchReg && matchReg[1]) regioneCal = matchReg[1];
-    }
+    let regioneCal = getCurrentGpsRegionName();
 
     let allCalendari = getRenderableStorageJSON('calendari_tartufi_custom', {});
     let datiRegioneCorrente = allCalendari[regioneCal] || {};
@@ -3337,6 +3612,9 @@ function openModule(moduleName, editMode = false) {
             const stopBtn = document.getElementById('offline-stop-btn');
             if (stopBtn) stopBtn.style.display = 'block';
         }
+    }
+    if (moduleName === 'previsione_tartufi') {
+        setTimeout(() => { void loadTruffleForecastModule(); }, 0);
     }
     if (moduleName === 'vet') {
         syncVetUnifiedInputForm();
@@ -4656,6 +4934,7 @@ function buildCompleteBackupData() {
         vetClinicsList: localStorage.getItem('vet_clinics_list'),
         calendariTartufiCustom: localStorage.getItem('calendari_tartufi_custom'),
         noteRegionaliTartufi: localStorage.getItem('note_regionali_tartufi'),
+        truffleForecastFeedback: localStorage.getItem(TRUFFLE_FORECAST_FEEDBACK_KEY),
         offlineRegioniPreferite: localStorage.getItem(OFFLINE_REGIONI_PREFERITE_KEY),
         backupDirLabel: localStorage.getItem(_BACKUP_DIR_LABEL_KEY)
     };
@@ -4977,6 +5256,7 @@ async function ripristinaBackupDaFile(event) {
         vetClinicsList: 'vet_clinics_list',
         calendariTartufiCustom: 'calendari_tartufi_custom',
         noteRegionaliTartufi: 'note_regionali_tartufi',
+        truffleForecastFeedback: TRUFFLE_FORECAST_FEEDBACK_KEY,
         offlineRegioniPreferite: OFFLINE_REGIONI_PREFERITE_KEY,
         backupDirLabel: _BACKUP_DIR_LABEL_KEY,
     };
@@ -6250,6 +6530,7 @@ async function mostraInfoModulo(moduleName) {
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
         'vet': "ℹ️ **Guida - Libretti Sanitari Cani & Profilassi**\n\nUsa la card unica \"Nuova Registrazione\" per inserire trattamenti/visite oppure voci del diario calore. In modalità diario calore puoi selezionare solo cagne femmine, con previsione del prossimo ciclo nello storico.",
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
+        'previsione_tartufi': "ℹ️ **Guida - Previsione Uscita Tartufi**\n\nStima una finestra favorevole di uscita usando calendario regionale, ultimi 15 giorni di pioggia, umidità del suolo, fase lunare, stabilità termica e storico personale. È un supporto decisionale, non una garanzia di ritrovamento.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
         'export': `ℹ️ Guida - Report & Backup Dati\n\nEsporta i dati contabili in formato CSV.\n\nIl backup automatico ti guida a scegliere la cartella Download del dispositivo e poi crea/usa sempre il percorso ${buildAutomaticBackupPathLabel('Download')} per salvare backup_truffle_automatico.json. Usa '📁 Imposta Cartella Backup' per registrare o cambiare il percorso, poi '💾 Salva Backup Ora' per forzarlo manualmente.\n\nSe il browser non supporta la scelta guidata della cartella, l'app usa il normale download del file JSON.`,
