@@ -2812,7 +2812,7 @@ function openModule(moduleName, editMode = false) {
             window.location.href = "tel:112";
             return;
         case 'vet-emergency':
-            const vetClinics = getRenderableStorageJSON('vet_clinics_list', []);
+            const vetClinics = readStorageJSON('vet_clinics_list', []);
             let clinicHtml = `
                 <h2>Soccorso Veterinario & Cliniche Veterinarie</h2>
                 <p>Gestisci i numeri d'emergenza dei veterinari:</p>
