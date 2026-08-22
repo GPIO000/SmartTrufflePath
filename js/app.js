@@ -1,5 +1,5 @@
 import * as TruffleStorage from './storage-sync.js';
-import { updateWeatherMoon } from './weather-moon.js';
+import { updateWeatherMoon, calcMoonPhase } from './weather-moon.js';
 import {
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
@@ -885,6 +885,7 @@ const ACTION_HANDLERS = {
     deleteHeatEntry: (_event, index) => deleteHeatEntry(index),
     saveRaccoltaGiornaliera: () => saveRaccoltaGiornaliera(),
     deleteRaccoltaGiornaliera: (_event, index) => deleteRaccoltaGiornaliera(index),
+    updateRegDataMoonPhase: () => updateRegDataMoonPhase(),
     saveSpesa: () => saveSpesa(),
     deleteSpesa: (_event, index) => deleteSpesa(index),
     esportaDatiCSV: () => esportaDatiCSV(),
@@ -2507,12 +2508,14 @@ function openModule(moduleName, editMode = false) {
             vetHtml += printOnlyVetBooklet;
             contentHTML = vetHtml;
             break;
-        case 'registro_giornaliero':
+        case 'registro_giornaliero': {
             const storicoRaccolta = getRenderableStorageJSON('storico_raccolta_giornaliera', []);
             const elAnno = document.getElementById('filtro-anno');
             const filtroAnno = elAnno ? elAnno.value : 'tutti';
             const elSpecie = document.getElementById('filtro-specie');
             const filtroSpecie = elSpecie ? elSpecie.value : 'tutte';
+            const elFaseLunare = document.getElementById('filtro-fase-lunare');
+            const filtroFaseLunare = elFaseLunare ? elFaseLunare.value : 'tutte';
 
             let anniDisponibili = [...new Set(storicoRaccolta.map(item => item.data ? item.data.slice(0,4) : ''))].filter(Boolean);
             if(anniDisponibili.length === 0) anniDisponibili = [new Date().getFullYear().toString()];
@@ -2525,17 +2528,25 @@ function openModule(moduleName, editMode = false) {
                 "Tuber uncinatum Chatin (Scorzone Invernale / Uncinato)", "Tuber borchii Vitt. / albidum Pico (Bianchetto / Marzuolo)",
                 "Tuber mesentericum Vitt. (Nero Ordinario / Bagnolese)"
             ];
+            const listeFasiLunari = [
+                'Luna nuova', 'Luna crescente', 'Quarto crescente', 'Gibbosa crescente',
+                'Luna piena', 'Gibbosa calante', 'Quarto calante', 'Luna calante'
+            ];
             let opzioniSpecieHtml = `<option value="">-- Nessun filtro --</option><option value="tutte">Tutte le specie</option>`;
             listaSpecie9.forEach(s => { opzioniSpecieHtml += `<option value="${s}" ${filtroSpecie === s ? 'selected' : ''}>${s}</option>`; });
+            let opzioniFasiHtml = `<option value="tutte">Tutte le fasi</option>`;
+            listeFasiLunari.forEach(f => { opzioniFasiHtml += `<option value="${f}" ${filtroFaseLunare === f ? 'selected' : ''}>${f}</option>`; });
             let selectSpecieFormHtml = '';
             listaSpecie9.forEach(s => { selectSpecieFormHtml += `<option value="${s}">${s}</option>`; });
+            const todayMoon = calcMoonPhase(new Date());
             let registroHtml = `
                 <h2>Registro Giornaliero Ritrovamenti</h2>
                 <p>Registra i quantitativi raccolti e filtra per anno o specie</p>
                 <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
                     <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Raccolta</h3>
                     <label>Data:</label>
-                    <input type="date" id="reg-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}">
+                    <input type="date" id="reg-data" class="mod-input" value="${new Date().toISOString().slice(0,10)}" ${eventActionAttrs('change', 'updateRegDataMoonPhase')}>
+                    <div id="reg-fase-lunare-display" style="margin: 4px 0 10px 0; font-size:0.85rem; color:#d4c98a; padding: 6px 10px; background: rgba(212,201,138,0.08); border-radius: 6px;">${todayMoon.icon} Fase lunare: <b>${todayMoon.name}</b></div>
                     <label>Specie Tartufo:</label>
                     <select id="reg-specie" class="mod-input">${selectSpecieFormHtml}</select>
                     <label>Peso Totale (grammi):</label>
@@ -2548,16 +2559,20 @@ function openModule(moduleName, editMode = false) {
                 </div>
                 <div class="module-card" style="margin-bottom: 15px; background: #121610; border: 1px solid rgba(255,255,255,0.07);">
                     <h3 style="font-size:0.85rem; color:#4d8a98; margin-bottom:8px;">🔍 Filtri Archivio</h3>
-                    <div style="display: flex; gap: 10px;">
-                        <div style="flex:1;"><label style="font-size:0.75rem;">Anno:</label><select id="filtro-anno" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniAnniHtml}</select></div>
-                        <div style="flex:2;"><label style="font-size:0.75rem;">Specie:</label><select id="filtro-specie" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniSpecieHtml}</select></div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <div style="flex:1; min-width:90px;"><label style="font-size:0.75rem;">Anno:</label><select id="filtro-anno" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniAnniHtml}</select></div>
+                        <div style="flex:2; min-width:140px;"><label style="font-size:0.75rem;">Specie:</label><select id="filtro-specie" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniSpecieHtml}</select></div>
+                        <div style="flex:1; min-width:120px;"><label style="font-size:0.75rem;">Fase lunare:</label><select id="filtro-fase-lunare" class="mod-input" ${eventActionAttrs('change', 'refreshRegistroGiornaliero')}>${opzioniFasiHtml}</select></div>
                     </div>
                     <button ${actionAttrs('printPage')} style="margin-top:10px; width:100%; background:#4b5563; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem;">🖨️ Stampa / Salva PDF</button>
                 </div>`;
             let datiFiltrati = storicoRaccolta.filter(item => {
                 const annoItem = item.data ? item.data.slice(0,4) : '';
                 const nessunFiltroSpecie = filtroSpecie === '' || filtroSpecie === 'tutte';
-                return (filtroAnno === 'tutti' || annoItem === filtroAnno) && (nessunFiltroSpecie || item.specie === filtroSpecie);
+                const nessunFiltroFase = filtroFaseLunare === '' || filtroFaseLunare === 'tutte';
+                const faseLunareItem = item.faseLunare ? item.faseLunare.name : null;
+                const corrispondeFase = nessunFiltroFase || faseLunareItem === filtroFaseLunare;
+                return (filtroAnno === 'tutti' || annoItem === filtroAnno) && (nessunFiltroSpecie || item.specie === filtroSpecie) && corrispondeFase;
             });
 
             if (datiFiltrati.length === 0) {
@@ -2585,12 +2600,16 @@ function openModule(moduleName, editMode = false) {
                 registroHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">Storico Filtrato (${datiFiltrati.length}):</h3>`;
                 datiFiltrati.slice().reverse().forEach((item) => {
                     const originalIndex = storicoRaccolta.indexOf(item);
+                    const faseLunareHtml = item.faseLunare
+                        ? `<p style="font-size:0.8rem; color:#d4c98a; margin: 2px 0;">${escapeHtml(item.faseLunare.icon)} Fase lunare: ${escapeHtml(item.faseLunare.name)}</p>`
+                        : '';
                     registroHtml += `
                         <div class="module-card" style="border-left: 4px solid #10b981; margin-bottom: 12px;">
                             <strong style="color:#f6f1e6; font-size:0.95rem;">📅 ${item.data}</strong>
                             <p style="font-size:0.9rem; color:#4d8a98; margin: 4px 0;"><b>${item.specie}</b></p>
                             <p style="font-size:0.85rem; color:#22c55e; margin: 2px 0;">⚖️ Peso: <b>${item.peso} g</b></p>
                             ${item.luogo ? `<p style="font-size:0.8rem; color:#a3c4bc; margin: 2px 0;">📍 Luogo: ${escapeHtml(item.luogo)}</p>` : ''}
+                            ${faseLunareHtml}
                             <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 Note: ${item.note || 'Nessuna nota'}</p>
                             <button class="overlay-btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" ${actionAttrs('deleteRaccoltaGiornaliera', [originalIndex])}>🗑️ Elimina</button>
                         </div>`;
@@ -2598,6 +2617,7 @@ function openModule(moduleName, editMode = false) {
             }
             contentHTML = registroHtml;
             break;
+        }
         case 'spese': {
             const speseList = getRenderableStorageJSON('spese_list', []);
             const annoCorrenteSpese = new Date().getFullYear();
@@ -3795,11 +3815,24 @@ function saveRaccoltaGiornaliera() {
     const note = document.getElementById('reg-note').value.trim();
     if (!data || peso <= 0) { showToast("Data e peso obbligatori.", 'error'); return; }
     if (luogo) aggiungiLuogoRaccolta(luogo);
+    const moonDate = new Date(data + 'T12:00:00');
+    const moon = calcMoonPhase(moonDate);
+    const faseLunare = { icon: moon.icon, name: moon.name };
     let storicoRaccolta = readStorageJSON('storico_raccolta_giornaliera', []);
-    storicoRaccolta.push({ data, specie, peso, luogo, note });
+    storicoRaccolta.push({ data, specie, peso, luogo, note, faseLunare });
     localStorage.setItem('storico_raccolta_giornaliera', JSON.stringify(storicoRaccolta));
     showToast("Raccolta registrata!", 'success');
     openModule('registro_giornaliero');
+}
+
+function updateRegDataMoonPhase() {
+    const el = document.getElementById('reg-data');
+    const display = document.getElementById('reg-fase-lunare-display');
+    if (!el || !display) return;
+    const dateStr = el.value;
+    if (!dateStr) { display.textContent = ''; return; }
+    const moon = calcMoonPhase(new Date(dateStr + 'T12:00:00'));
+    display.innerHTML = `${moon.icon} Fase lunare: <b>${moon.name}</b>`;
 }
 
 async function deleteRaccoltaGiornaliera(index) {

@@ -63,7 +63,7 @@ let _expanded      = false;
  * @param {Date} date
  * @returns {{ icon: string, name: string, illumination: number, age: number }}
  */
-function calcMoonPhase(date = new Date()) {
+export function calcMoonPhase(date = new Date()) {
     // Riferimento: luna nuova del 6 gennaio 2000
     const KNOWN_NEW_MOON = new Date('2000-01-06T18:14:00Z');
     const SYNODIC_MONTH  = 29.53059;
