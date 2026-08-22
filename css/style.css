@@ -773,7 +773,6 @@ textarea:focus-visible {
     align-items: flex-start;
     gap: 8px;
     width: 100%;
-    pointer-events: none;
 }
 
 .weather-widget {
