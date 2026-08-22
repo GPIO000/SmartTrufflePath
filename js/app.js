@@ -5001,6 +5001,17 @@ function saveVetClinic() {
     let vetClinics = readStorageJSON('vet_clinics_list', []);
     vetClinics.push({ nome, indirizzo, coordinate, tel, cell, note });
     localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
+    if (coordinate) {
+        const parsed = parseCoordinates(coordinate);
+        if (parsed) {
+            const alreadyExists = poiList.some(p => p.lat === parsed.lat && p.lng === parsed.lng);
+            if (!alreadyExists) {
+                const poiNote = indirizzo ? `${nome} - ${indirizzo}` : nome;
+                addPoi(parsed.lat, parsed.lng, poiNote, undefined, undefined, '🏥');
+                renderAllPoiMarkers();
+            }
+        }
+    }
     showToast("Clinica salvata!", 'success'); openModule('vet-emergency');
 }
 
