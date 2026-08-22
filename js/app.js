@@ -5154,11 +5154,12 @@ async function navigateToVetClinicByIndex(index) {
     if (!method) return;
 
     if (method === 'app') {
+        const clinicName = clinic.nome || 'Clinica Veterinaria';
         await showGpsNavigationExplanationIfNeeded(clinic.nome || 'Clinica Veterinaria');
         targetNavigation = {
             lat: coords.lat,
             lng: coords.lng,
-            label: `🏥 ${clinic.nome || 'Clinica Veterinaria'}`
+            label: `🏥 ${clinicName}`
         };
         closeActiveModule();
         map.setView([coords.lat, coords.lng], getAdaptiveFocusZoom(16));
@@ -5166,7 +5167,7 @@ async function navigateToVetClinicByIndex(index) {
             const currentPosition = userMarker.getLatLng();
             updateCompass(currentPosition.lat, currentPosition.lng);
         }
-        showToast(`🧭 Destinazione: ${clinic.nome}`, 'success');
+        showToast(`🧭 Destinazione: ${clinicName}`, 'success');
     } else {
         const mapsApp = await appChooseExternalMapsMethod('Quale app di mappe vuoi usare?');
         if (!mapsApp) return;
