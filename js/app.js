@@ -2601,7 +2601,7 @@ function openModule(moduleName, editMode = false) {
                 datiFiltrati.slice().reverse().forEach((item) => {
                     const originalIndex = storicoRaccolta.indexOf(item);
                     const faseLunareHtml = item.faseLunare
-                        ? `<p style="font-size:0.8rem; color:#d4c98a; margin: 2px 0;">${item.faseLunare.icon} Fase lunare: ${escapeHtml(item.faseLunare.name)}</p>`
+                        ? `<p style="font-size:0.8rem; color:#d4c98a; margin: 2px 0;">${escapeHtml(item.faseLunare.icon)} Fase lunare: ${escapeHtml(item.faseLunare.name)}</p>`
                         : '';
                     registroHtml += `
                         <div class="module-card" style="border-left: 4px solid #10b981; margin-bottom: 12px;">
