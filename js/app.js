@@ -1432,6 +1432,15 @@ function updateCompass(currentLat, currentLng) {
             const marker = normalizePoiMarker(poiList[index].marker, poiList[index].type);
             label = `${marker} ${poiList[index].note || 'Punto'}`;
         }
+    } else if (targetNavigation && typeof targetNavigation === 'object') {
+        const lat = Number(targetNavigation.lat);
+        const lng = Number(targetNavigation.lng);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            target = { lat, lng };
+            label = typeof targetNavigation.label === 'string' && targetNavigation.label.trim()
+                ? targetNavigation.label.trim()
+                : 'Destinazione';
+        }
     }
     if (target) {
         const res = calculateDistanceAndBearing(currentLat, currentLng, target.lat, target.lng);
@@ -5145,9 +5154,19 @@ async function navigateToVetClinicByIndex(index) {
     if (!method) return;
 
     if (method === 'app') {
+        await showGpsNavigationExplanationIfNeeded(clinic.nome || 'Clinica Veterinaria');
+        targetNavigation = {
+            lat: coords.lat,
+            lng: coords.lng,
+            label: `🏥 ${clinic.nome || 'Clinica Veterinaria'}`
+        };
         closeActiveModule();
         map.setView([coords.lat, coords.lng], getAdaptiveFocusZoom(16));
-        showToast(`🧭 Mappa centrata su ${clinic.nome}`, 'success');
+        if (userMarker) {
+            const currentPosition = userMarker.getLatLng();
+            updateCompass(currentPosition.lat, currentPosition.lng);
+        }
+        showToast(`🧭 Destinazione: ${clinic.nome}`, 'success');
     } else {
         const mapsApp = await appChooseExternalMapsMethod('Quale app di mappe vuoi usare?');
         if (!mapsApp) return;
