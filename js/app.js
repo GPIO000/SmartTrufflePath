@@ -1,5 +1,5 @@
 import * as TruffleStorage from './storage-sync.js';
-import { updateWeatherMoon, calcMoonPhase } from './weather-moon.js';
+import { updateWeatherMoon, updateWeatherMoonDest, clearWeatherDest, calcMoonPhase } from './weather-moon.js';
 import {
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
@@ -1398,7 +1398,7 @@ function renderAllPoiMarkers() {
         const fromInfo = poi.from ? `<br><small>Da: ${escapeHtml(safePoi.from || '')}</small>` : '';
         const poiMarker = L.marker([poi.lat, poi.lng], { icon }).addTo(map)
             .bindPopup(`<b>${popupTitle}</b><br>Nota: ${safePoi.note || 'Nessuna nota'}<br><small>${safePoi.date || ''}</small>${fromInfo}`);
-        poiMarker.on('popupopen', () => updateWeatherMoon(poi.lat, poi.lng, safePoi.note || popupTitle, true));
+        poiMarker.on('popupopen', () => updateWeatherMoonDest(poi.lat, poi.lng, safePoi.note || popupTitle));
         poiMapMarkers[index] = poiMarker;
     });
 }
@@ -1520,11 +1520,10 @@ async function navigateToPoi(index) {
         await showGpsNavigationExplanationIfNeeded(poiList[index].note);
         targetNavigation = `poi_${index}`;
         const marker = normalizePoiMarker(poiList[index].marker, poiList[index].type);
-        updateWeatherMoon(
+        updateWeatherMoonDest(
             poiList[index].lat,
             poiList[index].lng,
-            `${marker} ${poiList[index].note || 'Punto'}`,
-            true
+            `${marker} ${poiList[index].note || 'Punto'}`
         );
         map.setView([poiList[index].lat, poiList[index].lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
@@ -1534,6 +1533,7 @@ async function navigateToPoi(index) {
 }
 function stopNavigation() {
     targetNavigation = null;
+    clearWeatherDest();
     const compassText = document.getElementById('compass-box');
     if (compassText) compassText.innerHTML = `🧭 Seleziona una destinazione dall'elenco punti`;
     const stopBtn = document.getElementById('stop-nav-btn');
