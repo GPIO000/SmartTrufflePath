@@ -911,3 +911,56 @@ textarea:focus-visible {
 .wm-data-badge--cache { color: #fde68a; }
 .wm-data-badge--stale { color: #fb923c; }
 .wm-data-badge--error { color: #f87171; }
+
+/* ── Widget Meteo Destinazione ────────────────────────────────────────────── */
+#weather-moon-widget-dest {
+    position: static;
+    max-width: 100%;
+    font-size: 0.82rem;
+    font-family: inherit;
+    pointer-events: auto;
+    user-select: none;
+    margin-top: 4px;
+}
+
+#weather-moon-widget-dest #wm-dest-compact {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(30, 20, 5, 0.88);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    border-radius: 10px;
+    padding: 5px 10px;
+    cursor: pointer;
+    color: #f6f1e6;
+    line-height: 1.3;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+    transition: background 0.2s;
+    outline: none;
+}
+
+#weather-moon-widget-dest #wm-dest-compact:hover,
+#weather-moon-widget-dest #wm-dest-compact:focus-visible {
+    background: rgba(50, 35, 5, 0.95);
+}
+
+.wm-dest-label {
+    color: #fbbf24 !important;
+}
+
+#weather-moon-widget-dest #wm-dest-panel {
+    background: rgba(30, 20, 5, 0.94);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    border-radius: 10px;
+    margin-top: 4px;
+    padding: 10px 12px;
+    color: #f6f1e6;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
