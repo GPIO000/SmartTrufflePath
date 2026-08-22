@@ -120,6 +120,20 @@ describe('updateWeatherMoon — fetch riuscito', () => {
 
         expect(widget.innerHTML).toContain('Pineta Sud');
     });
+
+    it('mostra il badge "Aggiornato" dopo fetch riuscito', async () => {
+        const mockData = fakeWeatherResponse();
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(mockData),
+        }));
+        const { updateWeatherMoon } = await freshImport();
+
+        await updateWeatherMoon(44.0, 11.0, null, true);
+
+        expect(widget.innerHTML).toContain('wm-data-badge--live');
+        expect(widget.innerHTML).toContain('Aggiornato');
+    });
 });
 
 describe('updateWeatherMoon — fetch fallito', () => {
@@ -130,7 +144,8 @@ describe('updateWeatherMoon — fetch fallito', () => {
         await updateWeatherMoon(44.0, 11.0, null, true);
 
         expect(widget.style.display).toBe('block');
-        expect(widget.innerHTML).toContain('Meteo offline');
+        expect(widget.innerHTML).toContain('wm-data-badge--error');
+        expect(widget.innerHTML).toContain('Meteo n.d.');
         expect(widget.innerHTML).toContain('Rete non disponibile');
     });
 
@@ -143,7 +158,7 @@ describe('updateWeatherMoon — fetch fallito', () => {
 
         await updateWeatherMoon(44.0, 11.0, 'Bosco Nord', true);
 
-        expect(widget.innerHTML).toContain('Meteo non disp.');
+        expect(widget.innerHTML).toContain('Meteo n.d.');
         expect(widget.innerHTML).toContain('Errore API 400');
         expect(widget.innerHTML).toContain('Bosco Nord');
     });
@@ -163,6 +178,20 @@ describe('updateWeatherMoon — cache', () => {
 
         expect(mockFetch).not.toHaveBeenCalled();
         expect(widget.style.display).toBe('block');
+    });
+
+    it('mostra il badge "Cache" quando i dati vengono dalla cache', async () => {
+        vi.stubGlobal('fetch', vi.fn());
+
+        const mockData = fakeWeatherResponse();
+        const cacheKey = 'wm_cache_44.00_11.00';
+        localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), payload: mockData }));
+
+        const { updateWeatherMoon } = await freshImport();
+        await updateWeatherMoon(44.0, 11.0, null, true);
+
+        expect(widget.innerHTML).toContain('wm-data-badge--cache');
+        expect(widget.innerHTML).toContain('Cache');
     });
 
     it('non usa la cache scaduta', async () => {
@@ -257,6 +286,8 @@ describe('updateWeatherMoon — campi opzionali e concorrenza', () => {
 
         expect(widget.innerHTML).toContain('19°');
         expect(widget.innerHTML).toContain('Seconda posizione');
+        expect(widget.innerHTML).toContain('wm-data-badge--stale');
+        expect(widget.innerHTML).toContain('Dati precedenti');
         expect(widget.innerHTML).toContain('Rete non disponibile');
     });
 });
