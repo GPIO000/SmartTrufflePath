@@ -5233,10 +5233,12 @@ async function editVetClinic(index) {
     localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
 
     // Update POI marker on map: remove old POI if coordinates changed, then add new one
+    const COORD_EPSILON = 1e-7;
+    const coordsMatch = (a, b) => Math.abs(a.lat - b.lat) < COORD_EPSILON && Math.abs(a.lng - b.lng) < COORD_EPSILON;
     const oldParsed = oldCoordinate ? parseCoordinates(oldCoordinate) : null;
     const newParsed = newCoordinate ? parseCoordinates(newCoordinate) : null;
     if (oldParsed) {
-        const oldIdx = poiList.findIndex(p => p.lat === oldParsed.lat && p.lng === oldParsed.lng && p.marker === '🏥');
+        const oldIdx = poiList.findIndex(p => p.marker === '🏥' && coordsMatch(p, oldParsed));
         if (oldIdx !== -1) {
             poiList.splice(oldIdx, 1);
             poiList = normalizePoiList(poiList);
@@ -5244,7 +5246,7 @@ async function editVetClinic(index) {
         }
     }
     if (newParsed) {
-        const alreadyExists = poiList.some(p => p.lat === newParsed.lat && p.lng === newParsed.lng);
+        const alreadyExists = poiList.some(p => p.marker === '🏥' && coordsMatch(p, newParsed));
         if (!alreadyExists) {
             const poiNote = newIndirizzo ? `${newNome} - ${newIndirizzo}` : newNome;
             addPoi(newParsed.lat, newParsed.lng, poiNote, undefined, undefined, '🏥');
