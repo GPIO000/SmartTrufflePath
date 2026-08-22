@@ -3,13 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const WIDGET_ID = 'weather-moon-widget';
+const CURRENT_WIDGET_ID = 'weather-moon-widget';
+const DESTINATION_WIDGET_ID = 'weather-destination-widget';
 
-function makeWidget() {
-    const el = document.createElement('div');
-    el.id = WIDGET_ID;
-    document.body.appendChild(el);
-    return el;
+function makeWidgets() {
+    const current = document.createElement('div');
+    current.id = CURRENT_WIDGET_ID;
+    document.body.appendChild(current);
+
+    const destination = document.createElement('div');
+    destination.id = DESTINATION_WIDGET_ID;
+    document.body.appendChild(destination);
+
+    return { current, destination };
 }
 
 function fakeWeatherResponse(overrides = {}) {
@@ -53,10 +59,13 @@ async function freshImport() {
 // ── Setup / teardown ──────────────────────────────────────────────────────────
 
 let widget;
+let destinationWidget;
 
 beforeEach(() => {
     localStorage.clear();
-    widget = makeWidget();
+    const widgets = makeWidgets();
+    widget = widgets.current;
+    destinationWidget = widgets.destination;
 });
 
 afterEach(() => {
@@ -166,11 +175,15 @@ describe('updateWeatherMoonComparison', () => {
         expect(widget.innerHTML).toContain('21°');
         expect(widget.innerHTML).toContain('16°');
 
-        widget.querySelector('#wm-compact').click();
+        expect(destinationWidget.style.display).toBe('block');
+        expect(destinationWidget.innerHTML).toContain('📍 Bosco Nord');
 
-        expect(widget.innerHTML).toContain('Posizione attuale');
-        expect(widget.innerHTML).toContain('Destinazione');
-        expect(widget.innerHTML).toContain('wm-forecast-table');
+        widget.querySelector('.wm-compact').click();
+        destinationWidget.querySelector('.wm-compact').click();
+
+        expect(widget.innerHTML).toContain('wm-days-list');
+        expect(destinationWidget.innerHTML).toContain('wm-days-list');
+        expect(destinationWidget.innerHTML).toContain('📍 Bosco Nord');
     });
 });
 
@@ -266,7 +279,7 @@ describe('updateWeatherMoon — campi opzionali e concorrenza', () => {
         const { updateWeatherMoon } = await freshImport();
 
         await updateWeatherMoon(44.0, 11.0, 'Pineta Sud', true);
-        widget.querySelector('#wm-compact').click();
+        widget.querySelector('.wm-compact').click();
 
         expect(widget.innerHTML).toContain('Pineta Sud');
         expect(widget.innerHTML).not.toContain('🪱');
@@ -320,7 +333,7 @@ describe('updateWeatherMoon — campi opzionali e concorrenza', () => {
 
         await updateWeatherMoon(44.0, 11.0, 'Prima posizione', true);
         await updateWeatherMoon(45.0, 12.0, 'Seconda posizione', true);
-        widget.querySelector('#wm-compact').click();
+        widget.querySelector('.wm-compact').click();
 
         expect(widget.innerHTML).toContain('19°');
         expect(widget.innerHTML).toContain('Seconda posizione');
@@ -466,11 +479,11 @@ describe('updateWeatherMoon — pannello espandibile', () => {
 
         await updateWeatherMoon(44.0, 11.0, null, true);
 
-        expect(widget.querySelector('#wm-panel')).toBeNull();
+        expect(widget.querySelector('.wm-panel')).toBeNull();
 
-        widget.querySelector('#wm-compact').click();
+        widget.querySelector('.wm-compact').click();
 
-        expect(widget.querySelector('#wm-panel')).not.toBeNull();
+        expect(widget.querySelector('.wm-panel')).not.toBeNull();
         expect(widget.innerHTML).toContain('wm-days-list');
         expect(widget.innerHTML).toContain('wm-moon-row');
     });
@@ -484,9 +497,9 @@ describe('updateWeatherMoon — pannello espandibile', () => {
         const { updateWeatherMoon } = await freshImport();
 
         await updateWeatherMoon(44.0, 11.0, null, true);
-        widget.querySelector('#wm-compact').click(); // apre — il widget viene ri-renderizzato con #wm-compact ancora presente
-        widget.querySelector('#wm-compact').click(); // chiude
+        widget.querySelector('.wm-compact').click();
+        widget.querySelector('.wm-compact').click();
 
-        expect(widget.querySelector('#wm-panel')).toBeNull();
+        expect(widget.querySelector('.wm-panel')).toBeNull();
     });
 });

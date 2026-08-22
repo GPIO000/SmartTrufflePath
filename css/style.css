@@ -768,8 +768,18 @@ textarea:focus-visible {
 }
 
 /* ── Widget Meteo + Fase Lunare ───────────────────────────────────────────── */
-#weather-moon-widget {
+#weather-widgets-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    pointer-events: none;
+}
+
+.weather-widget {
     position: static;
+    flex: 1 1 0;
+    min-width: 0;
     max-width: 100%;
     font-size: 0.82rem;
     font-family: inherit;
@@ -777,7 +787,7 @@ textarea:focus-visible {
     user-select: none;
 }
 
-#wm-compact {
+.wm-compact {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -794,8 +804,8 @@ textarea:focus-visible {
     transition: background 0.2s;
     outline: none;
 }
-#wm-compact:hover,
-#wm-compact:focus-visible {
+.wm-compact:hover,
+.wm-compact:focus-visible {
     background: rgba(34, 50, 28, 0.92);
 }
 
@@ -823,7 +833,7 @@ textarea:focus-visible {
 .wm-moon-icon { font-size: 1rem; }
 .wm-expand-arrow { font-size: 0.65rem; color: rgba(255,255,255,0.5); margin-left: 2px; }
 
-#wm-panel {
+.wm-panel {
     background: rgba(20, 30, 18, 0.92);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
