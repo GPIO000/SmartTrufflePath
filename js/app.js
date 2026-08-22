@@ -5102,7 +5102,9 @@ function parseCoordinates(str) {
         if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
     }
 
-    return null;
+    // Fallback: try all formats handled by extractCoordsFromSharedMessage
+    // (comma-as-decimal, URL-based, DM, and other variants)
+    return extractCoordsFromSharedMessage(s);
 }
 
 function appChooseTwoOptions(message, okLabel, altLabel) {
@@ -5215,15 +5217,43 @@ async function editVetClinic(index) {
     const noteInput = await appPrompt("Modifica note:", clinic.note || '');
     if (noteInput === null) return;
 
+    const oldCoordinate = clinic.coordinate;
+    const newCoordinate = coordinateInput.trim();
+    const newNome = nomeInput.trim();
+    const newIndirizzo = indirizzoInput.trim();
+
     vetClinics[index] = {
-        nome: nomeInput.trim(),
-        indirizzo: indirizzoInput.trim(),
-        coordinate: coordinateInput.trim(),
+        nome: newNome,
+        indirizzo: newIndirizzo,
+        coordinate: newCoordinate,
         tel: telInput.trim(),
         cell: cellInput.trim(),
         note: noteInput.trim(),
     };
     localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
+
+    // Update POI marker on map: remove old POI if coordinates changed, then add new one
+    const COORD_EPSILON = 1e-7;
+    const coordsMatch = (a, b) => Math.abs(a.lat - b.lat) < COORD_EPSILON && Math.abs(a.lng - b.lng) < COORD_EPSILON;
+    const oldParsed = oldCoordinate ? parseCoordinates(oldCoordinate) : null;
+    const newParsed = newCoordinate ? parseCoordinates(newCoordinate) : null;
+    if (oldParsed) {
+        const oldIdx = poiList.findIndex(p => p.marker === '🏥' && coordsMatch(p, oldParsed));
+        if (oldIdx !== -1) {
+            poiList.splice(oldIdx, 1);
+            poiList = normalizePoiList(poiList);
+            localStorage.setItem('poi_list', JSON.stringify(poiList));
+        }
+    }
+    if (newParsed) {
+        const alreadyExists = poiList.some(p => p.marker === '🏥' && coordsMatch(p, newParsed));
+        if (!alreadyExists) {
+            const poiNote = newIndirizzo ? `${newNome} - ${newIndirizzo}` : newNome;
+            addPoi(newParsed.lat, newParsed.lng, poiNote, undefined, undefined, '🏥');
+        }
+    }
+    renderAllPoiMarkers();
+
     showToast("Clinica aggiornata!", 'success');
     openModule('vet-emergency');
 }
