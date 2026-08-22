@@ -401,17 +401,19 @@ describe('updateWeatherMoon — timeout fetch', () => {
         const d = deferred();
         vi.stubGlobal('fetch', vi.fn().mockReturnValue(d.promise));
 
-        const { updateWeatherMoon } = await freshImport();
-        const call = updateWeatherMoon(44.0, 11.0, null, true);
+        try {
+            const { updateWeatherMoon } = await freshImport();
+            const call = updateWeatherMoon(44.0, 11.0, null, true);
 
-        // Avanza oltre il timeout (8000 ms)
-        await vi.advanceTimersByTimeAsync(9000);
-        await call;
+            // Avanza oltre il timeout (8000 ms)
+            await vi.advanceTimersByTimeAsync(9000);
+            await call;
 
-        expect(widget.style.display).toBe('block');
-        expect(widget.innerHTML).toContain('wm-data-badge--error');
-
-        vi.useRealTimers();
+            expect(widget.style.display).toBe('block');
+            expect(widget.innerHTML).toContain('wm-data-badge--error');
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
 
@@ -444,7 +446,7 @@ describe('updateWeatherMoon — pannello espandibile', () => {
         const { updateWeatherMoon } = await freshImport();
 
         await updateWeatherMoon(44.0, 11.0, null, true);
-        widget.querySelector('#wm-compact').click(); // apre
+        widget.querySelector('#wm-compact').click(); // apre — il widget viene ri-renderizzato con #wm-compact ancora presente
         widget.querySelector('#wm-compact').click(); // chiude
 
         expect(widget.querySelector('#wm-panel')).toBeNull();
