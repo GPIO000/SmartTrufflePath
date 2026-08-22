@@ -226,11 +226,13 @@ function renderWidget(data, label, status = null) {
 
     // ── Compact bar ──────────────────────────────────────────────────────────
     const compactLabel = label ? `<span class="wm-location-label">${_esc(label)}</span>` : '';
+    const compactStatusText = _esc(curInfo.label);
     const compact = `
         <div id="wm-compact" role="button" aria-expanded="${_expanded}" tabindex="0" aria-label="Meteo e luna — tocca per dettagli">
             ${compactLabel}
             <span class="wm-cur-icon">${curInfo.icon}</span>
             <span class="wm-cur-temp">${Math.round(cur.temperature_2m)}°</span>
+            <span class="wm-cur-status">${compactStatusText}</span>
             <span class="wm-moon-icon">${moon.icon}</span>
             <span class="wm-expand-arrow">${_expanded ? '▲' : '▼'}</span>
         </div>`;

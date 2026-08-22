@@ -810,6 +810,14 @@ textarea:focus-visible {
 }
 .wm-cur-icon  { font-size: 1.15rem; }
 .wm-cur-temp  { font-weight: 700; color: #fde68a; }
+.wm-cur-status {
+    font-size: 0.7rem;
+    color: #d1fae5;
+    max-width: 88px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .wm-moon-icon { font-size: 1rem; }
 .wm-expand-arrow { font-size: 0.65rem; color: rgba(255,255,255,0.5); margin-left: 2px; }
 
