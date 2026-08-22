@@ -171,12 +171,11 @@ describe('updateWeatherMoonComparison', () => {
         );
 
         expect(widget.innerHTML).toContain('Sei qui');
-        expect(widget.innerHTML).toContain('📍 Bosco Nord');
         expect(widget.innerHTML).toContain('21°');
-        expect(widget.innerHTML).toContain('16°');
 
         expect(destinationWidget.style.display).toBe('block');
         expect(destinationWidget.innerHTML).toContain('📍 Bosco Nord');
+        expect(destinationWidget.innerHTML).toContain('16°');
 
         widget.querySelector('.wm-compact').click();
         destinationWidget.querySelector('.wm-compact').click();
