@@ -895,3 +895,19 @@ textarea:focus-visible {
     color: rgba(255,255,255,0.35);
     text-align: right;
 }
+.wm-source-label--live  { color: #86efac; }
+.wm-source-label--cache { color: #fde68a; }
+.wm-source-label--stale { color: #fb923c; }
+.wm-source-label--error { color: #f87171; }
+.wm-data-badge {
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    white-space: nowrap;
+}
+.wm-data-badge--live  { color: #86efac; }
+.wm-data-badge--cache { color: #fde68a; }
+.wm-data-badge--stale { color: #fb923c; }
+.wm-data-badge--error { color: #f87171; }
