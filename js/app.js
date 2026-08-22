@@ -5155,7 +5155,7 @@ async function navigateToVetClinicByIndex(index) {
 
     if (method === 'app') {
         const clinicName = clinic.nome || 'Clinica Veterinaria';
-        await showGpsNavigationExplanationIfNeeded(clinic.nome || 'Clinica Veterinaria');
+        await showGpsNavigationExplanationIfNeeded(clinicName);
         targetNavigation = {
             lat: coords.lat,
             lng: coords.lng,
