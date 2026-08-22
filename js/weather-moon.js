@@ -333,8 +333,10 @@ function renderWidget(widgetId, data, label, status = null, dataSource = 'live',
             </div>`;
     }
 
-    widget.innerHTML = compact + expandedHtml;
+    widget.innerHTML = compact;
     widget.style.display = 'block';
+    const panelSlot = document.getElementById(widgetId + '-panel');
+    if (panelSlot) panelSlot.innerHTML = expandedHtml;
 
     // Event: toggle expanded
     const compactEl = widget.querySelector('.wm-compact');
@@ -353,6 +355,8 @@ function hideWidget(widgetId) {
     if (!widget) return;
     widget.innerHTML = '';
     widget.style.display = 'none';
+    const panelSlot = document.getElementById(widgetId + '-panel');
+    if (panelSlot) panelSlot.innerHTML = '';
 }
 
 function renderWeatherState(widgetId, state, expanded, setExpanded) {
@@ -402,9 +406,10 @@ function renderError(widgetId, status = null, label = null) {
 
     widget.innerHTML = `
         <div class="wm-compact" style="opacity:.6">${moon.icon} <span class="wm-data-badge wm-data-badge--error">${srcLbl.badge}</span></div>
-        ${details}
     `;
     widget.style.display = 'block';
+    const panelSlot = document.getElementById(widgetId + '-panel');
+    if (panelSlot) panelSlot.innerHTML = details;
 }
 
 // ── API pubblica ──────────────────────────────────────────────────────────────
