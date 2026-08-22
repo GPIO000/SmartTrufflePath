@@ -811,6 +811,7 @@ textarea:focus-visible {
 .wm-cur-icon  { font-size: 1.15rem; }
 .wm-cur-temp  { font-weight: 700; color: #fde68a; }
 .wm-cur-status {
+    display: inline-block;
     font-size: 0.7rem;
     color: #d1fae5;
     max-width: 88px;
