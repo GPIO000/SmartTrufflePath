@@ -136,6 +136,44 @@ describe('updateWeatherMoon — fetch riuscito', () => {
     });
 });
 
+describe('updateWeatherMoonComparison', () => {
+    it('mostra il confronto meteo tra posizione attuale e destinazione', async () => {
+        const mockFetch = vi.fn((url) => {
+            if (url.includes('latitude=44.0000')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve(fakeWeatherResponse({ current: { temperature_2m: 21 } })),
+                });
+            }
+            if (url.includes('latitude=45.0000')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve(fakeWeatherResponse({ current: { temperature_2m: 16 } })),
+                });
+            }
+            throw new Error(`unexpected url ${url}`);
+        });
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoonComparison } = await freshImport();
+
+        await updateWeatherMoonComparison(
+            { lat: 44, lng: 11, label: 'Sei qui' },
+            { lat: 45, lng: 12, label: '📍 Bosco Nord' }
+        );
+
+        expect(widget.innerHTML).toContain('Sei qui');
+        expect(widget.innerHTML).toContain('📍 Bosco Nord');
+        expect(widget.innerHTML).toContain('21°');
+        expect(widget.innerHTML).toContain('16°');
+
+        widget.querySelector('#wm-compact').click();
+
+        expect(widget.innerHTML).toContain('Posizione attuale');
+        expect(widget.innerHTML).toContain('Destinazione');
+        expect(widget.innerHTML).toContain('wm-forecast-table');
+    });
+});
+
 describe('updateWeatherMoon — fetch fallito', () => {
     it('mostra renderError quando fetch fallisce e non ci sono dati precedenti', async () => {
         vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));

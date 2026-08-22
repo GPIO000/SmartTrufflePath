@@ -802,7 +802,7 @@ textarea:focus-visible {
 .wm-location-label {
     font-size: 0.72rem;
     color: #86efac;
-    max-width: 90px;
+    max-width: 78px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -810,6 +810,16 @@ textarea:focus-visible {
 }
 .wm-cur-icon  { font-size: 1.15rem; }
 .wm-cur-temp  { font-weight: 700; color: #fde68a; }
+.wm-compare-temp {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fde68a;
+    white-space: nowrap;
+}
+.wm-route-arrow {
+    color: rgba(255,255,255,0.6);
+    font-weight: 700;
+}
 .wm-moon-icon { font-size: 1rem; }
 .wm-expand-arrow { font-size: 0.65rem; color: rgba(255,255,255,0.5); margin-left: 2px; }
 
@@ -911,3 +921,70 @@ textarea:focus-visible {
 .wm-data-badge--cache { color: #fde68a; }
 .wm-data-badge--stale { color: #fb923c; }
 .wm-data-badge--error { color: #f87171; }
+
+.wm-compare-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.wm-compare-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wm-compare-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.wm-compare-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #d1fae5;
+}
+
+.wm-compare-location {
+    font-size: 0.72rem;
+    color: #86efac;
+}
+
+.wm-compare-empty {
+    font-size: 0.78rem;
+    color: #f87171;
+}
+
+.wm-forecast-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.68rem;
+}
+
+.wm-forecast-table th,
+.wm-forecast-table td {
+    padding: 5px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    text-align: left;
+    vertical-align: top;
+}
+
+.wm-forecast-table th {
+    color: #86efac;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.wm-forecast-table td {
+    color: #f6f1e6;
+}
+
+.wm-forecast-table tbody tr:last-child td {
+    border-bottom: none;
+}
