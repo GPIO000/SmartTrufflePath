@@ -1518,6 +1518,13 @@ async function navigateToPoi(index) {
     if (poiList[index]) {
         await showGpsNavigationExplanationIfNeeded(poiList[index].note);
         targetNavigation = `poi_${index}`;
+        const marker = normalizePoiMarker(poiList[index].marker, poiList[index].type);
+        updateWeatherMoon(
+            poiList[index].lat,
+            poiList[index].lng,
+            `${marker} ${poiList[index].note || 'Punto'}`,
+            true
+        );
         map.setView([poiList[index].lat, poiList[index].lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
         closeActiveModule();
