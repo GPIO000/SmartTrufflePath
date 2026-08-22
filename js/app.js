@@ -896,6 +896,8 @@ const ACTION_HANDLERS = {
     whatsappVetClinicByIndex: (_event, index) => whatsappVetClinicByIndex(index),
     shareLocationToVetByIndex: (_event, index) => shareLocationToVetByIndex(index),
     deleteVetClinic: (_event, index) => deleteVetClinic(index),
+    navigateToVetClinicByIndex: (_event, index) => navigateToVetClinicByIndex(index),
+    editVetClinic: (_event, index) => editVetClinic(index),
     salvaNotaClienteDaInput: (_event, index) => salvaNotaClienteDaInput(index),
     addClienteInRubrica: (_event) => addClienteInRubrica(),
     editCliente: (_event, index) => editCliente(index),
@@ -2820,6 +2822,8 @@ function openModule(moduleName, editMode = false) {
                     <input type="text" id="vc-nome" class="mod-input" placeholder="Es. Clinica Centrale">
                     <label>Indirizzo:</label>
                     <input type="text" id="vc-indirizzo" class="mod-input" placeholder="Es. Via Roma 1, Campobasso">
+                    <label>Coordinate Geografiche (qualsiasi formato):</label>
+                    <input type="text" id="vc-coordinate" class="mod-input" placeholder="Es. 41.9028, 12.4964 oppure 41°54'10\"N 12°29'47\"E">
                     <label>Numero di Telefono:</label>
                     <input type="tel" id="vc-tel" class="mod-input" placeholder="Es. 0874123456">
                     <label>Numero di Cellulare:</label>
@@ -2834,10 +2838,12 @@ function openModule(moduleName, editMode = false) {
                 clinicHtml += `<h3 style="font-size:0.85rem; color:#b8b0a0; margin-bottom:8px; text-transform:uppercase;">I tuoi contatti salvati:</h3>`;
                 vetClinics.forEach((clinic, idx) => {
                     const safeClinic = sanitizeRenderable(clinic);
+                    const parsedCoords = parseCoordinates(clinic.coordinate);
                     clinicHtml += `
                         <div class="module-card" style="border-left: 4px solid #dc2626; margin-bottom: 12px;">
                             <strong style="color:#f6f1e6; font-size:1rem;">🏥 ${safeClinic.nome}</strong>
                             ${safeClinic.indirizzo ? `<p style="font-size:0.8rem; color:#b8b0a0; margin: 2px 0;">📍 ${safeClinic.indirizzo}</p>` : ''}
+                            ${safeClinic.coordinate ? `<p style="font-size:0.8rem; color:#b8b0a0; margin: 2px 0;">🌐 ${safeClinic.coordinate}</p>` : ''}
                             ${safeClinic.tel ? `<p style="font-size:0.85rem; color:#4d8a98; margin: 2px 0;">📞 ${safeClinic.tel}</p>` : ''}
                             ${safeClinic.cell ? `<p style="font-size:0.85rem; color:#4d8a98; margin: 2px 0;">📱 ${safeClinic.cell}</p>` : ''}
                             <p style="font-size:0.8rem; color:#b8b0a0; margin-bottom: 8px;">📝 ${safeClinic.note || 'Nessuna nota'}</p>
@@ -2845,6 +2851,8 @@ function openModule(moduleName, editMode = false) {
                                 <button class="overlay-btn btn-danger" style="padding:8px 12px;" ${actionAttrs('callVetClinicByIndex', [idx])}>📞 Chiama</button>
                                 ${safeClinic.cell ? `<button class="overlay-btn" style="padding:8px 12px; background:#25d366;" ${actionAttrs('whatsappVetClinicByIndex', [idx])}>💬 WhatsApp</button>` : ''}
                                 <button class="overlay-btn btn-info" style="padding:8px 12px;" ${actionAttrs('shareLocationToVetByIndex', [idx])}>📍 Invia GPS</button>
+                                ${parsedCoords ? `<button class="overlay-btn btn-success" style="padding:8px 12px;" ${actionAttrs('navigateToVetClinicByIndex', [idx])}>🧭 Vai</button>` : ''}
+                                <button class="overlay-btn" style="padding:8px 12px; background:#7c3aed;" ${actionAttrs('editVetClinic', [idx])}>✏️ Modifica</button>
                                 <button class="overlay-btn btn-neutral" style="padding:8px 12px;" ${actionAttrs('deleteVetClinic', [idx])}>🗑️ Elimina</button>
                             </div>
                         </div>`;
@@ -4975,12 +4983,14 @@ function centerOnUser() {
 function saveVetClinic() {
     const nome = document.getElementById('vc-nome').value.trim();
     const indirizzo = document.getElementById('vc-indirizzo').value.trim();
+    const coordinate = document.getElementById('vc-coordinate').value.trim();
     const tel = document.getElementById('vc-tel').value.trim();
     const cell = document.getElementById('vc-cell').value.trim();
     const note = document.getElementById('vc-note').value.trim();
     if (!nome || (!tel && !cell)) { showToast("Inserisci nome e almeno un numero.", 'error'); return; }
+    if (coordinate && !parseCoordinates(coordinate)) { showToast("Formato coordinate non riconosciuto. Usa es. 41.9028, 12.4964", 'error'); return; }
     let vetClinics = readStorageJSON('vet_clinics_list', []);
-    vetClinics.push({ nome, indirizzo, tel, cell, note });
+    vetClinics.push({ nome, indirizzo, coordinate, tel, cell, note });
     localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
     showToast("Clinica salvata!", 'success'); openModule('vet-emergency');
 }
@@ -5039,6 +5049,154 @@ function whatsappVetClinicByIndex(index) {
     if (!clinic || !clinic.cell) { showToast("Nessun numero di cellulare disponibile.", 'error'); return; }
     window.location.href = `whatsapp://send?phone=${encodeURIComponent(sanitizePhoneHref(clinic.cell))}`;
 }
+
+function parseCoordinates(str) {
+    if (!str || typeof str !== 'string') return null;
+    const s = str.trim();
+
+    // Decimal degrees: "41.9028, 12.4964" or "41.9028 12.4964"
+    const decimalMatch = s.match(/^(-?\d{1,3}(?:\.\d+)?)[,\s]+(-?\d{1,3}(?:\.\d+)?)$/);
+    if (decimalMatch) {
+        const lat = parseFloat(decimalMatch[1]);
+        const lng = parseFloat(decimalMatch[2]);
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
+    }
+
+    // DD with N/S/E/W: "41.9028N, 12.4964E" or "41.9028 N 12.4964 E"
+    const ddNSEWMatch = s.match(/(\d{1,3}(?:\.\d+)?)\s*([NS])[,\s]+(\d{1,3}(?:\.\d+)?)\s*([EW])/i);
+    if (ddNSEWMatch) {
+        let lat = parseFloat(ddNSEWMatch[1]);
+        let lng = parseFloat(ddNSEWMatch[3]);
+        if (ddNSEWMatch[2].toUpperCase() === 'S') lat = -lat;
+        if (ddNSEWMatch[4].toUpperCase() === 'W') lng = -lng;
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
+    }
+
+    // DMS: "41°54'10.1"N 12°29'47.0"E" or "41°54'10"N, 12°29'47"E"
+    const dmsMatch = s.match(/(\d{1,3})[°\s]\s*(\d{1,2})['′\s]\s*(\d{1,2}(?:\.\d+)?)[""″\s]*([NS])[,\s]+(\d{1,3})[°\s]\s*(\d{1,2})['′\s]\s*(\d{1,2}(?:\.\d+)?)[""″\s]*([EW])/i);
+    if (dmsMatch) {
+        let lat = parseFloat(dmsMatch[1]) + parseFloat(dmsMatch[2]) / 60 + parseFloat(dmsMatch[3]) / 3600;
+        let lng = parseFloat(dmsMatch[5]) + parseFloat(dmsMatch[6]) / 60 + parseFloat(dmsMatch[7]) / 3600;
+        if (dmsMatch[4].toUpperCase() === 'S') lat = -lat;
+        if (dmsMatch[8].toUpperCase() === 'W') lng = -lng;
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
+    }
+
+    return null;
+}
+
+function appChooseTwoOptions(message, okLabel, altLabel) {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('app-dialog');
+        const msg = document.getElementById('app-dialog-message');
+        const inputField = document.getElementById('app-dialog-input');
+        const cancelBtn = document.getElementById('app-dialog-cancel');
+        const altBtn = document.getElementById('app-dialog-alt');
+        const okBtn = document.getElementById('app-dialog-ok');
+        if (!dialog) { resolve(null); return; }
+        msg.textContent = message;
+        inputField.style.display = 'none';
+        cancelBtn.style.display = '';
+        cancelBtn.textContent = 'Annulla';
+        altBtn.style.display = '';
+        altBtn.textContent = altLabel;
+        okBtn.textContent = okLabel;
+        const cleanup = () => {
+            dialog.close();
+            okBtn.removeEventListener('click', onOk);
+            altBtn.removeEventListener('click', onAlt);
+            cancelBtn.removeEventListener('click', onCancel);
+            altBtn.style.display = 'none';
+        };
+        const onOk = () => { cleanup(); resolve('ok'); };
+        const onAlt = () => { cleanup(); resolve('alt'); };
+        const onCancel = () => { cleanup(); resolve(null); };
+        okBtn.addEventListener('click', onOk);
+        altBtn.addEventListener('click', onAlt);
+        cancelBtn.addEventListener('click', onCancel);
+        dialog.showModal();
+    });
+}
+
+function appChooseExternalMapsMethod(message) {
+    return appChooseTwoOptions(message, '🗺️ Google Maps', '🍎 Apple Maps').then((result) => {
+        if (result === 'ok') return 'google';
+        if (result === 'alt') return 'apple';
+        return null;
+    });
+}
+
+function appChooseVetNavigationMethod(message) {
+    return appChooseTwoOptions(message, '🧭 App', '🗺️ Mappe Esterne').then((result) => {
+        if (result === 'ok') return 'app';
+        if (result === 'alt') return 'external';
+        return null;
+    });
+}
+
+async function navigateToVetClinicByIndex(index) {
+    const vetClinics = readStorageJSON('vet_clinics_list', []);
+    const clinic = vetClinics[index];
+    if (!clinic) return;
+    const coords = parseCoordinates(clinic.coordinate);
+    if (!coords) { showToast("Coordinate non disponibili o non valide.", 'error'); return; }
+
+    const method = await appChooseVetNavigationMethod(`Dove vuoi navigare verso ${clinic.nome}?`);
+    if (!method) return;
+
+    if (method === 'app') {
+        closeActiveModule();
+        map.setView([coords.lat, coords.lng], getAdaptiveFocusZoom(16));
+        showToast(`🧭 Mappa centrata su ${clinic.nome}`, 'success');
+    } else {
+        const mapsApp = await appChooseExternalMapsMethod('Quale app di mappe vuoi usare?');
+        if (!mapsApp) return;
+        if (mapsApp === 'google') {
+            window.open(`https://maps.google.com/?q=${encodeURIComponent(`${coords.lat},${coords.lng}`)}`, '_blank');
+        } else if (mapsApp === 'apple') {
+            window.open(`https://maps.apple.com/?ll=${encodeURIComponent(`${coords.lat},${coords.lng}`)}&q=${encodeURIComponent(clinic.nome || 'Clinica Veterinaria')}`, '_blank');
+        }
+    }
+}
+
+async function editVetClinic(index) {
+    const vetClinics = readStorageJSON('vet_clinics_list', []);
+    const clinic = vetClinics[index];
+    if (!clinic) return;
+
+    const nomeInput = await appPrompt("Modifica nome clinica:", clinic.nome || '');
+    if (nomeInput === null) return;
+    if (!nomeInput.trim()) { showToast("Il nome è obbligatorio.", 'error'); return; }
+
+    const indirizzoInput = await appPrompt("Modifica indirizzo:", clinic.indirizzo || '');
+    if (indirizzoInput === null) return;
+    const coordinateInput = await appPrompt("Modifica coordinate (qualsiasi formato):", clinic.coordinate || '');
+    if (coordinateInput === null) return;
+    if (coordinateInput.trim() && !parseCoordinates(coordinateInput.trim())) {
+        showToast("Formato coordinate non riconosciuto. Usa es. 41.9028, 12.4964", 'error'); return;
+    }
+    const telInput = await appPrompt("Modifica telefono fisso:", clinic.tel || '');
+    if (telInput === null) return;
+    const cellInput = await appPrompt("Modifica cellulare:", clinic.cell || '');
+    if (cellInput === null) return;
+    if (!telInput.trim() && !cellInput.trim()) { showToast("Inserisci almeno un numero di telefono.", 'error'); return; }
+
+    const noteInput = await appPrompt("Modifica note:", clinic.note || '');
+    if (noteInput === null) return;
+
+    vetClinics[index] = {
+        nome: nomeInput.trim(),
+        indirizzo: indirizzoInput.trim(),
+        coordinate: coordinateInput.trim(),
+        tel: telInput.trim(),
+        cell: cellInput.trim(),
+        note: noteInput.trim(),
+    };
+    localStorage.setItem('vet_clinics_list', JSON.stringify(vetClinics));
+    showToast("Clinica aggiornata!", 'success');
+    openModule('vet-emergency');
+}
+
 
 function syncVetUnifiedInputForm() {
     const modeSelect = document.getElementById('vet-entry-category');
