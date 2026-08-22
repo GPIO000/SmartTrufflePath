@@ -11,9 +11,17 @@ function makeWidgets() {
     current.id = CURRENT_WIDGET_ID;
     document.body.appendChild(current);
 
+    const currentPanel = document.createElement('div');
+    currentPanel.id = CURRENT_WIDGET_ID + '-panel';
+    document.body.appendChild(currentPanel);
+
     const destination = document.createElement('div');
     destination.id = DESTINATION_WIDGET_ID;
     document.body.appendChild(destination);
+
+    const destinationPanel = document.createElement('div');
+    destinationPanel.id = DESTINATION_WIDGET_ID + '-panel';
+    document.body.appendChild(destinationPanel);
 
     return { current, destination };
 }
@@ -180,9 +188,11 @@ describe('updateWeatherMoonComparison', () => {
         widget.querySelector('.wm-compact').click();
         destinationWidget.querySelector('.wm-compact').click();
 
-        expect(widget.innerHTML).toContain('wm-days-list');
-        expect(destinationWidget.innerHTML).toContain('wm-days-list');
-        expect(destinationWidget.innerHTML).toContain('📍 Bosco Nord');
+        const widgetPanel = document.getElementById(CURRENT_WIDGET_ID + '-panel');
+        const destPanel = document.getElementById(DESTINATION_WIDGET_ID + '-panel');
+        expect(widgetPanel.innerHTML).toContain('wm-days-list');
+        expect(destPanel.innerHTML).toContain('wm-days-list');
+        expect(destPanel.innerHTML).toContain('📍 Bosco Nord');
     });
 });
 
@@ -196,7 +206,8 @@ describe('updateWeatherMoon — fetch fallito', () => {
         expect(widget.style.display).toBe('block');
         expect(widget.innerHTML).toContain('wm-data-badge--error');
         expect(widget.innerHTML).toContain('Meteo n.d.');
-        expect(widget.innerHTML).toContain('Rete non disponibile');
+        const widgetPanel = document.getElementById(CURRENT_WIDGET_ID + '-panel');
+        expect(widgetPanel.innerHTML).toContain('Rete non disponibile');
     });
 
     it('mostra un messaggio specifico per errore HTTP', async () => {
@@ -209,8 +220,9 @@ describe('updateWeatherMoon — fetch fallito', () => {
         await updateWeatherMoon(44.0, 11.0, 'Bosco Nord', true);
 
         expect(widget.innerHTML).toContain('Meteo n.d.');
-        expect(widget.innerHTML).toContain('Errore API 400');
-        expect(widget.innerHTML).toContain('Bosco Nord');
+        const widgetPanel = document.getElementById(CURRENT_WIDGET_ID + '-panel');
+        expect(widgetPanel.innerHTML).toContain('Errore API 400');
+        expect(widgetPanel.innerHTML).toContain('Bosco Nord');
     });
 });
 
@@ -338,7 +350,8 @@ describe('updateWeatherMoon — campi opzionali e concorrenza', () => {
         expect(widget.innerHTML).toContain('Seconda posizione');
         expect(widget.innerHTML).toContain('wm-data-badge--stale');
         expect(widget.innerHTML).toContain('Dati precedenti');
-        expect(widget.innerHTML).toContain('Rete non disponibile');
+        const widgetPanel = document.getElementById(CURRENT_WIDGET_ID + '-panel');
+        expect(widgetPanel.innerHTML).toContain('Rete non disponibile');
     });
 });
 
@@ -482,9 +495,10 @@ describe('updateWeatherMoon — pannello espandibile', () => {
 
         widget.querySelector('.wm-compact').click();
 
-        expect(widget.querySelector('.wm-panel')).not.toBeNull();
-        expect(widget.innerHTML).toContain('wm-days-list');
-        expect(widget.innerHTML).toContain('wm-moon-row');
+        const widgetPanel = document.getElementById(CURRENT_WIDGET_ID + '-panel');
+        expect(widgetPanel.querySelector('.wm-panel')).not.toBeNull();
+        expect(widgetPanel.innerHTML).toContain('wm-days-list');
+        expect(widgetPanel.innerHTML).toContain('wm-moon-row');
     });
 
     it('doppio click chiude il pannello espanso', async () => {
