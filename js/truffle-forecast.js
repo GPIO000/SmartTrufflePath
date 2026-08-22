@@ -25,7 +25,7 @@ const AREA_PROFILES = [
         description: 'Trattiene più umidità e soffre meno la siccità breve.',
         rainAdjustment: -6,
         soilMoistureAdjustment: 0.03,
-        windPenaltyBoost: -0.05,
+        windPenaltyBoost: -2,
         temperatureShift: -1
     },
     {
@@ -34,7 +34,7 @@ const AREA_PROFILES = [
         description: 'Asciuga più rapidamente e patisce il vento.',
         rainAdjustment: 8,
         soilMoistureAdjustment: -0.02,
-        windPenaltyBoost: 0.12,
+        windPenaltyBoost: 4,
         temperatureShift: 1
     },
     {
@@ -719,7 +719,7 @@ export function buildTruffleForecastCalendar({
             7
         );
         const stabilityScore = scoreCeiling(swing7, 11, 20);
-        const windScore = scoreCeiling(maxWind5, speciesProfile.maxWind + area.windPenaltyBoost * 10, 48);
+        const windScore = scoreCeiling(maxWind5, speciesProfile.maxWind + area.windPenaltyBoost, 48);
         const dryPenaltyScore = clamp(1 - Math.max(0, dryDays - speciesProfile.maxDryDays) / 5, 0, 1);
         const moonAdjustment = getMoonAdjustment(moon.name, speciesProfile.moonBoostPhases);
         const historySignal = summarizeHistorySignals({
