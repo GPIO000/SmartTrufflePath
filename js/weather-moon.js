@@ -8,6 +8,10 @@
  *   import { updateWeatherMoon } from './weather-moon.js';
  *   updateWeatherMoon(lat, lng);                  // posizione GPS / POI
  *   updateWeatherMoon(lat, lng, 'Nome Luogo');    // con etichetta opzionale
+ *   updateWeatherMoonComparison(                  // confronto posizione/destinazione
+ *     { lat, lng, label: 'Sei qui' },
+ *     { lat, lng, label: 'Destinazione' }
+ *   );
  */
 
 // ── Costanti ──────────────────────────────────────────────────────────────────
@@ -53,7 +57,8 @@ const GIORNI_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 
 let _lastFetchLat  = null;
 let _lastFetchLng  = null;
-let _expanded      = false;
+let _singleExpanded = false;
+let _comparisonExpanded = false;
 
 // ── Calcolo fase lunare (astronomia di base, no API) ──────────────────────────
 
@@ -262,18 +267,18 @@ function renderWidget(data, label, status = null, dataSource = 'live') {
     // ── Compact bar ──────────────────────────────────────────────────────────
     const compactLabel = label ? `<span class="wm-location-label">${_esc(label)}</span>` : '';
     const compact = `
-        <div id="wm-compact" role="button" aria-expanded="${_expanded}" tabindex="0" aria-label="Meteo e luna — tocca per dettagli">
+        <div id="wm-compact" role="button" aria-expanded="${_singleExpanded ? 'true' : 'false'}" tabindex="0" aria-label="Meteo e luna — tocca per dettagli">
             ${compactLabel}
             <span class="wm-cur-icon">${curInfo.icon}</span>
             <span class="wm-cur-temp">${Math.round(cur.temperature_2m)}°</span>
             <span class="wm-moon-icon">${moon.icon}</span>
             <span class="wm-data-badge wm-data-badge--${_esc(dataSource)}">${srcLbl.badge}</span>
-            <span class="wm-expand-arrow">${_expanded ? '▲' : '▼'}</span>
+            <span class="wm-expand-arrow">${_singleExpanded ? '▲' : '▼'}</span>
         </div>`;
 
     // ── Expanded panel ───────────────────────────────────────────────────────
     let expandedHtml = '';
-    if (_expanded) {
+    if (_singleExpanded) {
         // Previsioni 4 giorni
         const today   = new Date();
         let daysHtml  = '';
@@ -333,7 +338,129 @@ function renderWidget(data, label, status = null, dataSource = 'live') {
     // Event: toggle expanded
     const compactEl = document.getElementById('wm-compact');
     if (compactEl) {
-        const toggle = () => { _expanded = !_expanded; renderWidget(data, label, status, dataSource); };
+        const toggle = () => { _singleExpanded = !_singleExpanded; renderWidget(data, label, status, dataSource); };
+        compactEl.addEventListener('click', toggle);
+        compactEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    }
+}
+
+function buildForecastTableRows(daily) {
+    const today = new Date();
+    let rowsHtml = '';
+    for (let i = 0; i < 4; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const dayLabel = i === 0 ? 'Oggi' : i === 1 ? 'Domani' : GIORNI_IT[d.getDay()];
+        const info = wmoInfo(daily.weather_code?.[i]);
+        const tMax = Math.round(daily.temperature_2m_max?.[i] ?? 0);
+        const tMin = Math.round(daily.temperature_2m_min?.[i] ?? 0);
+        const precip = (daily.precipitation_sum?.[i] ?? 0).toFixed(1);
+        const wind = Math.round(daily.wind_speed_10m_max?.[i] ?? 0);
+        rowsHtml += `
+            <tr>
+                <td>${dayLabel}</td>
+                <td>${info.icon} ${info.label}</td>
+                <td>${tMax}° / ${tMin}°</td>
+                <td>${precip} mm</td>
+                <td>${wind} km/h</td>
+            </tr>`;
+    }
+    return rowsHtml;
+}
+
+function renderComparisonCard(location, title) {
+    const srcLbl = dataSourceLabel(location.dataSource, location.status);
+    const labelHtml = location.label ? `<div class="wm-compare-location">${_esc(location.label)}</div>` : '';
+
+    if (!location.data) {
+        return `
+            <section class="wm-compare-card">
+                <div class="wm-compare-card-header">
+                    <span class="wm-compare-title">${_esc(title)}</span>
+                    <span class="wm-data-badge wm-data-badge--error">${srcLbl.badge}</span>
+                </div>
+                ${labelHtml}
+                <div class="wm-compare-empty">❌ Meteo non disponibile</div>
+                <div class="wm-source-label wm-source-label--error">${srcLbl.detail}</div>
+            </section>`;
+    }
+
+    const cur = location.data.current;
+    const daily = location.data.daily;
+    const curInfo = wmoInfo(cur.weather_code);
+    const curHumidity = cur.relative_humidity_2m != null
+        ? `<span class="wm-cur-pill">💧${cur.relative_humidity_2m}%</span>` : '';
+    const curWind = cur.wind_speed_10m != null
+        ? `<span class="wm-cur-pill">💨${Math.round(cur.wind_speed_10m)}km/h</span>` : '';
+
+    return `
+        <section class="wm-compare-card">
+            <div class="wm-compare-card-header">
+                <span class="wm-compare-title">${_esc(title)}</span>
+                <span class="wm-data-badge wm-data-badge--${_esc(location.dataSource)}">${srcLbl.badge}</span>
+            </div>
+            ${labelHtml}
+            <div class="wm-cur-row">
+                <span class="wm-cur-big">${curInfo.icon} ${curInfo.label} · ${Math.round(cur.temperature_2m)}°</span>
+                ${curHumidity}${curWind}
+            </div>
+            <table class="wm-forecast-table" aria-label="${_esc(title)}">
+                <thead>
+                    <tr>
+                        <th>Giorno</th>
+                        <th>Tempo</th>
+                        <th>Temp</th>
+                        <th>Pioggia</th>
+                        <th>Vento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${buildForecastTableRows(daily)}
+                </tbody>
+            </table>
+            <div class="wm-source-label wm-source-label--${_esc(location.dataSource)}">${srcLbl.detail}</div>
+        </section>`;
+}
+
+function renderComparisonWidget(currentLocation, destinationLocation) {
+    const widget = document.getElementById(WIDGET_ID);
+    if (!widget) return;
+
+    const moon = calcMoonPhase();
+    const currentTemp = currentLocation.data?.current?.temperature_2m;
+    const destinationTemp = destinationLocation.data?.current?.temperature_2m;
+    const compact = `
+        <div id="wm-compact" role="button" aria-expanded="${_comparisonExpanded ? 'true' : 'false'}" tabindex="0" aria-label="Confronto meteo percorso — tocca per dettagli">
+            <span class="wm-location-label">${_esc(currentLocation.label || 'Sei qui')}</span>
+            <span class="wm-compare-temp">${Number.isFinite(currentTemp) ? `${Math.round(currentTemp)}°` : 'n.d.'}</span>
+            <span class="wm-route-arrow">→</span>
+            <span class="wm-location-label">${_esc(destinationLocation.label || 'Destinazione')}</span>
+            <span class="wm-compare-temp">${Number.isFinite(destinationTemp) ? `${Math.round(destinationTemp)}°` : 'n.d.'}</span>
+            <span class="wm-moon-icon">${moon.icon}</span>
+            <span class="wm-expand-arrow">${_comparisonExpanded ? '▲' : '▼'}</span>
+        </div>`;
+
+    let expandedHtml = '';
+    if (_comparisonExpanded) {
+        expandedHtml = `
+            <div id="wm-panel" role="region" aria-label="Confronto meteo percorso">
+                <div class="wm-compare-grid">
+                    ${renderComparisonCard(currentLocation, 'Posizione attuale')}
+                    ${renderComparisonCard(destinationLocation, 'Destinazione')}
+                </div>
+                <div class="wm-moon-row">
+                    <span>${moon.icon} ${moon.name}</span>
+                    <span class="wm-moon-pct">${moon.illumination}% illuminata</span>
+                </div>
+            </div>`;
+    }
+
+    widget.innerHTML = compact + expandedHtml;
+    widget.style.display = 'block';
+
+    const compactEl = document.getElementById('wm-compact');
+    if (compactEl) {
+        const toggle = () => { _comparisonExpanded = !_comparisonExpanded; renderComparisonWidget(currentLocation, destinationLocation); };
         compactEl.addEventListener('click', toggle);
         compactEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
     }
@@ -374,6 +501,8 @@ let _lastData       = null;
 let _lastLabel      = null;
 let _lastStatus     = null;
 let _lastDataSource = null;
+let _lastRenderMode = 'single';
+let _lastComparisonState = null;
 let _requestSeq     = 0;
 const _inFlightFetches = new Map();
 
@@ -391,6 +520,42 @@ function getWeatherFetch(lat, lng) {
         _inFlightFetches.set(key, promise);
     }
     return promise;
+}
+
+async function resolveWeatherState(lat, lng, fallbackState = null) {
+    const cached = loadCache(lat, lng);
+    if (cached) {
+        return {
+            data: cached,
+            status: null,
+            dataSource: 'cache',
+        };
+    }
+
+    try {
+        const data = await getWeatherFetch(lat, lng);
+        saveCache(lat, lng, data);
+        return {
+            data,
+            status: null,
+            dataSource: 'live',
+        };
+    } catch (err) {
+        const errorStatus = describeWeatherError(err);
+        console.warn('[WeatherMoon] Fetch fallito:', errorStatus.logMessage);
+        if (fallbackState?.data) {
+            return {
+                data: fallbackState.data,
+                status: errorStatus,
+                dataSource: 'stale',
+            };
+        }
+        return {
+            data: null,
+            status: errorStatus,
+            dataSource: 'error',
+        };
+    }
 }
 
 /**
@@ -424,6 +589,8 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
         _lastLabel      = label;
         _lastStatus     = null;
         _lastDataSource = 'cache';
+        _lastRenderMode = 'single';
+        _lastComparisonState = null;
         renderWidget(cached, label, null, 'cache');
         return;
     }
@@ -437,6 +604,8 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
         _lastLabel      = label;
         _lastStatus     = null;
         _lastDataSource = 'live';
+        _lastRenderMode = 'single';
+        _lastComparisonState = null;
         saveCache(lat, lng, data);
         renderWidget(data, label, null, 'live');
     } catch (err) {
@@ -447,13 +616,51 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
         if (_lastData) {
             _lastStatus     = errorStatus;
             _lastDataSource = 'stale';
+            _lastRenderMode = 'single';
+            _lastComparisonState = null;
             renderWidget(_lastData, label, errorStatus, 'stale'); // mostra dati vecchi
         } else {
             _lastStatus     = errorStatus;
             _lastDataSource = 'error';
+            _lastRenderMode = 'single';
+            _lastComparisonState = null;
             renderError(errorStatus, label);
         }
     }
+}
+
+export async function updateWeatherMoonComparison(currentLocation, destinationLocation) {
+    const currentLat = Number(currentLocation?.lat);
+    const currentLng = Number(currentLocation?.lng);
+    const destinationLat = Number(destinationLocation?.lat);
+    const destinationLng = Number(destinationLocation?.lng);
+    if (!Number.isFinite(currentLat) || !Number.isFinite(currentLng)) return;
+    if (!Number.isFinite(destinationLat) || !Number.isFinite(destinationLng)) return;
+
+    const requestSeq = ++_requestSeq;
+    const previousState = _lastComparisonState;
+    const [currentState, destinationState] = await Promise.all([
+        resolveWeatherState(currentLat, currentLng, previousState?.current ?? null),
+        resolveWeatherState(destinationLat, destinationLng, previousState?.destination ?? null),
+    ]);
+    if (requestSeq !== _requestSeq) return;
+
+    _lastRenderMode = 'comparison';
+    _lastComparisonState = {
+        current: {
+            ...currentState,
+            label: typeof currentLocation?.label === 'string' && currentLocation.label.trim()
+                ? currentLocation.label.trim()
+                : 'Sei qui',
+        },
+        destination: {
+            ...destinationState,
+            label: typeof destinationLocation?.label === 'string' && destinationLocation.label.trim()
+                ? destinationLocation.label.trim()
+                : 'Destinazione',
+        }
+    };
+    renderComparisonWidget(_lastComparisonState.current, _lastComparisonState.destination);
 }
 
 /**
@@ -461,5 +668,9 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
  * Non fa chiamate di rete.
  */
 export function refreshMoonOnly() {
+    if (_lastRenderMode === 'comparison' && _lastComparisonState) {
+        renderComparisonWidget(_lastComparisonState.current, _lastComparisonState.destination);
+        return;
+    }
     if (_lastData) renderWidget(_lastData, _lastLabel, _lastStatus, _lastDataSource ?? 'live');
 }

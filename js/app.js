@@ -1,5 +1,5 @@
 import * as TruffleStorage from './storage-sync.js';
-import { updateWeatherMoon, calcMoonPhase } from './weather-moon.js';
+import { updateWeatherMoon, updateWeatherMoonComparison, calcMoonPhase } from './weather-moon.js';
 import {
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
@@ -68,6 +68,37 @@ async function forceAppServiceWorkerUpdateCheck() {
         console.warn('Service Worker update check failed:', error);
         return null;
     }
+}
+
+function getActiveNavigationWeatherTarget() {
+    if (typeof targetNavigation === 'string' && targetNavigation.startsWith('poi_')) {
+        const index = Number.parseInt(targetNavigation.split('_')[1], 10);
+        const poi = poiList[index];
+        if (poi) {
+            const marker = normalizePoiMarker(poi.marker, poi.type);
+            return {
+                lat: poi.lat,
+                lng: poi.lng,
+                label: `${marker} ${poi.note || 'Punto'}`
+            };
+        }
+    }
+
+    if (targetNavigation && typeof targetNavigation === 'object') {
+        const lat = Number(targetNavigation.lat);
+        const lng = Number(targetNavigation.lng);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            return {
+                lat,
+                lng,
+                label: typeof targetNavigation.label === 'string' && targetNavigation.label.trim()
+                    ? targetNavigation.label.trim()
+                    : 'Destinazione'
+            };
+        }
+    }
+
+    return null;
 }
 
 async function registerAppServiceWorker() {
@@ -1381,7 +1412,15 @@ if (navigator.geolocation) {
             renderAllPoiMarkers();
         } else { userMarker.setLatLng([lat, lng]); }
         updateCompass(lat, lng);
-        updateWeatherMoon(lat, lng);
+        const activeWeatherTarget = getActiveNavigationWeatherTarget();
+        if (activeWeatherTarget) {
+            updateWeatherMoonComparison(
+                { lat, lng, label: 'Sei qui' },
+                activeWeatherTarget
+            );
+        } else {
+            updateWeatherMoon(lat, lng);
+        }
     }, (error) => {
         console.warn("Errore GPS: " + error.message);
         const dot = document.getElementById('gps-status-dot');
@@ -1520,12 +1559,24 @@ async function navigateToPoi(index) {
         await showGpsNavigationExplanationIfNeeded(poiList[index].note);
         targetNavigation = `poi_${index}`;
         const marker = normalizePoiMarker(poiList[index].marker, poiList[index].type);
-        updateWeatherMoon(
-            poiList[index].lat,
-            poiList[index].lng,
-            `${marker} ${poiList[index].note || 'Punto'}`,
-            true
-        );
+        if (userMarker) {
+            const currentPosition = userMarker.getLatLng();
+            updateWeatherMoonComparison(
+                { lat: currentPosition.lat, lng: currentPosition.lng, label: 'Sei qui' },
+                {
+                    lat: poiList[index].lat,
+                    lng: poiList[index].lng,
+                    label: `${marker} ${poiList[index].note || 'Punto'}`
+                }
+            );
+        } else {
+            updateWeatherMoon(
+                poiList[index].lat,
+                poiList[index].lng,
+                `${marker} ${poiList[index].note || 'Punto'}`,
+                true
+            );
+        }
         map.setView([poiList[index].lat, poiList[index].lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[index]) poiMapMarkers[index].openPopup();
         closeActiveModule();
@@ -1538,6 +1589,10 @@ function stopNavigation() {
     if (compassText) compassText.innerHTML = `🧭 Seleziona una destinazione dall'elenco punti`;
     const stopBtn = document.getElementById('stop-nav-btn');
     if (stopBtn) stopBtn.style.display = 'none';
+    if (userMarker) {
+        const currentPosition = userMarker.getLatLng();
+        updateWeatherMoon(currentPosition.lat, currentPosition.lng);
+    }
     showToast('🧭 Navigazione annullata', 'info');
 }
 function sharePoi(index) {
@@ -5219,6 +5274,10 @@ async function navigateToVetClinicByIndex(index) {
         if (userMarker) {
             const currentPosition = userMarker.getLatLng();
             updateCompass(currentPosition.lat, currentPosition.lng);
+            updateWeatherMoonComparison(
+                { lat: currentPosition.lat, lng: currentPosition.lng, label: 'Sei qui' },
+                { lat: coords.lat, lng: coords.lng, label: `🏥 ${clinicName}` }
+            );
         }
         showToast(`🧭 Destinazione: ${clinicName}`, 'success');
     } else {
