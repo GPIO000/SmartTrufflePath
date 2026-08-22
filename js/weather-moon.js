@@ -57,7 +57,8 @@ const GIORNI_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 
 let _lastFetchLat  = null;
 let _lastFetchLng  = null;
-let _expanded      = false;
+let _singleExpanded = false;
+let _comparisonExpanded = false;
 
 // ── Calcolo fase lunare (astronomia di base, no API) ──────────────────────────
 
@@ -266,18 +267,18 @@ function renderWidget(data, label, status = null, dataSource = 'live') {
     // ── Compact bar ──────────────────────────────────────────────────────────
     const compactLabel = label ? `<span class="wm-location-label">${_esc(label)}</span>` : '';
     const compact = `
-        <div id="wm-compact" role="button" aria-expanded="${_expanded}" tabindex="0" aria-label="Meteo e luna — tocca per dettagli">
+        <div id="wm-compact" role="button" aria-expanded="${_singleExpanded ? 'true' : 'false'}" tabindex="0" aria-label="Meteo e luna — tocca per dettagli">
             ${compactLabel}
             <span class="wm-cur-icon">${curInfo.icon}</span>
             <span class="wm-cur-temp">${Math.round(cur.temperature_2m)}°</span>
             <span class="wm-moon-icon">${moon.icon}</span>
             <span class="wm-data-badge wm-data-badge--${_esc(dataSource)}">${srcLbl.badge}</span>
-            <span class="wm-expand-arrow">${_expanded ? '▲' : '▼'}</span>
+            <span class="wm-expand-arrow">${_singleExpanded ? '▲' : '▼'}</span>
         </div>`;
 
     // ── Expanded panel ───────────────────────────────────────────────────────
     let expandedHtml = '';
-    if (_expanded) {
+    if (_singleExpanded) {
         // Previsioni 4 giorni
         const today   = new Date();
         let daysHtml  = '';
@@ -337,7 +338,7 @@ function renderWidget(data, label, status = null, dataSource = 'live') {
     // Event: toggle expanded
     const compactEl = document.getElementById('wm-compact');
     if (compactEl) {
-        const toggle = () => { _expanded = !_expanded; renderWidget(data, label, status, dataSource); };
+        const toggle = () => { _singleExpanded = !_singleExpanded; renderWidget(data, label, status, dataSource); };
         compactEl.addEventListener('click', toggle);
         compactEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
     }
@@ -369,7 +370,7 @@ function buildForecastTableRows(daily) {
 
 function renderComparisonCard(location, title) {
     const srcLbl = dataSourceLabel(location.dataSource, location.status);
-    const labelHtml = location.label ? `<div class="wm-compare-location">📍 ${_esc(location.label)}</div>` : '';
+    const labelHtml = location.label ? `<div class="wm-compare-location">${_esc(location.label)}</div>` : '';
 
     if (!location.data) {
         return `
@@ -429,18 +430,18 @@ function renderComparisonWidget(currentLocation, destinationLocation) {
     const currentTemp = currentLocation.data?.current?.temperature_2m;
     const destinationTemp = destinationLocation.data?.current?.temperature_2m;
     const compact = `
-        <div id="wm-compact" role="button" aria-expanded="${_expanded}" tabindex="0" aria-label="Confronto meteo percorso — tocca per dettagli">
-            <span class="wm-location-label">📍 ${_esc(currentLocation.label || 'Sei qui')}</span>
+        <div id="wm-compact" role="button" aria-expanded="${_comparisonExpanded ? 'true' : 'false'}" tabindex="0" aria-label="Confronto meteo percorso — tocca per dettagli">
+            <span class="wm-location-label">${_esc(currentLocation.label || 'Sei qui')}</span>
             <span class="wm-compare-temp">${Number.isFinite(currentTemp) ? `${Math.round(currentTemp)}°` : 'n.d.'}</span>
             <span class="wm-route-arrow">→</span>
-            <span class="wm-location-label">🎯 ${_esc(destinationLocation.label || 'Destinazione')}</span>
+            <span class="wm-location-label">${_esc(destinationLocation.label || 'Destinazione')}</span>
             <span class="wm-compare-temp">${Number.isFinite(destinationTemp) ? `${Math.round(destinationTemp)}°` : 'n.d.'}</span>
             <span class="wm-moon-icon">${moon.icon}</span>
-            <span class="wm-expand-arrow">${_expanded ? '▲' : '▼'}</span>
+            <span class="wm-expand-arrow">${_comparisonExpanded ? '▲' : '▼'}</span>
         </div>`;
 
     let expandedHtml = '';
-    if (_expanded) {
+    if (_comparisonExpanded) {
         expandedHtml = `
             <div id="wm-panel" role="region" aria-label="Confronto meteo percorso">
                 <div class="wm-compare-grid">
@@ -459,7 +460,7 @@ function renderComparisonWidget(currentLocation, destinationLocation) {
 
     const compactEl = document.getElementById('wm-compact');
     if (compactEl) {
-        const toggle = () => { _expanded = !_expanded; renderComparisonWidget(currentLocation, destinationLocation); };
+        const toggle = () => { _comparisonExpanded = !_comparisonExpanded; renderComparisonWidget(currentLocation, destinationLocation); };
         compactEl.addEventListener('click', toggle);
         compactEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
     }
