@@ -37,6 +37,18 @@ export function formatPoiDisplayDate(savedAtIso) {
     return parsed.toLocaleDateString() + ' ' + parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+export function normalizePoiAltitude(altitude) {
+    const numericAltitude = Number(altitude);
+    if (!Number.isFinite(numericAltitude)) return undefined;
+    return numericAltitude;
+}
+
+export function formatPoiAltitude(altitude) {
+    const normalizedAltitude = normalizePoiAltitude(altitude);
+    if (!Number.isFinite(normalizedAltitude)) return '';
+    return `Quota: ${Math.round(normalizedAltitude)} m`;
+}
+
 export function getDefaultMarkerForPoiType(type) {
     if (type === 'auto') return '🚗';
     if (type === 'sos') return '🆘';
@@ -124,9 +136,11 @@ export function normalizePoiList(rawPoiList) {
             const type = typeof poi.type === 'string' && poi.type.trim() ? poi.type.trim() : undefined;
             const from = typeof poi.from === 'string' && poi.from.trim() ? poi.from.trim() : undefined;
             const marker = normalizePoiMarker(poi.marker, type);
+            const altitude = normalizePoiAltitude(poi.altitude);
             const entry = { id, lat, lng, note, savedAt, date: formatPoiDisplayDate(savedAt), marker };
             if (type) entry.type = type;
             if (from) entry.from = from;
+            if (Number.isFinite(altitude)) entry.altitude = altitude;
             return entry;
         })
         .filter(Boolean);

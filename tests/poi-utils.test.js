@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     buildAppleMapsUrl,
     buildEmergencyLocationMessage,
+    formatPoiAltitude,
     buildGoogleMapsUrl,
     buildMapsLinksText,
     buildSharedPoiMessage,
@@ -16,6 +17,7 @@ import {
     getDefaultMarkerForPoiType,
     hasMapLongPressExceededTolerance,
     isDuplicateMapLongPress,
+    normalizePoiAltitude,
     normalizePoiList,
     normalizePoiMarker,
     parseLegacyDateToTimestamp,
@@ -599,6 +601,22 @@ describe('normalizePoiList', () => {
         expect(result[0].marker).toBe('🚗');
     });
 
+    it('preserva la quota quando valida', () => {
+        const result = normalizePoiList([
+            { lat: 44.0, lng: 11.0, note: 'con quota', altitude: '612.4', savedAt: '2026-06-01T10:00:00.000Z' },
+        ]);
+        expect(result[0].altitude).toBe(612.4);
+    });
+
+    it('scarta la quota quando non valida e mantiene la compatibilità con i POI legacy', () => {
+        const result = normalizePoiList([
+            { lat: 44.0, lng: 11.0, note: 'legacy', altitude: null, savedAt: '2026-06-01T10:00:00.000Z' },
+            { lat: 45.0, lng: 12.0, note: 'quota errata', altitude: 'n/d', savedAt: '2026-06-02T10:00:00.000Z' },
+        ]);
+        expect(result[0]).not.toHaveProperty('altitude');
+        expect(result[1]).not.toHaveProperty('altitude');
+    });
+
     it('ordina i punti per data salvAt crescente', () => {
         const result = normalizePoiList([
             { lat: 44.0, lng: 11.0, note: 'secondo', savedAt: '2026-06-02T10:00:00.000Z' },
@@ -660,6 +678,30 @@ describe('formatPoiDisplayDate', () => {
     it('restituisce stringa vuota per input non valido', () => {
         expect(formatPoiDisplayDate('non-una-data')).toBe('');
         expect(formatPoiDisplayDate('')).toBe('');
+    });
+});
+
+describe('normalizePoiAltitude', () => {
+    it('restituisce un numero finito per quote valide', () => {
+        expect(normalizePoiAltitude('0')).toBe(0);
+        expect(normalizePoiAltitude('-12.5')).toBe(-12.5);
+    });
+
+    it('restituisce undefined per quote mancanti o non valide', () => {
+        expect(normalizePoiAltitude(undefined)).toBeUndefined();
+        expect(normalizePoiAltitude(null)).toBeUndefined();
+        expect(normalizePoiAltitude('non valida')).toBeUndefined();
+    });
+});
+
+describe('formatPoiAltitude', () => {
+    it('formatta la quota arrotondata quando disponibile', () => {
+        expect(formatPoiAltitude(612.6)).toBe('Quota: 613 m');
+    });
+
+    it('restituisce stringa vuota quando la quota non è disponibile', () => {
+        expect(formatPoiAltitude(undefined)).toBe('');
+        expect(formatPoiAltitude('n/d')).toBe('');
     });
 });
 
