@@ -218,19 +218,22 @@ const DEFAULT_FEEDBACK_CLASSES = [
         id: 'none',
         label: 'Nessun ritrovamento',
         found: false,
-        signalWeight: -1
+        signalWeight: -1,
+        emoji: '➖'
     },
     {
         id: 'lt500',
         label: 'Ritrovamenti <500g',
         found: true,
-        signalWeight: 0.9
+        signalWeight: 0.9,
+        emoji: '✅'
     },
     {
         id: 'gte500',
         label: 'Ritrovamenti ≥500g',
         found: true,
-        signalWeight: 1.5
+        signalWeight: 1.5,
+        emoji: '💰'
     }
 ];
 
@@ -239,25 +242,29 @@ const MAGNATUM_FEEDBACK_CLASSES = [
         id: 'none',
         label: 'Nessun ritrovamento',
         found: false,
-        signalWeight: -1
+        signalWeight: -1,
+        emoji: '➖'
     },
     {
         id: 'lt100',
         label: 'Ritrovamenti <100g',
         found: true,
-        signalWeight: 0.7
+        signalWeight: 0.7,
+        emoji: '✅'
     },
     {
         id: 'gte100_lt300',
         label: 'Ritrovamenti 100–300g',
         found: true,
-        signalWeight: 1.2
+        signalWeight: 1.2,
+        emoji: '✅'
     },
     {
         id: 'gte300',
         label: 'Ritrovamenti >300g',
         found: true,
-        signalWeight: 1.8
+        signalWeight: 1.8,
+        emoji: '💰'
     }
 ];
 
@@ -335,12 +342,16 @@ function resolveLegacyFeedbackClass(speciesId, found) {
     if (!found) {
         return getFeedbackClassById(speciesId, 'none');
     }
-    const classes = getFeedbackClassesForSpecies(speciesId);
-    return classes.find((entry) => entry.found && entry.id !== 'none') ?? null;
+    return {
+        id: 'legacy_found',
+        label: 'Ritrovamento (storico)',
+        found: true,
+        signalWeight: 1
+    };
 }
 
 export function resolveFeedbackEntryClass(speciesId, feedbackEntry = null) {
-    const classId = feedbackEntry?.outcomeClassId ?? feedbackEntry?.feedbackClassId ?? '';
+    const classId = feedbackEntry?.outcomeClassId;
     const fromClass = getFeedbackClassById(speciesId, classId);
     if (fromClass) return fromClass;
     if (typeof feedbackEntry?.found === 'boolean') {

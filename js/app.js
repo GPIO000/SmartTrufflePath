@@ -880,7 +880,7 @@ function getForecastFeedbackUiOptions(speciesId) {
         id: feedbackClass.id,
         label: feedbackClass.label,
         found: Boolean(feedbackClass.found),
-        emoji: !feedbackClass.found ? '➖' : feedbackClass.signalWeight >= 1.5 ? '💰' : '✅'
+        emoji: feedbackClass.emoji || (!feedbackClass.found ? '➖' : '✅')
     }));
 }
 
@@ -931,8 +931,15 @@ function renderTruffleForecastResults(forecast, regionName, feedbackEntries) {
         const borderColor = !day.legalOpen ? '#6b7280' : day.score >= 70 ? '#22c55e' : day.score >= 45 ? '#f59e0b' : '#ef4444';
         const feedback = findForecastFeedback(feedbackEntries, forecast.species.name, forecast.locationLabel, day.date);
         const feedbackClass = resolveFeedbackEntryClass(forecast.species.id, feedback);
-        const feedbackLabel = feedbackClass?.label || (feedback?.found ? 'Ritrovamento confermato' : 'Nessun ritrovamento');
-        const feedbackTone = feedbackClass?.found ? '#22c55e' : '#f59e0b';
+        const fallbackFound = typeof feedback?.found === 'boolean' ? feedback.found : null;
+        const feedbackLabel = feedbackClass?.label || (fallbackFound === null ? 'Feedback salvato' : fallbackFound ? 'Ritrovamento confermato' : 'Nessun ritrovamento');
+        const feedbackTone = feedbackClass
+            ? (feedbackClass.found ? '#22c55e' : '#f59e0b')
+            : fallbackFound === null
+                ? '#9ca3af'
+                : fallbackFound
+                    ? '#22c55e'
+                    : '#f59e0b';
         const feedbackHtml = feedback
             ? `<p style="margin:10px 0 0 0; color:${feedbackTone}; font-size:0.8rem;">🧠 Feedback salvato: ${escapeHtml(feedbackLabel)}.</p>`
             : '';
