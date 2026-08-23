@@ -948,15 +948,10 @@ function renderTruffleForecastResults(forecast, regionName, feedbackEntries, opt
         const borderColor = !day.legalOpen ? '#6b7280' : day.score >= 70 ? '#22c55e' : day.score >= 45 ? '#f59e0b' : '#ef4444';
         const feedback = findForecastFeedback(feedbackEntries, forecast.species.name, forecast.locationLabel, day.date);
         const feedbackClass = resolveFeedbackEntryClass(forecast.species.id, feedback);
-        const fallbackFound = typeof feedback?.found === 'boolean' ? feedback.found : null;
-        const feedbackLabel = feedbackClass?.label || (fallbackFound === null ? 'Feedback salvato' : fallbackFound ? 'Ritrovamento confermato' : 'Nessun ritrovamento');
+        const feedbackLabel = feedbackClass?.label || 'Feedback salvato';
         const feedbackTone = feedbackClass
             ? (feedbackClass.found ? '#22c55e' : '#f59e0b')
-            : fallbackFound === null
-                ? '#9ca3af'
-                : fallbackFound
-                    ? '#22c55e'
-                    : '#f59e0b';
+            : '#9ca3af';
         const feedbackHtml = feedback
             ? `<p style="margin:10px 0 0 0; color:${feedbackTone}; font-size:0.8rem;">🧠 Feedback salvato: ${escapeHtml(feedbackLabel)}.</p>`
             : '';
@@ -3504,7 +3499,7 @@ function openModule(moduleName, editMode = false) {
         calHtml += `
             <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: rgba(29,40,30,0.96); padding: 10px; border-radius: 6px;">
                 <strong style="color: #f6f1e6; font-size: 0.85rem; display: block;">🍄 [ID: ${escapeHtml(String(specie.id))}] ${escapeHtml(specie.name)}</strong>
-                <div style="font-size: 0.75rem; color: #b8b0a0; margin-top: 4px;">🗓️ Periodo consentito: ${periodoSalvato}</div>
+                <div style="font-size: 0.75rem; color: #b8b0a0; margin-top: 4px;">🗓️ Periodo consentito: ${escapeHtml(periodoSalvato)}</div>
                 <div style="font-size: 0.75rem; margin-top: 6px;"><span style="color:#22c55e; font-weight:bold;">🟢 RACCOLTA APERTA</span></div>
             </div>
         `;
