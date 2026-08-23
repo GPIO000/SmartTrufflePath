@@ -48,7 +48,9 @@ import {
     buildPoiScoreList,
     getScoreEmoji,
     getScoreLevel,
-    HARVEST_SPECIES_TO_ID
+    POI_SCORE_HIGH_THRESHOLD,
+    POI_SCORE_MAX,
+    POI_SCORE_MID_THRESHOLD
 } from './poi-forecast.js';
 
 window.TruffleStorage = TruffleStorage;
@@ -3089,7 +3091,7 @@ function openModule(moduleName, editMode = false) {
                     const { poi, totalScore, reasons, speciesAtPoi } = entry;
                     const emoji = getScoreEmoji(totalScore);
                     const level = getScoreLevel(totalScore);
-                    const levelColor = totalScore >= 65 ? '#22c55e' : totalScore >= 40 ? '#f59e0b' : '#6b7280';
+                    const levelColor = totalScore >= POI_SCORE_HIGH_THRESHOLD ? '#22c55e' : totalScore >= POI_SCORE_MID_THRESHOLD ? '#f59e0b' : '#6b7280';
                     const poiMarker = normalizePoiMarker(poi.marker, poi.type);
                     const safePoi = sanitizeRenderable(poi);
                     const speciesLine = speciesAtPoi.length > 0
@@ -3110,15 +3112,15 @@ function openModule(moduleName, editMode = false) {
                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                             <span style="font-size:1.3rem;">${emoji}</span>
                             <strong class="text-accent" style="flex:1;">${poiMarker} ${safePoi.note}</strong>
-                            <span style="font-weight:bold; color:${levelColor}; font-size:0.9rem;">${totalScore}/85 · ${escapeHtml(level)}</span>
+                            <span style="font-weight:bold; color:${levelColor}; font-size:0.9rem;">${totalScore}/${POI_SCORE_MAX} · ${escapeHtml(level)}</span>
                         </div>
                         <p style="font-size:0.75rem; color:#6b7280; margin:3px 0;">Lat: ${poi.lat.toFixed(4)}, Lng: ${poi.lng.toFixed(4)}</p>
                         ${distanceLine}
                         ${speciesLine}
                         <ul style="font-size:0.78rem; color:#b8b0a0; margin:6px 0 8px 16px; padding:0; line-height:1.6;">${reasonsHtml}</ul>
                         <div class="btn-row">
-                            <button class="overlay-btn btn-success" style="padding:6px 12px;" ${actionAttrs('navigateToPoi', [poiList.indexOf(poi)])}>🧭 Vai</button>
-                            <button class="overlay-btn btn-info" style="padding:6px 12px;" ${actionAttrs('sharePoi', [poiList.indexOf(poi)])}>📤 Condividi</button>
+                            <button class="overlay-btn btn-success" style="padding:6px 12px;" ${actionAttrs('navigateToPoi', [poiList.findIndex((p) => p.id === poi.id)])}>🧭 Vai</button>
+                            <button class="overlay-btn btn-info" style="padding:6px 12px;" ${actionAttrs('sharePoi', [poiList.findIndex((p) => p.id === poi.id)])}>📤 Condividi</button>
                         </div>
                     </div>`;
                 });
