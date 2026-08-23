@@ -4,6 +4,8 @@ import {
     buildTruffleForecastCalendar,
     fetchTruffleForecastDataset,
     getAreaProfiles,
+    getFeedbackClassesForSpecies,
+    resolveFeedbackEntryClass,
     TRUFFLE_SPECIES_FORECAST
 } from './truffle-forecast.js';
 import {
@@ -873,6 +875,15 @@ function findForecastFeedback(feedbackEntries, speciesName, locationLabel, date)
     return feedbackEntries.find((entry) => entry?.speciesName === speciesName && entry?.locationLabel === locationLabel && entry?.date === date) || null;
 }
 
+function getForecastFeedbackUiOptions(speciesId) {
+    return getFeedbackClassesForSpecies(speciesId).map((feedbackClass) => ({
+        id: feedbackClass.id,
+        label: feedbackClass.label,
+        found: Boolean(feedbackClass.found),
+        emoji: !feedbackClass.found ? '➖' : feedbackClass.signalWeight >= 1.5 ? '💰' : '✅'
+    }));
+}
+
 function escapeAttr(value) {
     return escapeHtml(value).replace(/"/g, '&quot;');
 }
@@ -919,14 +930,19 @@ function renderTruffleForecastResults(forecast, regionName, feedbackEntries) {
     const cardsHtml = forecast.days.map((day) => {
         const borderColor = !day.legalOpen ? '#6b7280' : day.score >= 70 ? '#22c55e' : day.score >= 45 ? '#f59e0b' : '#ef4444';
         const feedback = findForecastFeedback(feedbackEntries, forecast.species.name, forecast.locationLabel, day.date);
+        const feedbackClass = resolveFeedbackEntryClass(forecast.species.id, feedback);
+        const feedbackLabel = feedbackClass?.label || (feedback?.found ? 'Ritrovamento confermato' : 'Nessun ritrovamento');
+        const feedbackTone = feedbackClass?.found ? '#22c55e' : '#f59e0b';
         const feedbackHtml = feedback
-            ? `<p style="margin:10px 0 0 0; color:${feedback.found ? '#22c55e' : '#f59e0b'}; font-size:0.8rem;">🧠 Feedback salvato: ${feedback.found ? 'ritrovamento confermato' : 'nessun ritrovamento'}.</p>`
+            ? `<p style="margin:10px 0 0 0; color:${feedbackTone}; font-size:0.8rem;">🧠 Feedback salvato: ${escapeHtml(feedbackLabel)}.</p>`
             : '';
+        const feedbackButtons = getForecastFeedbackUiOptions(forecast.species.id);
         const buttonsHtml = day.legalOpen
             ? `
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-                    <button class="overlay-btn btn-success" style="flex:1; min-width:140px; padding:8px 10px;" ${actionAttrs('saveTruffleForecastFeedback', [day.date, true])}>✅ Ho trovato</button>
-                    <button class="overlay-btn btn-neutral" style="flex:1; min-width:140px; padding:8px 10px; background:#4b5563;" ${actionAttrs('saveTruffleForecastFeedback', [day.date, false])}>➖ Nessun ritrovamento</button>
+                    ${feedbackButtons.map((option) => `
+                        <button class="overlay-btn ${option.found ? 'btn-success' : 'btn-neutral'}" style="flex:1; min-width:150px; padding:8px 10px;${option.found ? '' : ' background:#4b5563;'}" ${actionAttrs('saveTruffleForecastFeedback', [day.date, option.id])}>${option.emoji} ${escapeHtml(option.label)}</button>
+                    `).join('')}
                 </div>`
             : '';
         return `
@@ -1026,7 +1042,7 @@ async function loadTruffleForecastModule() {
     }
 }
 
-function saveTruffleForecastFeedback(date, found) {
+function saveTruffleForecastFeedback(date, outcomeClassId) {
     const locationSelect = document.getElementById('truffle-forecast-location');
     const speciesSelect = document.getElementById('truffle-forecast-species');
     const areaSelect = document.getElementById('truffle-forecast-area');
@@ -1035,6 +1051,8 @@ function saveTruffleForecastFeedback(date, found) {
     const locationChoice = getTruffleForecastLocationChoices().find((choice) => choice.id === locationSelect.value);
     const speciesProfile = TRUFFLE_SPECIES_FORECAST.find((item) => String(item.id) === speciesSelect.value);
     if (!locationChoice || !speciesProfile) return;
+    const selectedClass = getFeedbackClassesForSpecies(speciesProfile.id).find((feedbackClass) => feedbackClass.id === outcomeClassId);
+    if (!selectedClass) return;
 
     const feedbackEntries = getStoredForecastFeedback().filter((entry) => !(
         entry?.date === date
@@ -1045,7 +1063,8 @@ function saveTruffleForecastFeedback(date, found) {
 
     feedbackEntries.push({
         date,
-        found: Boolean(found),
+        found: Boolean(selectedClass.found),
+        outcomeClassId: selectedClass.id,
         speciesId: speciesProfile.id,
         speciesName: speciesProfile.name,
         locationLabel: locationChoice.label,
@@ -1053,7 +1072,7 @@ function saveTruffleForecastFeedback(date, found) {
         savedAt: new Date().toISOString()
     });
     localStorage.setItem(TRUFFLE_FORECAST_FEEDBACK_KEY, JSON.stringify(feedbackEntries));
-    showToast(found ? 'Feedback positivo salvato.' : 'Feedback di prudenza salvato.', 'success');
+    showToast(`Feedback salvato: ${selectedClass.label}.`, 'success');
     void loadTruffleForecastModule();
 }
 
@@ -1212,7 +1231,7 @@ const ACTION_HANDLERS = {
     refreshRegistroGiornaliero: () => openModule('registro_giornaliero'),
     refreshSpese: () => openModule('spese'),
     refreshTruffleForecast: () => loadTruffleForecastModule(),
-    saveTruffleForecastFeedback: (_event, date, found) => saveTruffleForecastFeedback(date, found),
+    saveTruffleForecastFeedback: (_event, date, outcomeClassId) => saveTruffleForecastFeedback(date, outcomeClassId),
     registerRicevutaSafe: async () => {
         try {
             await registraVenditaConPrezzoKg();

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     aggregateHourlyToDaily,
     buildTruffleForecastCalendar,
+    getFeedbackClassesForSpecies,
     isDateWithinPeriod
 } from '../js/truffle-forecast.js';
 
@@ -134,5 +135,56 @@ describe('buildTruffleForecastCalendar', () => {
 
         expect(forecast.days[0].score).toBeLessThan(40);
         expect(forecast.days[0].reasons.join(' ')).toContain('Terreno secco');
+    });
+
+    it('espone soglie feedback dedicate per magnatum e default per altre specie', () => {
+        const magnatum = getFeedbackClassesForSpecies(0);
+        const scorzone = getFeedbackClassesForSpecies(5);
+
+        expect(magnatum.map((entry) => entry.id)).toEqual([
+            'none',
+            'lt100',
+            'gte100_lt300',
+            'gte300'
+        ]);
+        expect(scorzone.map((entry) => entry.id)).toEqual([
+            'none',
+            'lt500',
+            'gte500'
+        ]);
+    });
+
+    it('assegna più peso ai feedback classe alta e mantiene compatibilità con found legacy', () => {
+        const series = makeSeries('2026-10-01', 21);
+        const baseArgs = {
+            speciesId: 1,
+            legalPeriod: '1 ottobre - 31 dicembre',
+            weatherSeries: series,
+            locationLabel: 'Bosco Test',
+            referenceDate: new Date('2026-10-15T12:00:00'),
+            forecastDays: 1
+        };
+
+        const withLowClass = buildTruffleForecastCalendar({
+            ...baseArgs,
+            feedbackHistory: [
+                { date: '2025-10-18', speciesName: 'Tuber melanosporum Vitt. (Tartufo nero di Norcia)', locationLabel: 'Bosco Test', outcomeClassId: 'lt500' }
+            ]
+        });
+        const withHighClass = buildTruffleForecastCalendar({
+            ...baseArgs,
+            feedbackHistory: [
+                { date: '2025-10-18', speciesName: 'Tuber melanosporum Vitt. (Tartufo nero di Norcia)', locationLabel: 'Bosco Test', outcomeClassId: 'gte500' }
+            ]
+        });
+        const withLegacyPositive = buildTruffleForecastCalendar({
+            ...baseArgs,
+            feedbackHistory: [
+                { date: '2025-10-18', speciesName: 'Tuber melanosporum Vitt. (Tartufo nero di Norcia)', locationLabel: 'Bosco Test', found: true }
+            ]
+        });
+
+        expect(withHighClass.days[0].score).toBeGreaterThan(withLowClass.days[0].score);
+        expect(withLegacyPositive.days[0].score).toBeGreaterThanOrEqual(withLowClass.days[0].score);
     });
 });
