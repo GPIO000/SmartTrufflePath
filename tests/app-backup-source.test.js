@@ -1,8 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const appSource = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
-const buildCompleteBackupDataSource = extractFunctionSource(appSource, 'buildCompleteBackupData');
+let buildCompleteBackupDataSource = '';
+
+beforeAll(() => {
+  const appSource = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  buildCompleteBackupDataSource = extractFunctionSource(appSource, 'buildCompleteBackupData');
+  expect(getExternalDependencies(buildCompleteBackupDataSource)).toEqual([
+    'OFFLINE_REGIONI_PREFERITE_KEY',
+    'TRUFFLE_FORECAST_FEEDBACK_KEY',
+    '_BACKUP_DIR_LABEL_KEY',
+    'localStorage',
+  ]);
+});
 
 function extractFunctionSource(source, functionName) {
   const signature = `function ${functionName}() {`;
@@ -30,6 +40,13 @@ function extractFunctionSource(source, functionName) {
   }
 
   return source.slice(startIndex, endIndex);
+}
+
+function getExternalDependencies(source) {
+  const sourceWithoutStrings = source.replace(/'[^']*'|"[^"]*"/g, '');
+  return [...new Set(
+    sourceWithoutStrings.match(/(?<![.\w$])([A-Za-z_][A-Za-z0-9_]*)\b(?!\s*:)/g) || [],
+  )].filter((identifier) => !['function', 'return', 'buildCompleteBackupData'].includes(identifier)).sort();
 }
 
 function runBuildCompleteBackupData() {
