@@ -44,6 +44,12 @@ import {
     shouldConfirmMapLongPressOnTimeout,
     toMapContainerPoint,
 } from './poi-utils.js';
+import {
+    buildPoiScoreList,
+    getScoreEmoji,
+    getScoreLevel,
+    HARVEST_SPECIES_TO_ID
+} from './poi-forecast.js';
 
 window.TruffleStorage = TruffleStorage;
 
@@ -3047,6 +3053,79 @@ function openModule(moduleName, editMode = false) {
             vetHtml += printOnlyVetBooklet;
             contentHTML = vetHtml;
             break;
+        case 'dove_andare': {
+            const harvestHistory = readStorageJSON('storico_raccolta_giornaliera', []);
+            const feedbackHistory = readStorageJSON(TRUFFLE_FORECAST_FEEDBACK_KEY, []);
+            const calendari = readStorageJSON('calendari_tartufi_custom', {});
+            const regionName = getCurrentGpsRegionName();
+            const regionCalendar = calendari[regionName] ?? null;
+            const scored = buildPoiScoreList(poiList, harvestHistory, feedbackHistory, regionCalendar, new Date());
+
+            let doveHtml = `<h2>🗺️ Dove Andare Oggi</h2>
+                <p>Le tue tartufaie ordinate per probabilità di ritrovamento, basata sullo storico personale, la stagione e le condizioni attuali.</p>`;
+
+            if (!regionCalendar) {
+                doveHtml += `<div class="module-card" style="border-left:3px solid #f59e0b;">
+                    <p style="color:#f59e0b; font-size:0.85rem;">⚠️ Nessun calendario salvato per la regione <strong>${escapeHtml(regionName)}</strong>. Il punteggio stagionale non può essere calcolato. Compila i calendari nell'archivio regionale per migliorare la precisione.</p>
+                </div>`;
+            }
+
+            const genericCount = poiList.filter((p) => !p?.type || (p.type !== 'auto' && p.type !== 'sos')).length;
+            if (genericCount === 0) {
+                doveHtml += `<div class="module-card"><p>Nessuna tartufaia salvata. Salva i tuoi punti di interesse dalla mappa per usare questa funzione.</p></div>`;
+            } else {
+                doveHtml += `
+                <div class="module-card" style="background:#121610; border:1px solid rgba(255,255,255,0.07); margin-bottom:16px;">
+                    <h3 style="font-size:0.85rem; color:#4d8a98; margin-bottom:6px;">📊 Come si calcola il punteggio</h3>
+                    <p style="font-size:0.78rem; color:#b8b0a0; line-height:1.5; margin:0;">
+                        🟢 Alta (≥65): buona stagione + storico positivo + posto riposato<br>
+                        🟡 Media (40–64): condizioni parziali o dati insufficienti<br>
+                        ⚫ Bassa (&lt;40): fuori stagione, visitato di recente o nessuno storico
+                    </p>
+                    <p style="font-size:0.75rem; color:#6b7280; margin:8px 0 0 0;">Regione rilevata: <b>${escapeHtml(regionName)}</b> · Punteggio meteo: carica la previsione per ogni punto dalla scheda "📈 Previsione Uscita Tartufi".</p>
+                </div>`;
+
+                scored.forEach((entry, idx) => {
+                    const { poi, totalScore, reasons, speciesAtPoi } = entry;
+                    const emoji = getScoreEmoji(totalScore);
+                    const level = getScoreLevel(totalScore);
+                    const levelColor = totalScore >= 65 ? '#22c55e' : totalScore >= 40 ? '#f59e0b' : '#6b7280';
+                    const poiMarker = normalizePoiMarker(poi.marker, poi.type);
+                    const safePoi = sanitizeRenderable(poi);
+                    const speciesLine = speciesAtPoi.length > 0
+                        ? `<p style="font-size:0.78rem; color:#4d8a98; margin:3px 0;">🍄 ${escapeHtml(speciesAtPoi.slice(0, 2).map((s) => s.split('(')[0].trim()).join(', '))}</p>`
+                        : '';
+                    const reasonsHtml = reasons.slice(0, 3).map((r) => `<li>${escapeHtml(r)}</li>`).join('');
+
+                    let distanceLine = '';
+                    if (latestGpsSnapshot && Number.isFinite(latestGpsSnapshot.lat) && Number.isFinite(latestGpsSnapshot.lng)) {
+                        const dist = calculateDistanceAndBearing(latestGpsSnapshot.lat, latestGpsSnapshot.lng, poi.lat, poi.lng);
+                        if (dist && Number.isFinite(dist.distance)) {
+                            distanceLine = `<p style="font-size:0.8rem; color:#a3c4bc; margin:3px 0;">📏 ${dist.distance < 1000 ? Math.round(dist.distance) + ' m' : (dist.distance / 1000).toFixed(1) + ' km'} da te</p>`;
+                        }
+                    }
+
+                    doveHtml += `
+                    <div class="module-card card-gap" style="border-left:4px solid ${levelColor}; margin-bottom:12px;">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span style="font-size:1.3rem;">${emoji}</span>
+                            <strong class="text-accent" style="flex:1;">${poiMarker} ${safePoi.note}</strong>
+                            <span style="font-weight:bold; color:${levelColor}; font-size:0.9rem;">${totalScore}/85 · ${escapeHtml(level)}</span>
+                        </div>
+                        <p style="font-size:0.75rem; color:#6b7280; margin:3px 0;">Lat: ${poi.lat.toFixed(4)}, Lng: ${poi.lng.toFixed(4)}</p>
+                        ${distanceLine}
+                        ${speciesLine}
+                        <ul style="font-size:0.78rem; color:#b8b0a0; margin:6px 0 8px 16px; padding:0; line-height:1.6;">${reasonsHtml}</ul>
+                        <div class="btn-row">
+                            <button class="overlay-btn btn-success" style="padding:6px 12px;" ${actionAttrs('navigateToPoi', [poiList.indexOf(poi)])}>🧭 Vai</button>
+                            <button class="overlay-btn btn-info" style="padding:6px 12px;" ${actionAttrs('sharePoi', [poiList.indexOf(poi)])}>📤 Condividi</button>
+                        </div>
+                    </div>`;
+                });
+            }
+            contentHTML = doveHtml;
+            break;
+        }
         case 'registro_giornaliero': {
             const storicoRaccolta = getRenderableStorageJSON('storico_raccolta_giornaliera', []);
             const elAnno = document.getElementById('filtro-anno');
@@ -6668,6 +6747,7 @@ async function mostraInfoModulo(moduleName) {
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
         'vet': "ℹ️ **Guida - Libretti Sanitari Cani & Profilassi**\n\nUsa la card unica \"Nuova Registrazione\" per inserire trattamenti/visite oppure voci del diario calore. In modalità diario calore puoi selezionare solo cagne femmine, con previsione del prossimo ciclo nello storico.",
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
+        'dove_andare': "ℹ️ **Guida - Dove Andare Oggi**\n\nQuesto registro interattivo ordina le tue tartufaie salvate per probabilità di ritrovamento oggi, basandosi su tre fattori:\n\n📅 Storico personale: quante volte hai trovato in quel posto in questo periodo dell'anno. Ogni ritrovamento registrato nel periodo corrente aggiunge peso; feedback negativi (uscite senza risultati) riducono il punteggio.\n\n🗓️ Stagione: verifica se la specie storicamente trovata in quel posto è nel periodo legale di raccolta della tua regione. Massimo punteggio se in stagione, minimo se fuori.\n\n⏱️ Freschezza: favorisce le zone 'riposate' da almeno 8-14 giorni rispetto a quelle visitate di recente.\n\n💡 Consigli per migliorare la precisione:\n• Compila sempre il campo 'Luogo' nel Registro Ritrovamenti usando esattamente il nome salvato nel punto GPS.\n• Aggiungi i periodi di raccolta regionali nell'Archivio Calendari.\n• Lascia passare almeno una settimana prima di tornare nello stesso posto.\n• Usa '📈 Previsione Uscita Tartufi' per le condizioni meteo aggiornate.",
         'previsione_tartufi': "ℹ️ **Guida - Previsione Uscita Tartufi**\n\nStima una finestra favorevole di uscita usando calendario regionale, ultimi 15 giorni di pioggia, umidità del suolo, fase lunare, stabilità termica e storico personale. È un supporto decisionale, non una garanzia di ritrovamento.\n\n💡 **Più dati fornisci, più accurata sarà la previsione.** Inserisci le tartufaie nei punti GPS, compila il registro giornaliero dei ritrovamenti, aggiungi il feedback sui giorni passati e salva i calendari regionali aggiornati: ogni dato in più affina il calcolo e migliora l'indice di probabilità.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
