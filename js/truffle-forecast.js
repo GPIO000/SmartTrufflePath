@@ -333,7 +333,7 @@ export function getFeedbackClassesForSpecies(speciesId) {
     return classes.map((entry) => ({ ...entry }));
 }
 
-export function getOpenSpeciesForRegion(regionCalendar = {}, date = new Date()) {
+export function getOpenSpeciesForRegion(regionCalendar, date = new Date()) {
     if (!regionCalendar || typeof regionCalendar !== 'object' || Array.isArray(regionCalendar)) return [];
 
     return TRUFFLE_SPECIES_FORECAST

@@ -3491,7 +3491,7 @@ function openModule(moduleName, editMode = false) {
     const specieAperteOggi = getOpenSpeciesForRegion(datiRegioneCorrente);
     let specieAperteTrovate = specieAperteOggi.length;
     const specieConDateSalvate = Object.values(datiRegioneCorrente)
-        .filter((periodo) => String(periodo ?? '').trim())
+        .filter((periodo) => typeof periodo === 'string' && periodo.trim())
         .length;
 
     specieAperteOggi.forEach((specie) => {
