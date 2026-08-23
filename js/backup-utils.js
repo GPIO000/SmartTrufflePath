@@ -77,7 +77,13 @@ function extractValidBackupEntries(content, backupMap, plainStringKeys = new Set
  * @returns {{ entries: Array<[string, string]>, keysToRemove: string[] }}
  */
 function buildBackupRestorePlan(content, backupMap, plainStringBackupKeys = []) {
-    const entries = extractValidBackupEntries(content, backupMap, new Set(plainStringBackupKeys));
+    const rawEntries = extractValidBackupEntries(content, backupMap, new Set(plainStringBackupKeys));
+    const seenStorageKeys = new Set();
+    const entries = rawEntries.filter(([storageKey]) => {
+        if (seenStorageKeys.has(storageKey)) return false;
+        seenStorageKeys.add(storageKey);
+        return true;
+    });
     const restoredStorageKeys = new Set(entries.map(([storageKey]) => storageKey));
     const managedStorageKeys = [...new Set(Object.values(backupMap))];
 

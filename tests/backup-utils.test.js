@@ -124,4 +124,20 @@ describe('buildBackupRestorePlan', () => {
       keysToRemove: ['storico_vendite', 'poi_list'],
     });
   });
+
+  it('deduplica le chiavi storage duplicate mantenendo la prima voce valida', () => {
+    const duplicateMap = {
+      luoghiRaccolta: 'luoghi_raccolta',
+      archivioLuoghiRaccolta: 'luoghi_raccolta',
+    };
+    const content = {
+      luoghiRaccolta: '["A"]',
+      archivioLuoghiRaccolta: '["B"]',
+    };
+
+    expect(buildBackupRestorePlan(content, duplicateMap)).toEqual({
+      entries: [['luoghi_raccolta', '["A"]']],
+      keysToRemove: [],
+    });
+  });
 });
