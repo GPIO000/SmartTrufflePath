@@ -5287,6 +5287,14 @@ function syncAutomaticBackupStatusUI() {
     const statusEl = document.getElementById('local-backup-status');
     if (!statusEl) return;
     if (!lastAutomaticBackupSavedAt) {
+        const persistedStatus = typeof TruffleStorage.getAutomaticBackupStatus === 'function'
+            ? TruffleStorage.getAutomaticBackupStatus()
+            : null;
+        if (persistedStatus && persistedStatus.ok && persistedStatus.savedAt) {
+            lastAutomaticBackupSavedAt = persistedStatus.savedAt;
+        }
+    }
+    if (!lastAutomaticBackupSavedAt) {
         statusEl.textContent = 'Stato ultimo backup automatico: non disponibile';
         return;
     }
