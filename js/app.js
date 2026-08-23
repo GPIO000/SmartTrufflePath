@@ -1701,7 +1701,7 @@ async function fetchLocationDataFromCoordinates(lat, lng) {
     return locationData;
 }
 
-async function resolveRegionNameForCoordinates(lat, lng, fallbackRegion = 'Campania') {
+async function resolveRegionNameForCoordinates(lat, lng, fallbackRegion = '') {
     if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return fallbackRegion;
     try {
         const locationData = await fetchLocationDataFromCoordinates(lat, lng);
