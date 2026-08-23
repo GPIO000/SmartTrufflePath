@@ -5637,10 +5637,37 @@ async function _requestBackupReauth() {
     }
 }
 
+let _backupFolderPromptInProgress = false;
+
+async function _requestBackupFolderForDataChanges() {
+    if (_backupFolderPromptInProgress || _backupReauthInProgress) return false;
+    _backupFolderPromptInProgress = true;
+    try {
+        const confirmed = await appConfirm(
+            '📁 Backup automatico non configurato\n\n' +
+            'Hai appena creato, modificato o eliminato dei dati.\n\n' +
+            'Per salvare automaticamente le modifiche, seleziona ora la cartella Download del dispositivo.'
+        );
+        if (!confirmed) return false;
+        const configuredFolder = await configureAutomaticBackupFolder(true);
+        if (!configuredFolder) return false;
+        showToast(`Cartella backup registrata: ${configuredFolder.destinationLabel}.`, 'success');
+        return true;
+    } finally {
+        _backupFolderPromptInProgress = false;
+    }
+}
+
 async function runAutomaticLocalBackup() {
-    const hasDestinationLabel = Boolean(getAutomaticBackupDestinationLabel());
-    const hasStoredHandle = hasDestinationLabel ? true : Boolean(await _loadBackupDirHandle());
-    if (!hasDestinationLabel && !hasStoredHandle) return;
+    let hasDestinationLabel = Boolean(getAutomaticBackupDestinationLabel());
+    let hasStoredHandle = hasDestinationLabel ? true : Boolean(await _loadBackupDirHandle());
+    if (!hasDestinationLabel && !hasStoredHandle) {
+        const folderConfigured = await _requestBackupFolderForDataChanges();
+        if (!folderConfigured) return;
+        hasDestinationLabel = Boolean(getAutomaticBackupDestinationLabel());
+        hasStoredHandle = hasDestinationLabel ? true : Boolean(await _loadBackupDirHandle());
+        if (!hasDestinationLabel && !hasStoredHandle) return;
+    }
     const backupData = buildCompleteBackupData();
     const fingerprint = JSON.stringify(backupData);
     if (fingerprint === lastAutomaticBackupFingerprint) return;
