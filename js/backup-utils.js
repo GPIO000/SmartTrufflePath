@@ -40,9 +40,10 @@ function buildAutomaticBackupPathLabel(rootFolderName = 'Download') {
  *
  * @param {unknown} content - Parsed backup JSON object.
  * @param {Record<string, string>} backupMap - Mapping from backup field names to localStorage keys.
+ * @param {Set<string>} plainStringKeys - Backup fields allowed as plain strings.
  * @returns {Array<[string, string]>} Valid [storageKey, value] pairs to restore.
  */
-function extractValidBackupEntries(content, backupMap) {
+function extractValidBackupEntries(content, backupMap, plainStringKeys = new Set()) {
     if (!content || typeof content !== 'object' || Array.isArray(content)) {
         throw new Error('Formato backup non valido');
     }
@@ -55,7 +56,9 @@ function extractValidBackupEntries(content, backupMap) {
                 JSON.parse(value);
                 entries.push([storageKey, value]);
             } catch {
-                // skip entries that are not valid JSON strings
+                if (plainStringKeys.has(backupKey)) {
+                    entries.push([storageKey, JSON.stringify(value)]);
+                }
             }
         }
     }
@@ -70,10 +73,11 @@ function extractValidBackupEntries(content, backupMap) {
  *
  * @param {unknown} content - Parsed backup JSON object.
  * @param {Record<string, string>} backupMap - Mapping from backup field names to localStorage keys.
+ * @param {string[]} plainStringBackupKeys - Backup field names allowed as plain strings.
  * @returns {{ entries: Array<[string, string]>, keysToRemove: string[] }}
  */
-function buildBackupRestorePlan(content, backupMap) {
-    const entries = extractValidBackupEntries(content, backupMap);
+function buildBackupRestorePlan(content, backupMap, plainStringBackupKeys = []) {
+    const entries = extractValidBackupEntries(content, backupMap, new Set(plainStringBackupKeys));
     const restoredStorageKeys = new Set(entries.map(([storageKey]) => storageKey));
     const managedStorageKeys = [...new Set(Object.values(backupMap))];
 

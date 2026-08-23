@@ -5554,6 +5554,8 @@ async function ripristinaBackupDaFile(event) {
         f24: 'f24_data',
         storicoVendite: 'storico_vendite',
         luoghiRaccolta: 'luoghi_raccolta',
+        archivioLuoghiRaccolta: 'luoghi_raccolta',
+        archivioAreeLuoghiRaccolta: 'luoghi_raccolta',
         poiList: 'poi_list',
         dogsList: 'dogs_list',
         caneData: 'cane_data',
@@ -5575,7 +5577,7 @@ async function ripristinaBackupDaFile(event) {
     reader.onload = async function(e) {
         try {
             const content = JSON.parse(e.target.result);
-            const { entries, keysToRemove } = buildBackupRestorePlan(content, backupMap);
+            const { entries, keysToRemove } = buildBackupRestorePlan(content, backupMap, ['backupDirLabel']);
 
             const confirmed = await appConfirm(
                 '⚠️ Ripristina Backup\n\n' +
