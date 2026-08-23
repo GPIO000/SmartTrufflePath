@@ -1664,6 +1664,18 @@ function buildPoiAltitudeHtml(altitude) {
     return altitudeText ? `<br><small>${escapeHtml(altitudeText)}</small>` : '';
 }
 
+function updateAltitudeIndicator(altitude) {
+    const el = document.getElementById('altitude-indicator');
+    if (!el) return;
+    const altitudeText = formatPoiAltitude(altitude);
+    if (altitudeText) {
+        el.textContent = `⛰️ ${altitudeText}`;
+        el.style.display = '';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
 function buildUserMarkerPopupHtml(altitude) {
     const altitudeText = formatPoiAltitude(altitude);
     return altitudeText ? `<b>Sei qui</b><br><small>${escapeHtml(altitudeText)}</small>` : '<b>Sei qui</b>';
@@ -1763,6 +1775,7 @@ if (navigator.geolocation) {
             dot.title = `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}${Number.isFinite(altitude) ? ` • ${formatPoiAltitude(altitude)}` : ''}`;
         }
         reverseGeocodePosition(lat, lng);
+        updateAltitudeIndicator(altitude);
         if (!userMarker) {
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup(buildUserMarkerPopupHtml(altitude)).openPopup();
             map.setView([lat, lng], getAdaptiveFocusZoom(18));
