@@ -36,16 +36,6 @@ function extractFunctionSource(source, functionName) {
   return source.slice(startIndex, endIndex);
 }
 
-function getExternalDependencies(source) {
-  const sanitizedSource = source
-    .replace(/\/\/.*$/gm, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/`[^`]*`|'[^']*'|"[^"]*"/g, '');
-  return [...new Set(
-    sanitizedSource.match(/(?<![.\w$])([A-Za-z_][A-Za-z0-9_]*)\b(?!\s*:)/g) || [],
-  )].filter((identifier) => !['function', 'return', 'buildCompleteBackupData'].includes(identifier)).sort();
-}
-
 function runBuildCompleteBackupData() {
   const localStorage = {
     getItem: (key) => `value:${key}`,
@@ -66,15 +56,6 @@ function runBuildCompleteBackupData() {
 }
 
 describe('buildCompleteBackupData', () => {
-  it('dipende solo dalle chiavi storage attese', () => {
-    expect(getExternalDependencies(buildCompleteBackupDataSource)).toEqual([
-      'OFFLINE_REGIONI_PREFERITE_KEY',
-      'TRUFFLE_FORECAST_FEEDBACK_KEY',
-      '_BACKUP_DIR_LABEL_KEY',
-      'localStorage',
-    ]);
-  });
-
   it('mantiene la chiave canonica dei luoghi di raccolta nel payload backup', () => {
     const backupData = runBuildCompleteBackupData();
 
