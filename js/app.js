@@ -1907,7 +1907,7 @@ async function savePoiPosition(forceLat, forceLng) {
         ? resolvePoiCoords(forceLat, forceLng, userMarker)
         : (latestGpsSnapshot
             ? { lat: latestGpsSnapshot.lat, lng: latestGpsSnapshot.lng }
-            : resolvePoiCoords(forceLat, forceLng, userMarker));
+            : resolvePoiCoords(undefined, undefined, userMarker));
     if (pos) {
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
         if (note === null) return;
