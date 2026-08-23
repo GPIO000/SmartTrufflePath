@@ -5230,8 +5230,6 @@ function buildCompleteBackupData() {
         f24: localStorage.getItem('f24_data'),
         storicoVendite: localStorage.getItem('storico_vendite'), 
         luoghiRaccolta: localStorage.getItem('luoghi_raccolta'),
-        archivioLuoghiRaccolta: localStorage.getItem('luoghi_raccolta'),
-        archivioAreeLuoghiRaccolta: localStorage.getItem('luoghi_raccolta'),
         poiList: localStorage.getItem('poi_list'),
         dogsList: localStorage.getItem('dogs_list'),
         caneData: localStorage.getItem('cane_data'),
