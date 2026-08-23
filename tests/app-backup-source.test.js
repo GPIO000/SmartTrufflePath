@@ -2,12 +2,34 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const appSource = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
-const buildCompleteBackupDataSource = appSource.match(
-  /function buildCompleteBackupData\(\) \{[\s\S]*?\n\}(?=\n\nfunction formatBackupTimestamp)/,
-);
+const buildCompleteBackupDataSource = extractFunctionSource(appSource, 'buildCompleteBackupData');
 
-if (!buildCompleteBackupDataSource) {
-  throw new Error('Impossibile trovare buildCompleteBackupData in js/app.js');
+function extractFunctionSource(source, functionName) {
+  const signature = `function ${functionName}() {`;
+  const startIndex = source.indexOf(signature);
+  if (startIndex === -1) {
+    throw new Error(`Impossibile trovare ${functionName} in js/app.js`);
+  }
+
+  let braceDepth = 0;
+  let endIndex = -1;
+  for (let index = startIndex; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '{') braceDepth += 1;
+    if (char === '}') {
+      braceDepth -= 1;
+      if (braceDepth === 0) {
+        endIndex = index + 1;
+        break;
+      }
+    }
+  }
+
+  if (endIndex === -1) {
+    throw new Error(`Impossibile estrarre il corpo di ${functionName} da js/app.js`);
+  }
+
+  return source.slice(startIndex, endIndex);
 }
 
 function runBuildCompleteBackupData() {
@@ -20,7 +42,7 @@ function runBuildCompleteBackupData() {
     'TRUFFLE_FORECAST_FEEDBACK_KEY',
     'OFFLINE_REGIONI_PREFERITE_KEY',
     '_BACKUP_DIR_LABEL_KEY',
-    `${buildCompleteBackupDataSource[0]}; return buildCompleteBackupData();`,
+    `${buildCompleteBackupDataSource}; return buildCompleteBackupData();`,
   )(
     localStorage,
     'truffle_forecast_feedback',

@@ -350,7 +350,7 @@ Modulo principale dell'applicazione. Contiene la logica UI, la gestione della ma
 - `saveSpesa()` / `deleteSpesa(index)` — CRUD spese
 
 **Backup e ripristino**
-- `buildCompleteBackupData()` — costruisce il payload completo del backup dei dati utente persistiti, incluso l'archivio luoghi/aree basato sulla chiave `luoghi_raccolta`
+- `buildCompleteBackupData()` — costruisce il payload completo del backup dei dati utente persistiti, incluso `luoghiRaccolta` basato sulla chiave `luoghi_raccolta`
 - `configureAutomaticBackupFolder(forceReselect)` / `chooseAutomaticBackupFolder()` — configurazione cartella backup automatico
 - `downloadBackupFile(data, options)` — scarica il file di backup (manuale o automatico)
 - `forceLocalBackupNow()` — avvia un backup locale immediato
