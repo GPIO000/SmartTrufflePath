@@ -64,6 +64,14 @@ describe('extractValidBackupEntries', () => {
     ]);
   });
 
+  it('ripristina una stringa semplice se la chiave è esplicitamente consentita', () => {
+    const content = { backupDirLabel: 'Download/SmartTrufflePath/file backup' };
+    const map = { backupDirLabel: 'backup_dir_label' };
+    expect(extractValidBackupEntries(content, map, new Set(['backupDirLabel']))).toEqual([
+      ['backup_dir_label', '"Download/SmartTrufflePath/file backup"'],
+    ]);
+  });
+
   it('lancia un errore se il contenuto non è un oggetto valido', () => {
     expect(() => extractValidBackupEntries(null, backupMap)).toThrow();
     expect(() => extractValidBackupEntries([], backupMap)).toThrow();
@@ -103,6 +111,33 @@ describe('buildBackupRestorePlan', () => {
         ['backup_dir_label', '"Download/SmartTrufflePath/file backup"'],
       ],
       keysToRemove: ['storico_vendite'],
+    });
+  });
+
+  it('accetta backupDirLabel come stringa semplice quando configurato', () => {
+    const content = {
+      backupDirLabel: 'Download/SmartTrufflePath/file backup',
+    };
+
+    expect(buildBackupRestorePlan(content, backupMap, ['backupDirLabel'])).toEqual({
+      entries: [['backup_dir_label', '"Download/SmartTrufflePath/file backup"']],
+      keysToRemove: ['storico_vendite', 'poi_list'],
+    });
+  });
+
+  it('deduplica le chiavi storage duplicate mantenendo la prima voce valida', () => {
+    const duplicateMap = {
+      luoghiRaccolta: 'luoghi_raccolta',
+      archivioLuoghiRaccolta: 'luoghi_raccolta',
+    };
+    const content = {
+      luoghiRaccolta: '["A"]',
+      archivioLuoghiRaccolta: '["B"]',
+    };
+
+    expect(buildBackupRestorePlan(content, duplicateMap)).toEqual({
+      entries: [['luoghi_raccolta', '["A"]']],
+      keysToRemove: [],
     });
   });
 });
