@@ -1080,7 +1080,10 @@ function saveTruffleForecastFeedback(date, outcomeClassId) {
     const speciesProfile = TRUFFLE_SPECIES_FORECAST.find((item) => String(item.id) === speciesSelect.value);
     if (!locationChoice || !speciesProfile) return;
     const selectedClass = getFeedbackClassesForSpecies(speciesProfile.id).find((feedbackClass) => feedbackClass.id === outcomeClassId);
-    if (!selectedClass) return;
+    if (!selectedClass) {
+        showToast('Feedback non valido per la specie selezionata.', 'error');
+        return;
+    }
 
     const feedbackEntries = getStoredForecastFeedback().filter((entry) => !(
         entry?.date === date
@@ -3504,15 +3507,9 @@ function openModule(moduleName, editMode = false) {
 
     const specieAperteOggi = getOpenSpeciesForRegion(datiRegioneCorrente);
     let specieAperteTrovate = specieAperteOggi.length;
-    let specieConDateSalvate = 0;
-
-    specieTartufiCal.forEach((_specie, id) => {
-        let periodoSalvato = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : '';
-
-        // Se non ci sono date salvate per questa specie, la saltiamo
-        if (!periodoSalvato) return;
-        specieConDateSalvate++;
-    });
+    const specieConDateSalvate = specieTartufiCal.reduce((count, _specie, id) => (
+        datiRegioneCorrente[id] ? count + 1 : count
+    ), 0);
 
     specieAperteOggi.forEach((specie) => {
         const periodoSalvato = datiRegioneCorrente[specie.id] || '';
