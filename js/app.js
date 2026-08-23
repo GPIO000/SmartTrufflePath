@@ -868,6 +868,25 @@ function getTruffleForecastLocationChoices() {
     return choices;
 }
 
+function renderTruffleForecastSpeciesOptions(speciesSelect, openSpecies, preferredSpeciesId = '') {
+    if (!speciesSelect) return null;
+    const availableSpecies = Array.isArray(openSpecies) ? openSpecies : [];
+    if (!availableSpecies.length) {
+        speciesSelect.innerHTML = '<option value="">Nessuna specie aperta per la posizione selezionata</option>';
+        speciesSelect.value = '';
+        speciesSelect.disabled = true;
+        return null;
+    }
+
+    speciesSelect.disabled = false;
+    speciesSelect.innerHTML = availableSpecies
+        .map((specie) => `<option value="${escapeAttr(String(specie.id))}">${escapeHtml(specie.name)}</option>`)
+        .join('');
+    const selectedSpecies = availableSpecies.find((specie) => String(specie.id) === String(preferredSpeciesId)) || availableSpecies[0];
+    speciesSelect.value = String(selectedSpecies.id);
+    return selectedSpecies;
+}
+
 function getStoredForecastFeedback() {
     return readStorageJSON(TRUFFLE_FORECAST_FEEDBACK_KEY, []);
 }
@@ -1021,10 +1040,18 @@ async function loadTruffleForecastModule() {
     const selectedLocation = locationChoices.find((choice) => choice.id === locationSelect.value) || locationChoices[0];
     if (locationSelect.value !== selectedLocation.id) locationSelect.value = selectedLocation.id;
 
-    const speciesProfile = TRUFFLE_SPECIES_FORECAST.find((item) => String(item.id) === speciesSelect.value) || TRUFFLE_SPECIES_FORECAST[0];
-    const regionName = getCurrentGpsRegionName();
+    const previousSpeciesId = speciesSelect.value;
+    const regionName = await resolveRegionNameForCoordinates(selectedLocation.lat, selectedLocation.lng, getCurrentGpsRegionName());
     const calendari = readStorageJSON('calendari_tartufi_custom', {});
     const openSpeciesToday = getOpenSpeciesForRegion(calendari?.[regionName] ?? {}, new Date());
+    const speciesProfile = renderTruffleForecastSpeciesOptions(speciesSelect, openSpeciesToday, previousSpeciesId);
+    if (!speciesProfile) {
+        renderTruffleForecastMessage(
+            '🔴 Nessuna specie aperta',
+            `Per ${selectedLocation.label} (${regionName}) non risultano specie legalmente aperte oggi nei calendari salvati.`
+        );
+        return;
+    }
     const periodoRegionale = calendari?.[regionName]?.[speciesProfile.id] || '';
 
     if (!periodoRegionale) {
@@ -1643,6 +1670,48 @@ function updateGpsStatusTextFromLocation(locationData, lat, lng) {
     gpsText.innerHTML = parti.length > 0 ? `GPS: ${parti.join(' > ')}` : `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 }
 
+function cacheReverseGeocodeLocation(lat, lng, locationData) {
+    if (!locationData || typeof locationData !== 'object') return;
+    const cacheKey = getReverseGeocodeCacheKey(lat, lng);
+    reverseGeocodeCache.set(cacheKey, locationData);
+    if (reverseGeocodeCache.size > REVERSE_GEOCODE_MAX_CACHE_ENTRIES) {
+        const firstKey = reverseGeocodeCache.keys().next().value;
+        if (firstKey !== undefined) reverseGeocodeCache.delete(firstKey);
+    }
+}
+
+async function fetchLocationDataFromCoordinates(lat, lng) {
+    const cacheKey = getReverseGeocodeCacheKey(lat, lng);
+    const cachedLocation = reverseGeocodeCache.get(cacheKey);
+    if (cachedLocation) return cachedLocation;
+
+    const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=14&addressdetails=1`,
+        { headers: { 'Accept-Language': 'it' } }
+    );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const address = data && data.address ? data.address : {};
+    const locationData = {
+        regione: address.region || address.state || '',
+        provincia: address.province || address.county || '',
+        comune: address.city || address.town || address.village || address.municipality || ''
+    };
+    cacheReverseGeocodeLocation(lat, lng, locationData);
+    return locationData;
+}
+
+async function resolveRegionNameForCoordinates(lat, lng, fallbackRegion = '') {
+    if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return fallbackRegion;
+    try {
+        const locationData = await fetchLocationDataFromCoordinates(lat, lng);
+        const regione = typeof locationData?.regione === 'string' ? locationData.regione.trim() : '';
+        return regione || fallbackRegion;
+    } catch (error) {
+        return fallbackRegion;
+    }
+}
+
 async function reverseGeocodePosition(lat, lng) {
     const cacheKey = getReverseGeocodeCacheKey(lat, lng);
     const cachedLocation = reverseGeocodeCache.get(cacheKey);
@@ -1660,23 +1729,7 @@ async function reverseGeocodePosition(lat, lng) {
     lastReverseGeocodeAt = now;
 
     try {
-        const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=14&addressdetails=1`,
-            { headers: { 'Accept-Language': 'it' } }
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        const address = data && data.address ? data.address : {};
-        const locationData = {
-            regione: address.region || address.state || '',
-            provincia: address.province || address.county || '',
-            comune: address.city || address.town || address.village || address.municipality || ''
-        };
-        reverseGeocodeCache.set(cacheKey, locationData);
-        if (reverseGeocodeCache.size > REVERSE_GEOCODE_MAX_CACHE_ENTRIES) {
-            const firstKey = reverseGeocodeCache.keys().next().value;
-            if (firstKey !== undefined) reverseGeocodeCache.delete(firstKey);
-        }
+        const locationData = await fetchLocationDataFromCoordinates(lat, lng);
         updateGpsStatusTextFromLocation(locationData, lat, lng);
     } catch (error) {
         console.log("Errore geocodifica:", error);
@@ -3435,9 +3488,6 @@ function openModule(moduleName, editMode = false) {
 
             case 'previsione_tartufi': {
                 const locationChoices = getTruffleForecastLocationChoices();
-                const speciesOptions = TRUFFLE_SPECIES_FORECAST
-                    .map((specie) => `<option value="${specie.id}">${escapeHtml(specie.name)}</option>`)
-                    .join('');
                 const areaOptions = TRUFFLE_AREA_PROFILES
                     .map((profile) => `<option value="${profile.id}">${escapeHtml(profile.label)}</option>`)
                     .join('');
@@ -3457,7 +3507,9 @@ function openModule(moduleName, editMode = false) {
                             </div>
                             <div style="flex:1; min-width:180px;">
                                 <label style="font-size:0.75rem;">Specie:</label>
-                                <select id="truffle-forecast-species" class="mod-input" ${eventActionAttrs('change', 'refreshTruffleForecast')}>${speciesOptions}</select>
+                                <select id="truffle-forecast-species" class="mod-input" ${eventActionAttrs('change', 'refreshTruffleForecast')}>
+                                    <option value="">Nessuna specie caricata</option>
+                                </select>
                             </div>
                             <div style="flex:1; min-width:180px;">
                                 <label style="font-size:0.75rem;">Profilo area:</label>
