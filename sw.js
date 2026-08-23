@@ -26,7 +26,9 @@ const LOCAL_ASSETS = [
   './js/offline-cache-utils.js',
   './js/offline-map-download-utils.js',
   './js/poi-utils.js',
-  './js/sw-utils.js'
+  './js/sw-utils.js',
+  './js/truffle-forecast.js',
+  './js/weather-moon.js'
 ];
 
 // Asset CDN esterni: vengono aggiunti alla cache in modalità best-effort.
