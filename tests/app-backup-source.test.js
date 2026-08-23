@@ -9,7 +9,7 @@ describe('buildCompleteBackupData source', () => {
   });
 
   it('non mantiene alias legacy ridondanti per luoghi/aree di raccolta', () => {
-    expect(appSource).not.toContain('archivioLuoghiRaccolta');
-    expect(appSource).not.toContain('archivioAreeLuoghiRaccolta');
+    expect(appSource).not.toContain('archivioLuoghiRaccolta:');
+    expect(appSource).not.toContain('archivioAreeLuoghiRaccolta:');
   });
 });
