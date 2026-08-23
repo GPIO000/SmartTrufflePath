@@ -1653,7 +1653,7 @@ const REVERSE_GEOCODE_MAX_CACHE_ENTRIES = 200;
 const reverseGeocodeCache = new Map();
 let reverseGeocodeInFlight = false;
 let lastReverseGeocodeAt = 0;
-let latestGpsAltitude;
+let latestGpsSnapshot = null;
 
 function getReverseGeocodeCacheKey(lat, lng) {
     return `${Number(lat).toFixed(REVERSE_GEOCODE_GRID_DECIMALS)},${Number(lng).toFixed(REVERSE_GEOCODE_GRID_DECIMALS)}`;
@@ -1755,20 +1755,21 @@ if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        latestGpsAltitude = normalizePoiAltitude(position.coords.altitude);
+        const altitude = normalizePoiAltitude(position.coords.altitude);
+        latestGpsSnapshot = { lat, lng, altitude };
         const dot = document.getElementById('gps-status-dot');
         if (dot) {
             dot.style.backgroundColor = '#22c55e';
-            dot.title = `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}${Number.isFinite(latestGpsAltitude) ? ` • ${formatPoiAltitude(latestGpsAltitude)}` : ''}`;
+            dot.title = `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}${Number.isFinite(altitude) ? ` • ${formatPoiAltitude(altitude)}` : ''}`;
         }
         reverseGeocodePosition(lat, lng);
         if (!userMarker) {
-            userMarker = L.marker([lat, lng]).addTo(map).bindPopup(buildUserMarkerPopupHtml(latestGpsAltitude)).openPopup();
+            userMarker = L.marker([lat, lng]).addTo(map).bindPopup(buildUserMarkerPopupHtml(altitude)).openPopup();
             map.setView([lat, lng], getAdaptiveFocusZoom(18));
             renderAllPoiMarkers();
         } else {
             userMarker.setLatLng([lat, lng]);
-            userMarker.setPopupContent(buildUserMarkerPopupHtml(latestGpsAltitude));
+            userMarker.setPopupContent(buildUserMarkerPopupHtml(altitude));
         }
         updateCompass(lat, lng);
         const activeWeatherTarget = getActiveNavigationWeatherTarget();
@@ -1881,8 +1882,8 @@ function addPoi(lat, lng, note, type, from, marker, altitude) {
 
 function saveCarPosition() {
     if (userMarker) {
-        const pos = userMarker.getLatLng();
-        addPoi(pos.lat, pos.lng, 'Auto', 'auto', undefined, undefined, latestGpsAltitude);
+        const pos = latestGpsSnapshot || userMarker.getLatLng();
+        addPoi(pos.lat, pos.lng, 'Auto', 'auto', undefined, undefined, latestGpsSnapshot?.altitude);
         renderAllPoiMarkers();
         showToast("🚗 Posizione auto aggiunta nell'elenco punti!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
@@ -1902,14 +1903,18 @@ async function savePoiPosition(forceLat, forceLng) {
         }
         if (saveSource !== 'gps') return;
     }
-    const pos = resolvePoiCoords(forceLat, forceLng, userMarker);
+    const pos = hasForcedCoords
+        ? resolvePoiCoords(forceLat, forceLng, userMarker)
+        : (latestGpsSnapshot
+            ? { lat: latestGpsSnapshot.lat, lng: latestGpsSnapshot.lng }
+            : resolvePoiCoords(forceLat, forceLng, userMarker));
     if (pos) {
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
         if (note === null) return;
         await waitForDialogToSettle(document.getElementById('app-dialog'));
         const marker = await choosePoiMarker();
         if (marker === null) return;
-        const poiAltitude = hasForcedCoords ? undefined : latestGpsAltitude;
+        const poiAltitude = hasForcedCoords ? undefined : latestGpsSnapshot?.altitude;
         const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, marker, poiAltitude);
         renderAllPoiMarkers();
         map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18));
@@ -1995,16 +2000,19 @@ function savePoiEdit(index) {
     if (isNaN(lat) || isNaN(lng)) { showToast("Coordinate non valide.", 'error'); return; }
     const previousLat = Number(poiList[index].lat);
     const previousLng = Number(poiList[index].lng);
+    const hadAltitude = Number.isFinite(normalizePoiAltitude(poiList[index].altitude));
     poiList[index].note = note;
     poiList[index].lat = lat;
     poiList[index].lng = lng;
-    if (previousLat !== lat || previousLng !== lng) delete poiList[index].altitude;
+    const changedCoords = previousLat !== lat || previousLng !== lng;
+    if (changedCoords) delete poiList[index].altitude;
     const updatedMarker = normalizePoiMarker(markerEl ? markerEl.value : poiList[index].marker, poiType);
     poiList[index].marker = updatedMarker;
     poiList = normalizePoiList(poiList);
     localStorage.setItem('poi_list', JSON.stringify(poiList));
     renderAllPoiMarkers();
     editingPoiIndex = null;
+    if (changedCoords && hadAltitude) showToast('ℹ️ Quota rimossa: aggiorna il punto da GPS per salvarla di nuovo.', 'info');
     showToast(`${updatedMarker} Punto aggiornato!`, 'success');
     openModule('poilist');
 }
