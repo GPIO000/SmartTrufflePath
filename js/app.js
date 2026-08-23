@@ -33,9 +33,11 @@ import {
     isDuplicateMapLongPress,
     DEFAULT_GENERIC_POI_MARKER,
     DEFAULT_SHARED_POI_MARKER,
+    formatPoiAltitude,
     formatPoiDisplayDate,
     getDefaultMarkerForPoiType,
     normalizePoiList,
+    normalizePoiAltitude,
     normalizePoiMarker,
     parseLegacyDateToTimestamp,
     resolvePoiCoords,
@@ -1651,9 +1653,20 @@ const REVERSE_GEOCODE_MAX_CACHE_ENTRIES = 200;
 const reverseGeocodeCache = new Map();
 let reverseGeocodeInFlight = false;
 let lastReverseGeocodeAt = 0;
+let latestGpsSnapshot = null;
 
 function getReverseGeocodeCacheKey(lat, lng) {
     return `${Number(lat).toFixed(REVERSE_GEOCODE_GRID_DECIMALS)},${Number(lng).toFixed(REVERSE_GEOCODE_GRID_DECIMALS)}`;
+}
+
+function buildPoiAltitudeHtml(altitude) {
+    const altitudeText = formatPoiAltitude(altitude);
+    return altitudeText ? `<br><small>${escapeHtml(altitudeText)}</small>` : '';
+}
+
+function buildUserMarkerPopupHtml(altitude) {
+    const altitudeText = formatPoiAltitude(altitude);
+    return altitudeText ? `<b>Sei qui</b><br><small>${escapeHtml(altitudeText)}</small>` : '<b>Sei qui</b>';
 }
 
 function updateGpsStatusTextFromLocation(locationData, lat, lng) {
@@ -1742,14 +1755,22 @@ if (navigator.geolocation) {
     navigator.geolocation.watchPosition((position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
+        const altitude = normalizePoiAltitude(position.coords.altitude);
+        latestGpsSnapshot = { lat, lng, altitude };
         const dot = document.getElementById('gps-status-dot');
-        if (dot) { dot.style.backgroundColor = '#22c55e'; dot.title = "GPS Attivo: " + lat.toFixed(4) + ", " + lng.toFixed(4); }
+        if (dot) {
+            dot.style.backgroundColor = '#22c55e';
+            dot.title = `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}${Number.isFinite(altitude) ? ` • ${formatPoiAltitude(altitude)}` : ''}`;
+        }
         reverseGeocodePosition(lat, lng);
         if (!userMarker) {
-            userMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>Sei qui</b>").openPopup();
+            userMarker = L.marker([lat, lng]).addTo(map).bindPopup(buildUserMarkerPopupHtml(altitude)).openPopup();
             map.setView([lat, lng], getAdaptiveFocusZoom(18));
             renderAllPoiMarkers();
-        } else { userMarker.setLatLng([lat, lng]); }
+        } else {
+            userMarker.setLatLng([lat, lng]);
+            userMarker.setPopupContent(buildUserMarkerPopupHtml(altitude));
+        }
         updateCompass(lat, lng);
         const activeWeatherTarget = getActiveNavigationWeatherTarget();
         if (activeWeatherTarget) {
@@ -1774,8 +1795,9 @@ function renderAllPoiMarkers() {
         const { marker, popupTitle } = getPoiMarkerAndTitle(poi);
         const icon = L.divIcon({ className: '', html: `<div style="font-size:28px;line-height:1;">${escapeHtml(marker)}</div>`, iconAnchor: [14, 14] });
         const fromInfo = poi.from ? `<br><small>Da: ${escapeHtml(safePoi.from || '')}</small>` : '';
+        const altitudeInfo = buildPoiAltitudeHtml(poi.altitude);
         const poiMarker = L.marker([poi.lat, poi.lng], { icon }).addTo(map)
-            .bindPopup(`<b>${popupTitle}</b><br>Nota: ${safePoi.note || 'Nessuna nota'}<br><small>${safePoi.date || ''}</small>${fromInfo}`);
+            .bindPopup(`<b>${popupTitle}</b><br>Nota: ${safePoi.note || 'Nessuna nota'}<br><small>${safePoi.date || ''}</small>${altitudeInfo}${fromInfo}`);
         poiMarker.on('popupopen', () => updateWeatherMoon(poi.lat, poi.lng, safePoi.note || popupTitle, true));
         poiMapMarkers[index] = poiMarker;
     });
@@ -1836,7 +1858,7 @@ function getSavedSenderName() {
     return typeof tData.nome === 'string' ? tData.nome.trim() : '';
 }
 
-function addPoi(lat, lng, note, type, from, marker) {
+function addPoi(lat, lng, note, type, from, marker, altitude) {
     const savedAt = new Date().toISOString();
     const id = `poi-${savedAt}-${Math.random().toString(36).slice(2, 8)}`;
     const entry = {
@@ -1850,6 +1872,8 @@ function addPoi(lat, lng, note, type, from, marker) {
     };
     if (type) entry.type = type;
     if (from) entry.from = from;
+    const normalizedAltitude = normalizePoiAltitude(altitude);
+    if (Number.isFinite(normalizedAltitude)) entry.altitude = normalizedAltitude;
     poiList.push(entry);
     poiList = normalizePoiList(poiList);
     localStorage.setItem('poi_list', JSON.stringify(poiList));
@@ -1858,8 +1882,8 @@ function addPoi(lat, lng, note, type, from, marker) {
 
 function saveCarPosition() {
     if (userMarker) {
-        const pos = userMarker.getLatLng();
-        addPoi(pos.lat, pos.lng, 'Auto', 'auto');
+        const pos = latestGpsSnapshot || userMarker.getLatLng();
+        addPoi(pos.lat, pos.lng, 'Auto', 'auto', undefined, undefined, latestGpsSnapshot?.altitude);
         renderAllPoiMarkers();
         showToast("🚗 Posizione auto aggiunta nell'elenco punti!", 'success');
     } else { showToast("Segnale GPS non ancora disponibile.", 'error'); }
@@ -1879,14 +1903,19 @@ async function savePoiPosition(forceLat, forceLng) {
         }
         if (saveSource !== 'gps') return;
     }
-    const pos = resolvePoiCoords(forceLat, forceLng, userMarker);
+    const pos = hasForcedCoords
+        ? resolvePoiCoords(forceLat, forceLng, userMarker)
+        : (latestGpsSnapshot
+            ? { lat: latestGpsSnapshot.lat, lng: latestGpsSnapshot.lng }
+            : resolvePoiCoords(undefined, undefined, userMarker));
     if (pos) {
         const note = await appPrompt("Inserisci una nota per questo punto (es. Tartufaia bianca sotto quercia):", "");
         if (note === null) return;
         await waitForDialogToSettle(document.getElementById('app-dialog'));
         const marker = await choosePoiMarker();
         if (marker === null) return;
-        const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, marker);
+        const poiAltitude = hasForcedCoords ? undefined : latestGpsSnapshot?.altitude;
+        const newIndex = addPoi(pos.lat, pos.lng, note, undefined, undefined, marker, poiAltitude);
         renderAllPoiMarkers();
         map.setView([pos.lat, pos.lng], getAdaptiveFocusZoom(18));
         if (poiMapMarkers[newIndex]) poiMapMarkers[newIndex].openPopup();
@@ -1969,15 +1998,21 @@ function savePoiEdit(index) {
     const lng = parseFloat(lngEl.value);
     if (!note) { showToast("La nota non può essere vuota.", 'error'); return; }
     if (isNaN(lat) || isNaN(lng)) { showToast("Coordinate non valide.", 'error'); return; }
+    const previousLat = Number(poiList[index].lat);
+    const previousLng = Number(poiList[index].lng);
+    const hadAltitude = Number.isFinite(normalizePoiAltitude(poiList[index].altitude));
     poiList[index].note = note;
     poiList[index].lat = lat;
     poiList[index].lng = lng;
+    const changedCoords = previousLat !== lat || previousLng !== lng;
+    if (changedCoords) delete poiList[index].altitude;
     const updatedMarker = normalizePoiMarker(markerEl ? markerEl.value : poiList[index].marker, poiType);
     poiList[index].marker = updatedMarker;
     poiList = normalizePoiList(poiList);
     localStorage.setItem('poi_list', JSON.stringify(poiList));
     renderAllPoiMarkers();
     editingPoiIndex = null;
+    if (changedCoords && hadAltitude) showToast('ℹ️ Quota rimossa: aggiorna il punto da GPS per salvarla di nuovo.', 'info');
     showToast(`${updatedMarker} Punto aggiornato!`, 'success');
     openModule('poilist');
 }
@@ -2098,11 +2133,13 @@ function openModule(moduleName, editMode = false) {
                             </div>
                         </div>`;
                     } else {
+                        const altitudeLine = formatPoiAltitude(poi.altitude);
                         poiHtml += `
                         <div class="module-card card-gap">
                             <strong class="text-accent">${poiIcon} ${safePoi.note}</strong>
                             <p class="text-muted small-text" style="margin:4px 0;">Data: ${safePoi.date}</p>
                             <p class="text-subtle small-text">Lat: ${poi.lat.toFixed(4)}, Lng: ${poi.lng.toFixed(4)}</p>
+                            ${altitudeLine ? `<p class="text-subtle small-text">${escapeHtml(altitudeLine)}</p>` : ''}
                             ${fromLine}
                             <div class="btn-row">
                                 <button class="overlay-btn btn-success" ${actionAttrs('navigateToPoi', [idx])}>🧭 Vai</button>
