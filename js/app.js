@@ -5,6 +5,7 @@ import {
     fetchTruffleForecastDataset,
     getAreaProfiles,
     getFeedbackClassesForSpecies,
+    getOpenSpeciesForRegion,
     resolveFeedbackEntryClass,
     TRUFFLE_SPECIES_FORECAST
 } from './truffle-forecast.js';
@@ -908,7 +909,7 @@ function renderTruffleForecastMessage(title, body, tone = '#f59e0b') {
         </div>`;
 }
 
-function renderTruffleForecastResults(forecast, regionName, feedbackEntries) {
+function renderTruffleForecastResults(forecast, regionName, feedbackEntries, options = {}) {
     const results = document.getElementById('truffle-forecast-results');
     if (!results) return;
 
@@ -918,6 +919,21 @@ function renderTruffleForecastResults(forecast, regionName, feedbackEntries) {
     }
 
     const bestDay = forecast.bestDay;
+    const noOpenSpeciesToday = Number(options.openSpeciesTodayCount) === 0;
+    const noOpenSpeciesTodayHtml = noOpenSpeciesToday
+        ? `
+            <div class="module-card" style="margin-bottom:12px; background: rgba(29,40,30,0.96); border-left:4px solid #ef4444;">
+                <p style="margin:0; color:#ef4444; font-weight:bold;">🔴 Nessuna specie aperta oggi in quest'area.</p>
+                <p style="margin:8px 0 0 0; color:#ddd6c8; font-size:0.82rem;">Per la regione ${escapeHtml(regionName)} oggi non risultano specie legalmente aperte nei calendari salvati.</p>
+            </div>`
+        : '';
+    const noOpenForecastDaysHtml = !bestDay
+        ? `
+            <div class="module-card" style="margin-bottom:12px; background: rgba(29,40,30,0.96); border-left:4px solid #6b7280;">
+                <p style="margin:0; color:#d1d5db; font-weight:bold;">📅 Nessuna apertura per la specie selezionata nella finestra mostrata.</p>
+                <p style="margin:8px 0 0 0; color:#b8b0a0; font-size:0.82rem;">La previsione resta visibile, ma tutti i giorni mostrati risultano fuori periodo regionale per ${escapeHtml(forecast.species.shortName)}.</p>
+            </div>`
+        : '';
     const summaryHtml = bestDay
         ? `
             <div class="module-card" style="margin-bottom:12px; background: rgba(29,40,30,0.96); border-left:4px solid ${bestDay.score >= 70 ? '#22c55e' : bestDay.score >= 45 ? '#f59e0b' : '#ef4444'};">
@@ -982,6 +998,8 @@ function renderTruffleForecastResults(forecast, regionName, feedbackEntries) {
     }).join('');
 
     results.innerHTML = `
+        ${noOpenSpeciesTodayHtml}
+        ${noOpenForecastDaysHtml}
         ${summaryHtml}
         <div class="module-card" style="margin-bottom:12px; background: rgba(18,22,16,0.96);">
             <p style="margin:0; color:#f6f1e6; font-size:0.84rem;"><strong>Zona:</strong> ${escapeHtml(forecast.locationLabel)} · <strong>Profilo:</strong> ${escapeHtml(forecast.areaProfile.label)} · <strong>Regione:</strong> ${escapeHtml(regionName)}</p>
@@ -1010,6 +1028,7 @@ async function loadTruffleForecastModule() {
     const speciesProfile = TRUFFLE_SPECIES_FORECAST.find((item) => String(item.id) === speciesSelect.value) || TRUFFLE_SPECIES_FORECAST[0];
     const regionName = getCurrentGpsRegionName();
     const calendari = readStorageJSON('calendari_tartufi_custom', {});
+    const openSpeciesToday = getOpenSpeciesForRegion(calendari?.[regionName] ?? {});
     const periodoRegionale = calendari?.[regionName]?.[speciesProfile.id] || '';
 
     if (!periodoRegionale) {
@@ -1038,7 +1057,9 @@ async function loadTruffleForecastModule() {
             locationLabel: selectedLocation.label,
             areaProfile: areaSelect.value || 'equilibrato'
         });
-        renderTruffleForecastResults(forecast, regionName, feedbackEntries);
+        renderTruffleForecastResults(forecast, regionName, feedbackEntries, {
+            openSpeciesTodayCount: openSpeciesToday.length
+        });
     } catch (error) {
         console.warn('Previsione tartufi non disponibile:', error);
         renderTruffleForecastMessage(
@@ -3481,29 +3502,27 @@ function openModule(moduleName, editMode = false) {
         <p style="font-size:0.85rem; color:#b8b0a0; margin-bottom:15px;">Specie con periodo di raccolta attualmente <b>aperto</b>:</p>
     `;
 
-    let specieAperteTrovate = 0;
+    const specieAperteOggi = getOpenSpeciesForRegion(datiRegioneCorrente);
+    let specieAperteTrovate = specieAperteOggi.length;
     let specieConDateSalvate = 0;
 
-    specieTartufiCal.forEach((specie, id) => {
+    specieTartufiCal.forEach((_specie, id) => {
         let periodoSalvato = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : '';
 
         // Se non ci sono date salvate per questa specie, la saltiamo
         if (!periodoSalvato) return;
         specieConDateSalvate++;
+    });
 
-        // Controllo di sicurezza nel caso in cui la funzione di verifica non esista
-        let isOpen = typeof isSpecieApertaCorrente === 'function' ? isSpecieApertaCorrente(periodoSalvato) : false;
-
-        if (isOpen) {
-            specieAperteTrovate++;
-            calHtml += `
-                <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: rgba(29,40,30,0.96); padding: 10px; border-radius: 6px;">
-                    <strong style="color: #f6f1e6; font-size: 0.85rem; display: block;">🍄 [ID: ${id}] ${specie}</strong>
-                    <div style="font-size: 0.75rem; color: #b8b0a0; margin-top: 4px;">🗓️ Periodo consentito: ${periodoSalvato}</div>
-                    <div style="font-size: 0.75rem; margin-top: 6px;"><span style="color:#22c55e; font-weight:bold;">🟢 RACCOLTA APERTA</span></div>
-                </div>
-            `;
-        }
+    specieAperteOggi.forEach((specie) => {
+        const periodoSalvato = datiRegioneCorrente[specie.id] || '';
+        calHtml += `
+            <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: rgba(29,40,30,0.96); padding: 10px; border-radius: 6px;">
+                <strong style="color: #f6f1e6; font-size: 0.85rem; display: block;">🍄 [ID: ${specie.id}] ${specie.name}</strong>
+                <div style="font-size: 0.75rem; color: #b8b0a0; margin-top: 4px;">🗓️ Periodo consentito: ${periodoSalvato}</div>
+                <div style="font-size: 0.75rem; margin-top: 6px;"><span style="color:#22c55e; font-weight:bold;">🟢 RACCOLTA APERTA</span></div>
+            </div>
+        `;
     });
 
     if (specieConDateSalvate === 0) {
@@ -6252,97 +6271,6 @@ function salvaArchivioRegionaleTartufi(regione) {
 
     showToast("Calendario salvato!", 'success');
     openModule('archivio');
-}
-
-function isSpecieApertaCorrente(periodoStr) {
-    if (!periodoStr) return false;
-    
-    const oggi = new Date();
-    const annoCorrente = oggi.getFullYear();
-    
-    // Mappatura completa dei mesi in italiano (inclusi abbreviazioni)
-    const mesiMap = {
-        "gennaio": 0, "gen": 0,
-        "febbraio": 1, "feb": 1,
-        "marzo": 2, "mar": 2,
-        "aprile": 3, "apr": 3,
-        "maggio": 4, "mag": 4,
-        "giugno": 5, "giu": 5,
-        "luglio": 6, "lug": 6,
-        "agosto": 7, "ago": 7,
-        "settembre": 8, "set": 8, "sett": 8,
-        "ottobre": 9, "ott": 9,
-        "novembre": 10, "nov": 10,
-        "dicembre": 11, "dic": 11
-    };
-
-    // Funzione interna di supporto per convertire una stringa di data (es. "1 ottobre" o "15/10") in un oggetto Date
-    function parseDataStringa(stringaData, annoRiferimento) {
-        stringaData = stringaData.toLowerCase().trim();
-        
-        // Tentativo 1: Formato numerico (es. 01/10 o 1-10 o 1.10.2026)
-        const matchNum = stringaData.match(/(\d{1,2})[\/\-\.\s](\d{1,2})(?:[\/\-\.\s](\d{4}))?/);
-        if (matchNum) {
-            const giorno = parseInt(matchNum[1], 10);
-            const mese = parseInt(matchNum[2], 10) - 1; // I mesi in JS vanno da 0 a 11
-            const anno = matchNum[3] ? parseInt(matchNum[3], 10) : annoRiferimento;
-            return new Date(anno, mese, giorno);
-        }
-
-        // Tentativo 2: Formato testuale (es. "1 ottobre" o "ottobre")
-        let trovatoMese = null;
-        let giorno = 1; // Default al primo del mese se il giorno non è specificato
-
-        for (const [nomeMese, idxMese] of Object.entries(mesiMap)) {
-            if (stringaData.includes(nomeMese)) {
-                trovatoMese = idxMese;
-                break;
-            }
-        }
-
-        if (trovatoMese === null) return null;
-
-        // Cerca se c'è un numero che rappresenta il giorno prima del mese
-        const matchGiorno = stringaData.match(/(\d{1,2})/);
-        if (matchGiorno) {
-            giorno = parseInt(matchGiorno[1], 10);
-        }
-
-        return new Date(annoRiferimento, trovatoMese, giorno);
-    }
-
-    // Pulisce la stringa rimuovendo parole superflue come "dal", "al", "ore", ecc.
-    let testoPulito = periodoStr.toLowerCase()
-        .replace(/\bdal\b/g, '')
-        .replace(/\bal\b/g, '-')
-        .replace(/\bdel\b/g, '')
-        .trim();
-
-    // Divide la stringa in due parti usando il trattino o la parola "al" come separatore
-    const parti = testoPulito.split(/\s*-\s*/);
-    if (parti.length < 2) return false;
-
-    let dataInizio = parseDataStringa(parti[0], annoCorrente);
-    let dataFine = parseDataStringa(parti[1], annoCorrente);
-
-    if (!dataInizio || !dataFine) return false;
-
-    // Se la data di fine è precedente o uguale a quella di inizio, significa che siamo a cavallo d'anno (es. Ottobre - Gennaio)
-    if (dataInizio > dataFine) {
-        if (oggi.getMonth() <= dataFine.getMonth()) {
-            // Se siamo nei primi mesi dell'anno corrente, l'inizio è avvenuto l'anno scorso
-            dataInizio.setFullYear(annoCorrente - 1);
-        } else {
-            // Altrimenti, la fine si sposta all'anno prossimo
-            dataFine.setFullYear(annoCorrente + 1);
-        }
-    }
-
-    // Normalizza l'orario a inizio e fine giornata per un confronto pulito
-    dataInizio.setHours(0, 0, 0, 0);
-    dataFine.setHours(23, 59, 59, 999);
-
-    return oggi >= dataInizio && oggi <= dataFine;
 }
 
 function elaboraTestoIncollato() {

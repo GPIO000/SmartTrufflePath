@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     aggregateHourlyToDaily,
     buildTruffleForecastCalendar,
+    getOpenSpeciesForRegion,
     getFeedbackClassesForSpecies,
     isDateWithinPeriod
 } from '../js/truffle-forecast.js';
@@ -65,6 +66,23 @@ describe('isDateWithinPeriod', () => {
         expect(isDateWithinPeriod('15 novembre - 31 gennaio', new Date('2026-12-20T12:00:00'))).toBe(true);
         expect(isDateWithinPeriod('15 novembre - 31 gennaio', new Date('2027-01-10T12:00:00'))).toBe(true);
         expect(isDateWithinPeriod('15 novembre - 31 gennaio', new Date('2027-03-10T12:00:00'))).toBe(false);
+    });
+});
+
+describe('getOpenSpeciesForRegion', () => {
+    it('restituisce solo le specie aperte alla data indicata', () => {
+        const openSpecies = getOpenSpeciesForRegion({
+            0: '1 ottobre - 31 dicembre',
+            1: '1 gennaio - 31 gennaio',
+            5: '15 giugno - 31 agosto'
+        }, new Date('2026-10-15T12:00:00'));
+
+        expect(openSpecies.map((species) => species.id)).toEqual([0]);
+    });
+
+    it('ignora calendari mancanti o non validi', () => {
+        expect(getOpenSpeciesForRegion(null, new Date('2026-10-15T12:00:00'))).toEqual([]);
+        expect(getOpenSpeciesForRegion([], new Date('2026-10-15T12:00:00'))).toEqual([]);
     });
 });
 

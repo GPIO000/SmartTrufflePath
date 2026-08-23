@@ -333,6 +333,14 @@ export function getFeedbackClassesForSpecies(speciesId) {
     return classes.map((entry) => ({ ...entry }));
 }
 
+export function getOpenSpeciesForRegion(regionCalendar = {}, date = new Date()) {
+    if (!regionCalendar || typeof regionCalendar !== 'object' || Array.isArray(regionCalendar)) return [];
+
+    return TRUFFLE_SPECIES_FORECAST
+        .filter((species) => isDateWithinPeriod(regionCalendar?.[species.id] || '', date))
+        .map((species) => ({ ...species }));
+}
+
 function getFeedbackClassById(speciesId, classId) {
     if (!classId) return null;
     return getFeedbackClassesForSpecies(speciesId).find((entry) => entry.id === classId) ?? null;
