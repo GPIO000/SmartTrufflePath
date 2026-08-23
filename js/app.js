@@ -4,6 +4,9 @@ import {
     buildTruffleForecastCalendar,
     fetchTruffleForecastDataset,
     getAreaProfiles,
+    getFeedbackClassesForSpecies,
+    getOpenSpeciesForRegion,
+    resolveFeedbackEntryClass,
     TRUFFLE_SPECIES_FORECAST
 } from './truffle-forecast.js';
 import {
@@ -873,6 +876,15 @@ function findForecastFeedback(feedbackEntries, speciesName, locationLabel, date)
     return feedbackEntries.find((entry) => entry?.speciesName === speciesName && entry?.locationLabel === locationLabel && entry?.date === date) || null;
 }
 
+function getForecastFeedbackUiOptions(speciesId) {
+    return getFeedbackClassesForSpecies(speciesId).map((feedbackClass) => ({
+        id: feedbackClass.id,
+        label: feedbackClass.label,
+        found: Boolean(feedbackClass.found),
+        emoji: feedbackClass.emoji || (!feedbackClass.found ? '➖' : '✅')
+    }));
+}
+
 function escapeAttr(value) {
     return escapeHtml(value).replace(/"/g, '&quot;');
 }
@@ -897,7 +909,7 @@ function renderTruffleForecastMessage(title, body, tone = '#f59e0b') {
         </div>`;
 }
 
-function renderTruffleForecastResults(forecast, regionName, feedbackEntries) {
+function renderTruffleForecastResults(forecast, regionName, feedbackEntries, options = {}) {
     const results = document.getElementById('truffle-forecast-results');
     if (!results) return;
 
@@ -907,6 +919,22 @@ function renderTruffleForecastResults(forecast, regionName, feedbackEntries) {
     }
 
     const bestDay = forecast.bestDay;
+    const { openSpeciesTodayCount = null } = options;
+    const noOpenSpeciesToday = openSpeciesTodayCount === 0;
+    const noOpenSpeciesTodayHtml = noOpenSpeciesToday
+        ? `
+            <div class="module-card" style="margin-bottom:12px; background: rgba(29,40,30,0.96); border-left:4px solid #ef4444;">
+                <p style="margin:0; color:#ef4444; font-weight:bold;">🔴 Nessuna specie aperta oggi in quest'area.</p>
+                <p style="margin:8px 0 0 0; color:#ddd6c8; font-size:0.82rem;">Per la regione ${escapeHtml(regionName)} oggi non risultano specie legalmente aperte nei calendari salvati.</p>
+            </div>`
+        : '';
+    const noOpenForecastDaysHtml = !bestDay
+        ? `
+            <div class="module-card" style="margin-bottom:12px; background: rgba(29,40,30,0.96); border-left:4px solid #6b7280;">
+                <p style="margin:0; color:#d1d5db; font-weight:bold;">📅 Nessuna apertura per la specie selezionata nella finestra mostrata.</p>
+                <p style="margin:8px 0 0 0; color:#b8b0a0; font-size:0.82rem;">La previsione resta visibile, ma tutti i giorni mostrati risultano fuori periodo regionale per ${escapeHtml(forecast.species.shortName)}.</p>
+            </div>`
+        : '';
     const summaryHtml = bestDay
         ? `
             <div class="module-card" style="margin-bottom:12px; background: rgba(29,40,30,0.96); border-left:4px solid ${bestDay.score >= 70 ? '#22c55e' : bestDay.score >= 45 ? '#f59e0b' : '#ef4444'};">
@@ -919,14 +947,21 @@ function renderTruffleForecastResults(forecast, regionName, feedbackEntries) {
     const cardsHtml = forecast.days.map((day) => {
         const borderColor = !day.legalOpen ? '#6b7280' : day.score >= 70 ? '#22c55e' : day.score >= 45 ? '#f59e0b' : '#ef4444';
         const feedback = findForecastFeedback(feedbackEntries, forecast.species.name, forecast.locationLabel, day.date);
+        const feedbackClass = resolveFeedbackEntryClass(forecast.species.id, feedback);
+        const feedbackLabel = feedbackClass?.label || 'Feedback salvato';
+        const feedbackTone = feedbackClass
+            ? (feedbackClass.found ? '#22c55e' : '#f59e0b')
+            : '#9ca3af';
         const feedbackHtml = feedback
-            ? `<p style="margin:10px 0 0 0; color:${feedback.found ? '#22c55e' : '#f59e0b'}; font-size:0.8rem;">🧠 Feedback salvato: ${feedback.found ? 'ritrovamento confermato' : 'nessun ritrovamento'}.</p>`
+            ? `<p style="margin:10px 0 0 0; color:${feedbackTone}; font-size:0.8rem;">🧠 Feedback salvato: ${escapeHtml(feedbackLabel)}.</p>`
             : '';
+        const feedbackButtons = getForecastFeedbackUiOptions(forecast.species.id);
         const buttonsHtml = day.legalOpen
             ? `
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-                    <button class="overlay-btn btn-success" style="flex:1; min-width:140px; padding:8px 10px;" ${actionAttrs('saveTruffleForecastFeedback', [day.date, true])}>✅ Ho trovato</button>
-                    <button class="overlay-btn btn-neutral" style="flex:1; min-width:140px; padding:8px 10px; background:#4b5563;" ${actionAttrs('saveTruffleForecastFeedback', [day.date, false])}>➖ Nessun ritrovamento</button>
+                    ${feedbackButtons.map((option) => `
+                        <button class="overlay-btn ${option.found ? 'btn-success' : 'btn-neutral'}" style="flex:1; min-width:150px; padding:8px 10px;${option.found ? '' : ' background:#4b5563;'}" ${actionAttrs('saveTruffleForecastFeedback', [day.date, option.id])}>${option.emoji} ${escapeHtml(option.label)}</button>
+                    `).join('')}
                 </div>`
             : '';
         return `
@@ -959,6 +994,8 @@ function renderTruffleForecastResults(forecast, regionName, feedbackEntries) {
     }).join('');
 
     results.innerHTML = `
+        ${noOpenSpeciesTodayHtml}
+        ${noOpenForecastDaysHtml}
         ${summaryHtml}
         <div class="module-card" style="margin-bottom:12px; background: rgba(18,22,16,0.96);">
             <p style="margin:0; color:#f6f1e6; font-size:0.84rem;"><strong>Zona:</strong> ${escapeHtml(forecast.locationLabel)} · <strong>Profilo:</strong> ${escapeHtml(forecast.areaProfile.label)} · <strong>Regione:</strong> ${escapeHtml(regionName)}</p>
@@ -987,6 +1024,7 @@ async function loadTruffleForecastModule() {
     const speciesProfile = TRUFFLE_SPECIES_FORECAST.find((item) => String(item.id) === speciesSelect.value) || TRUFFLE_SPECIES_FORECAST[0];
     const regionName = getCurrentGpsRegionName();
     const calendari = readStorageJSON('calendari_tartufi_custom', {});
+    const openSpeciesToday = getOpenSpeciesForRegion(calendari?.[regionName] ?? {}, new Date());
     const periodoRegionale = calendari?.[regionName]?.[speciesProfile.id] || '';
 
     if (!periodoRegionale) {
@@ -1015,7 +1053,9 @@ async function loadTruffleForecastModule() {
             locationLabel: selectedLocation.label,
             areaProfile: areaSelect.value || 'equilibrato'
         });
-        renderTruffleForecastResults(forecast, regionName, feedbackEntries);
+        renderTruffleForecastResults(forecast, regionName, feedbackEntries, {
+            openSpeciesTodayCount: openSpeciesToday.length
+        });
     } catch (error) {
         console.warn('Previsione tartufi non disponibile:', error);
         renderTruffleForecastMessage(
@@ -1026,7 +1066,7 @@ async function loadTruffleForecastModule() {
     }
 }
 
-function saveTruffleForecastFeedback(date, found) {
+function saveTruffleForecastFeedback(date, outcomeClassId) {
     const locationSelect = document.getElementById('truffle-forecast-location');
     const speciesSelect = document.getElementById('truffle-forecast-species');
     const areaSelect = document.getElementById('truffle-forecast-area');
@@ -1035,6 +1075,11 @@ function saveTruffleForecastFeedback(date, found) {
     const locationChoice = getTruffleForecastLocationChoices().find((choice) => choice.id === locationSelect.value);
     const speciesProfile = TRUFFLE_SPECIES_FORECAST.find((item) => String(item.id) === speciesSelect.value);
     if (!locationChoice || !speciesProfile) return;
+    const selectedClass = getFeedbackClassesForSpecies(speciesProfile.id).find((feedbackClass) => feedbackClass.id === outcomeClassId);
+    if (!selectedClass) {
+        showToast('Feedback non valido per la specie selezionata.', 'error');
+        return;
+    }
 
     const feedbackEntries = getStoredForecastFeedback().filter((entry) => !(
         entry?.date === date
@@ -1045,7 +1090,8 @@ function saveTruffleForecastFeedback(date, found) {
 
     feedbackEntries.push({
         date,
-        found: Boolean(found),
+        found: Boolean(selectedClass.found),
+        outcomeClassId: selectedClass.id,
         speciesId: speciesProfile.id,
         speciesName: speciesProfile.name,
         locationLabel: locationChoice.label,
@@ -1053,7 +1099,7 @@ function saveTruffleForecastFeedback(date, found) {
         savedAt: new Date().toISOString()
     });
     localStorage.setItem(TRUFFLE_FORECAST_FEEDBACK_KEY, JSON.stringify(feedbackEntries));
-    showToast(found ? 'Feedback positivo salvato.' : 'Feedback di prudenza salvato.', 'success');
+    showToast(`Feedback salvato: ${selectedClass.label}.`, 'success');
     void loadTruffleForecastModule();
 }
 
@@ -1212,7 +1258,7 @@ const ACTION_HANDLERS = {
     refreshRegistroGiornaliero: () => openModule('registro_giornaliero'),
     refreshSpese: () => openModule('spese'),
     refreshTruffleForecast: () => loadTruffleForecastModule(),
-    saveTruffleForecastFeedback: (_event, date, found) => saveTruffleForecastFeedback(date, found),
+    saveTruffleForecastFeedback: (_event, date, outcomeClassId) => saveTruffleForecastFeedback(date, outcomeClassId),
     registerRicevutaSafe: async () => {
         try {
             await registraVenditaConPrezzoKg();
@@ -3423,6 +3469,9 @@ function openModule(moduleName, editMode = false) {
                     <div class="module-card" style="margin-bottom: 14px; background: rgba(18,22,16,0.96); border-left:4px solid #4d8a98;">
                         <p style="margin:0; color:#f6f1e6; font-size:0.84rem;"><strong>Nota importante:</strong> questo modulo non garantisce il ritrovamento. Serve a stimare una finestra favorevole, non sostituisce esperienza sul bosco, cane, microzona e rispetto delle regole regionali.</p>
                     </div>
+                    <div class="module-card" style="margin-bottom: 14px; background: rgba(29,40,30,0.96); border-left:4px solid #f59e0b;">
+                        <p style="margin:0; color:#f6f1e6; font-size:0.84rem;">💡 <strong>Più dati fornisci, più accurata sarà la previsione.</strong> Inserisci le tartufaie nei punti GPS, compila il registro giornaliero dei ritrovamenti, aggiungi il feedback sui giorni passati e salva i calendari regionali aggiornati: ogni dato in più affina il calcolo e migliora l'indice di probabilità.</p>
+                    </div>
                     <div id="truffle-forecast-results"></div>`;
                 break;
             }
@@ -3431,23 +3480,13 @@ function openModule(moduleName, editMode = false) {
     let regioneCal = getCurrentGpsRegionName();
 
     let allCalendari = getRenderableStorageJSON('calendari_tartufi_custom', {});
-    let datiRegioneCorrente = allCalendari[regioneCal] || {};
+    let datiRegioneCorrente = allCalendari[regioneCal];
+    if (!datiRegioneCorrente || typeof datiRegioneCorrente !== 'object' || Array.isArray(datiRegioneCorrente)) {
+        datiRegioneCorrente = {};
+    }
 
     let noteRegionaliSalvate = getRenderableStorageJSON('note_regionali_tartufi', {});
     let notaRegionaleCorrente = noteRegionaliSalvate[regioneCal] || '';
-
-    const specieTartufiCal = [
-        "Tuber magnatum Pico (Tartufo bianco pregiato)",
-        "Tuber melanosporum Vitt. (Tartufo nero di Norcia)",
-        "Tuber macrosporum Vitt. (Tartufo nero liscio)",
-        "Tuber brumale Vitt. (Tartufo nero d'inverno)",
-        "Tuber brumale var. moschatum De Ferry (Tartufo moscato)",
-        "Tuber aestivum Vitt. (Tartufo estivo o scorzone)",
-        "Tuber uncinatum Chatin (Tartufo uncinato)",
-        "Tuber borchii Vitt. / T. albidum Pico (Bianchetto o marzuolo)",
-        "Tuber mesentericum Vitt. (Tartufo nero di Bagnoli Irpino)"
-    ];
-    const defaultPeriodiCal = [];
 
     let calHtml = `
         <h2>📅 Calendario Raccolta (GPS)</h2>
@@ -3455,29 +3494,21 @@ function openModule(moduleName, editMode = false) {
         <p style="font-size:0.85rem; color:#b8b0a0; margin-bottom:15px;">Specie con periodo di raccolta attualmente <b>aperto</b>:</p>
     `;
 
-    let specieAperteTrovate = 0;
-    let specieConDateSalvate = 0;
+    const specieAperteOggi = getOpenSpeciesForRegion(datiRegioneCorrente);
+    const specieAperteTrovate = specieAperteOggi.length;
+    const specieConDateSalvate = Object.values(datiRegioneCorrente)
+        .filter((periodo) => typeof periodo === 'string' && periodo.trim())
+        .length;
 
-    specieTartufiCal.forEach((specie, id) => {
-        let periodoSalvato = datiRegioneCorrente[id] !== undefined ? datiRegioneCorrente[id] : '';
-
-        // Se non ci sono date salvate per questa specie, la saltiamo
-        if (!periodoSalvato) return;
-        specieConDateSalvate++;
-
-        // Controllo di sicurezza nel caso in cui la funzione di verifica non esista
-        let isOpen = typeof isSpecieApertaCorrente === 'function' ? isSpecieApertaCorrente(periodoSalvato) : false;
-
-        if (isOpen) {
-            specieAperteTrovate++;
-            calHtml += `
-                <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: rgba(29,40,30,0.96); padding: 10px; border-radius: 6px;">
-                    <strong style="color: #f6f1e6; font-size: 0.85rem; display: block;">🍄 [ID: ${id}] ${specie}</strong>
-                    <div style="font-size: 0.75rem; color: #b8b0a0; margin-top: 4px;">🗓️ Periodo consentito: ${periodoSalvato}</div>
-                    <div style="font-size: 0.75rem; margin-top: 6px;"><span style="color:#22c55e; font-weight:bold;">🟢 RACCOLTA APERTA</span></div>
-                </div>
-            `;
-        }
+    specieAperteOggi.forEach((specie) => {
+        const periodoSalvato = datiRegioneCorrente[specie.id] || '';
+        calHtml += `
+            <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: rgba(29,40,30,0.96); padding: 10px; border-radius: 6px;">
+                <strong style="color: #f6f1e6; font-size: 0.85rem; display: block;">🍄 [ID: ${escapeHtml(String(specie.id))}] ${escapeHtml(specie.name)}</strong>
+                <div style="font-size: 0.75rem; color: #b8b0a0; margin-top: 4px;">🗓️ Periodo consentito: ${escapeHtml(periodoSalvato)}</div>
+                <div style="font-size: 0.75rem; margin-top: 6px;"><span style="color:#22c55e; font-weight:bold;">🟢 RACCOLTA APERTA</span></div>
+            </div>
+        `;
     });
 
     if (specieConDateSalvate === 0) {
@@ -6228,97 +6259,6 @@ function salvaArchivioRegionaleTartufi(regione) {
     openModule('archivio');
 }
 
-function isSpecieApertaCorrente(periodoStr) {
-    if (!periodoStr) return false;
-    
-    const oggi = new Date();
-    const annoCorrente = oggi.getFullYear();
-    
-    // Mappatura completa dei mesi in italiano (inclusi abbreviazioni)
-    const mesiMap = {
-        "gennaio": 0, "gen": 0,
-        "febbraio": 1, "feb": 1,
-        "marzo": 2, "mar": 2,
-        "aprile": 3, "apr": 3,
-        "maggio": 4, "mag": 4,
-        "giugno": 5, "giu": 5,
-        "luglio": 6, "lug": 6,
-        "agosto": 7, "ago": 7,
-        "settembre": 8, "set": 8, "sett": 8,
-        "ottobre": 9, "ott": 9,
-        "novembre": 10, "nov": 10,
-        "dicembre": 11, "dic": 11
-    };
-
-    // Funzione interna di supporto per convertire una stringa di data (es. "1 ottobre" o "15/10") in un oggetto Date
-    function parseDataStringa(stringaData, annoRiferimento) {
-        stringaData = stringaData.toLowerCase().trim();
-        
-        // Tentativo 1: Formato numerico (es. 01/10 o 1-10 o 1.10.2026)
-        const matchNum = stringaData.match(/(\d{1,2})[\/\-\.\s](\d{1,2})(?:[\/\-\.\s](\d{4}))?/);
-        if (matchNum) {
-            const giorno = parseInt(matchNum[1], 10);
-            const mese = parseInt(matchNum[2], 10) - 1; // I mesi in JS vanno da 0 a 11
-            const anno = matchNum[3] ? parseInt(matchNum[3], 10) : annoRiferimento;
-            return new Date(anno, mese, giorno);
-        }
-
-        // Tentativo 2: Formato testuale (es. "1 ottobre" o "ottobre")
-        let trovatoMese = null;
-        let giorno = 1; // Default al primo del mese se il giorno non è specificato
-
-        for (const [nomeMese, idxMese] of Object.entries(mesiMap)) {
-            if (stringaData.includes(nomeMese)) {
-                trovatoMese = idxMese;
-                break;
-            }
-        }
-
-        if (trovatoMese === null) return null;
-
-        // Cerca se c'è un numero che rappresenta il giorno prima del mese
-        const matchGiorno = stringaData.match(/(\d{1,2})/);
-        if (matchGiorno) {
-            giorno = parseInt(matchGiorno[1], 10);
-        }
-
-        return new Date(annoRiferimento, trovatoMese, giorno);
-    }
-
-    // Pulisce la stringa rimuovendo parole superflue come "dal", "al", "ore", ecc.
-    let testoPulito = periodoStr.toLowerCase()
-        .replace(/\bdal\b/g, '')
-        .replace(/\bal\b/g, '-')
-        .replace(/\bdel\b/g, '')
-        .trim();
-
-    // Divide la stringa in due parti usando il trattino o la parola "al" come separatore
-    const parti = testoPulito.split(/\s*-\s*/);
-    if (parti.length < 2) return false;
-
-    let dataInizio = parseDataStringa(parti[0], annoCorrente);
-    let dataFine = parseDataStringa(parti[1], annoCorrente);
-
-    if (!dataInizio || !dataFine) return false;
-
-    // Se la data di fine è precedente o uguale a quella di inizio, significa che siamo a cavallo d'anno (es. Ottobre - Gennaio)
-    if (dataInizio > dataFine) {
-        if (oggi.getMonth() <= dataFine.getMonth()) {
-            // Se siamo nei primi mesi dell'anno corrente, l'inizio è avvenuto l'anno scorso
-            dataInizio.setFullYear(annoCorrente - 1);
-        } else {
-            // Altrimenti, la fine si sposta all'anno prossimo
-            dataFine.setFullYear(annoCorrente + 1);
-        }
-    }
-
-    // Normalizza l'orario a inizio e fine giornata per un confronto pulito
-    dataInizio.setHours(0, 0, 0, 0);
-    dataFine.setHours(23, 59, 59, 999);
-
-    return oggi >= dataInizio && oggi <= dataFine;
-}
-
 function elaboraTestoIncollato() {
     estraiDateTartufiDaTesto();
 }
@@ -6530,7 +6470,7 @@ async function mostraInfoModulo(moduleName) {
         'polizze': "ℹ️ **Guida - Polizze & Assicurazioni**\n\nTieni traccia delle polizze assicurative (RC cane, responsabilità civile per la raccolta e infortuni) monitorando le relative scadenze.",
         'vet': "ℹ️ **Guida - Libretti Sanitari Cani & Profilassi**\n\nUsa la card unica \"Nuova Registrazione\" per inserire trattamenti/visite oppure voci del diario calore. In modalità diario calore puoi selezionare solo cagne femmine, con previsione del prossimo ciclo nello storico.",
         'registro_giornaliero': "ℹ️ **Guida - Registro Giornaliero Ritrovamenti**\n\nAnnota i quantitativi giornalieri raccolti suddivisi per specie e data, con filtri avanzati per anno e tipologia di tartufo.",
-        'previsione_tartufi': "ℹ️ **Guida - Previsione Uscita Tartufi**\n\nStima una finestra favorevole di uscita usando calendario regionale, ultimi 15 giorni di pioggia, umidità del suolo, fase lunare, stabilità termica e storico personale. È un supporto decisionale, non una garanzia di ritrovamento.",
+        'previsione_tartufi': "ℹ️ **Guida - Previsione Uscita Tartufi**\n\nStima una finestra favorevole di uscita usando calendario regionale, ultimi 15 giorni di pioggia, umidità del suolo, fase lunare, stabilità termica e storico personale. È un supporto decisionale, non una garanzia di ritrovamento.\n\n💡 **Più dati fornisci, più accurata sarà la previsione.** Inserisci le tartufaie nei punti GPS, compila il registro giornaliero dei ritrovamenti, aggiungi il feedback sui giorni passati e salva i calendari regionali aggiornati: ogni dato in più affina il calcolo e migliora l'indice di probabilità.",
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
         'export': `ℹ️ Guida - Report & Backup Dati\n\nEsporta i dati contabili in formato CSV.\n\nIl backup automatico ti guida a scegliere la cartella Download del dispositivo e poi crea/usa sempre il percorso ${buildAutomaticBackupPathLabel('Download')} per salvare backup_truffle_automatico.json. Usa '📁 Imposta Cartella Backup' per registrare o cambiare il percorso, poi '💾 Salva Backup Ora' per forzarlo manualmente.\n\nSe il browser non supporta la scelta guidata della cartella, l'app usa il normale download del file JSON.`,

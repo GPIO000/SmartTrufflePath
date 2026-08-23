@@ -213,6 +213,65 @@ export const TRUFFLE_SPECIES_FORECAST = [
     }
 ];
 
+const DEFAULT_FEEDBACK_CLASSES = [
+    {
+        id: 'none',
+        label: 'Nessun ritrovamento',
+        found: false,
+        signalWeight: -1,
+        emoji: '➖'
+    },
+    {
+        id: 'lt500',
+        label: 'Ritrovamenti <500g',
+        found: true,
+        signalWeight: 0.9,
+        emoji: '✅'
+    },
+    {
+        id: 'gte500',
+        label: 'Ritrovamenti ≥500g',
+        found: true,
+        signalWeight: 1.5,
+        emoji: '💰'
+    }
+];
+
+const MAGNATUM_FEEDBACK_CLASSES = [
+    {
+        id: 'none',
+        label: 'Nessun ritrovamento',
+        found: false,
+        signalWeight: -1,
+        emoji: '➖'
+    },
+    {
+        id: 'lt100',
+        label: 'Ritrovamenti <100g',
+        found: true,
+        signalWeight: 0.7,
+        emoji: '✅'
+    },
+    {
+        id: 'gte100_lt300',
+        label: 'Ritrovamenti 100–300g',
+        found: true,
+        signalWeight: 1.2,
+        emoji: '✅'
+    },
+    {
+        id: 'gte300',
+        label: 'Ritrovamenti >300g',
+        found: true,
+        signalWeight: 1.8,
+        emoji: '💰'
+    }
+];
+
+const SPECIES_FEEDBACK_CLASSES = {
+    0: MAGNATUM_FEEDBACK_CLASSES
+};
+
 const MESI_MAP = {
     gennaio: 0, gen: 0,
     febbraio: 1, feb: 1,
@@ -267,6 +326,46 @@ function normalizeText(value) {
 
 function getSpeciesProfile(speciesId) {
     return TRUFFLE_SPECIES_FORECAST.find((item) => item.id === Number(speciesId)) ?? null;
+}
+
+export function getFeedbackClassesForSpecies(speciesId) {
+    const classes = SPECIES_FEEDBACK_CLASSES[Number(speciesId)] ?? DEFAULT_FEEDBACK_CLASSES;
+    return classes.map((entry) => ({ ...entry }));
+}
+
+export function getOpenSpeciesForRegion(regionCalendar, date = new Date()) {
+    if (!regionCalendar || typeof regionCalendar !== 'object' || Array.isArray(regionCalendar)) return [];
+
+    return TRUFFLE_SPECIES_FORECAST
+        .filter((species) => isDateWithinPeriod(regionCalendar?.[species.id] || '', date))
+        .map((species) => ({ ...species }));
+}
+
+function getFeedbackClassById(speciesId, classId) {
+    if (!classId) return null;
+    return getFeedbackClassesForSpecies(speciesId).find((entry) => entry.id === classId) ?? null;
+}
+
+function resolveLegacyFeedbackClass(speciesId, found) {
+    if (!found) {
+        return getFeedbackClassById(speciesId, 'none');
+    }
+    return {
+        id: 'legacy_found',
+        label: 'Ritrovamento (storico)',
+        found: true,
+        signalWeight: 1
+    };
+}
+
+export function resolveFeedbackEntryClass(speciesId, feedbackEntry = null) {
+    const classId = feedbackEntry?.outcomeClassId;
+    const fromClass = getFeedbackClassById(speciesId, classId);
+    if (fromClass) return fromClass;
+    if (typeof feedbackEntry?.found === 'boolean') {
+        return resolveLegacyFeedbackClass(speciesId, feedbackEntry.found);
+    }
+    return null;
 }
 
 export function getAreaProfiles() {
@@ -546,6 +645,7 @@ function getMoonAdjustment(phaseName, preferredPhases) {
 }
 
 function summarizeHistorySignals({
+    speciesId,
     speciesName,
     locationLabel,
     targetDate,
@@ -580,8 +680,11 @@ function summarizeHistorySignals({
         const weight = normalizedLocation && entryLocation && (entryLocation.includes(normalizedLocation) || normalizedLocation.includes(entryLocation))
             ? 1.2
             : 0.6;
-        if (entry?.found) positives += weight;
-        else negatives += weight;
+        const feedbackClass = resolveFeedbackEntryClass(speciesId, entry);
+        const signalWeight = feedbackClass?.signalWeight;
+        if (!Number.isFinite(signalWeight) || signalWeight === 0) return;
+        if (signalWeight > 0) positives += weight * signalWeight;
+        else negatives += weight * Math.abs(signalWeight);
     });
 
     const rawScore = clamp(Math.round((positives - negatives) * 3), -10, 10);
@@ -723,6 +826,7 @@ export function buildTruffleForecastCalendar({
         const dryPenaltyScore = clamp(1 - Math.max(0, dryDays - speciesProfile.maxDryDays) / 5, 0, 1);
         const moonAdjustment = getMoonAdjustment(moon.name, speciesProfile.moonBoostPhases);
         const historySignal = summarizeHistorySignals({
+            speciesId: speciesProfile.id,
             speciesName: speciesProfile.name,
             locationLabel,
             targetDate,
