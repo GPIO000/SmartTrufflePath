@@ -847,11 +847,13 @@ function getTruffleForecastLocationChoices() {
     if (userMarker && typeof userMarker.getLatLng === 'function') {
         const currentPosition = userMarker.getLatLng();
         if (currentPosition && Number.isFinite(currentPosition.lat) && Number.isFinite(currentPosition.lng)) {
+            const gpsAltitude = normalizePoiAltitude(latestGpsSnapshot?.altitude);
             choices.push({
                 id: 'current_gps',
                 label: '📍 Posizione attuale GPS',
                 lat: currentPosition.lat,
-                lng: currentPosition.lng
+                lng: currentPosition.lng,
+                altitude: Number.isFinite(gpsAltitude) ? gpsAltitude : undefined
             });
         }
     }
@@ -859,15 +861,25 @@ function getTruffleForecastLocationChoices() {
     poiList.forEach((poi, index) => {
         if (!Number.isFinite(Number(poi?.lat)) || !Number.isFinite(Number(poi?.lng))) return;
         const marker = normalizePoiMarker(poi.marker, poi.type);
+        const poiAltitude = normalizePoiAltitude(poi.altitude);
         choices.push({
             id: `poi_${index}`,
             label: `${marker} ${poi.note || `Punto ${index + 1}`}`,
             lat: Number(poi.lat),
-            lng: Number(poi.lng)
+            lng: Number(poi.lng),
+            altitude: Number.isFinite(poiAltitude) ? poiAltitude : undefined
         });
     });
 
     return choices;
+}
+
+function suggestAreaProfileFromAltitude(altitude) {
+    if (!Number.isFinite(altitude)) return null;
+    if (altitude < 200) return 'umido';
+    if (altitude < 500) return 'equilibrato';
+    if (altitude < 900) return 'fresco';
+    return 'ventilato';
 }
 
 function renderTruffleForecastSpeciesOptions(speciesSelect, openSpecies, preferredSpeciesId = '') {
@@ -908,6 +920,26 @@ function getForecastFeedbackUiOptions(speciesId) {
 
 function escapeAttr(value) {
     return escapeHtml(value).replace(/"/g, '&quot;');
+}
+
+function updateTruffleForecastAreaHint(selectedLocation, currentProfileId) {
+    const hint = document.getElementById('truffle-forecast-area-hint');
+    if (!hint) return;
+    const altitude = selectedLocation?.altitude;
+    const profile = TRUFFLE_AREA_PROFILES.find((p) => p.id === currentProfileId);
+    const profileLabel = profile ? profile.label : '';
+    if (Number.isFinite(altitude)) {
+        const suggested = suggestAreaProfileFromAltitude(altitude);
+        const isAutoSuggested = suggested === currentProfileId;
+        const autoNote = isAutoSuggested
+            ? `<span style="color:#4ade80;">✔ suggerito automaticamente dalla quota</span>`
+            : `<span style="color:#f59e0b;">⚠ profilo modificato manualmente</span>`;
+        hint.innerHTML = `⛰️ Quota rilevata: <strong>${Math.round(altitude)} m s.l.m.</strong> → profilo: <strong>${escapeHtml(profileLabel)}</strong> — ${autoNote}`;
+        hint.style.display = 'block';
+    } else {
+        hint.innerHTML = `Quota GPS non disponibile per questa zona — profilo selezionato: <strong>${escapeHtml(profileLabel)}</strong>`;
+        hint.style.display = 'block';
+    }
 }
 
 function renderTruffleForecastResultsLoading() {
@@ -1041,6 +1073,16 @@ async function loadTruffleForecastModule() {
 
     const selectedLocation = locationChoices.find((choice) => choice.id === locationSelect.value) || locationChoices[0];
     if (locationSelect.value !== selectedLocation.id) locationSelect.value = selectedLocation.id;
+
+    const manualOverrideKey = `truffle_area_manual_${selectedLocation.id}`;
+    const hasManualOverride = localStorage.getItem(manualOverrideKey) === 'true';
+    if (!hasManualOverride) {
+        const suggested = suggestAreaProfileFromAltitude(selectedLocation.altitude);
+        if (suggested && areaSelect.value !== suggested) {
+            areaSelect.value = suggested;
+        }
+    }
+    updateTruffleForecastAreaHint(selectedLocation, areaSelect.value);
 
     const previousSpeciesId = speciesSelect.value;
     const regionName = await resolveRegionNameForCoordinates(selectedLocation.lat, selectedLocation.lng, getCurrentGpsRegionName());
@@ -1287,6 +1329,20 @@ const ACTION_HANDLERS = {
     refreshRegistroGiornaliero: () => openModule('registro_giornaliero'),
     refreshSpese: () => openModule('spese'),
     refreshTruffleForecast: () => loadTruffleForecastModule(),
+    onTruffleForecastAreaManualChange: () => {
+        const locationSelect = document.getElementById('truffle-forecast-location');
+        const areaSelect = document.getElementById('truffle-forecast-area');
+        if (locationSelect && areaSelect) {
+            const locationChoices = getTruffleForecastLocationChoices();
+            const selectedLocation = locationChoices.find((c) => c.id === locationSelect.value) || locationChoices[0];
+            if (selectedLocation) {
+                const manualOverrideKey = `truffle_area_manual_${selectedLocation.id}`;
+                localStorage.setItem(manualOverrideKey, 'true');
+                updateTruffleForecastAreaHint(selectedLocation, areaSelect.value);
+            }
+        }
+        loadTruffleForecastModule();
+    },
     saveTruffleForecastFeedback: (_event, date, outcomeClassId) => saveTruffleForecastFeedback(date, outcomeClassId),
     registerRicevutaSafe: async () => {
         try {
@@ -3602,9 +3658,10 @@ function openModule(moduleName, editMode = false) {
                             </div>
                             <div style="flex:1; min-width:180px;">
                                 <label style="font-size:0.75rem;">Profilo area:</label>
-                                <select id="truffle-forecast-area" class="mod-input" ${eventActionAttrs('change', 'refreshTruffleForecast')}>${areaOptions}</select>
+                                <select id="truffle-forecast-area" class="mod-input" ${eventActionAttrs('change', 'onTruffleForecastAreaManualChange')}>${areaOptions}</select>
                             </div>
                         </div>
+                        <p id="truffle-forecast-area-hint" style="margin:8px 0 0 0; color:#b8b0a0; font-size:0.78rem; display:none;"></p>
                         <p style="margin:10px 0 0 0; color:#b8b0a0; font-size:0.8rem;">Regione corrente letta dal GPS: <strong style="color:#4d8a98;">${escapeHtml(regionName)}</strong>. Il punteggio è attivo solo nei periodi legali salvati nel tuo archivio regionale.</p>
                     </div>
                     <div class="module-card" style="margin-bottom: 14px; background: rgba(18,22,16,0.96); border-left:4px solid #4d8a98;">
