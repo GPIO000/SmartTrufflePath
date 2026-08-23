@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const appSource = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
 const buildCompleteBackupDataSource = appSource.match(
-  /function buildCompleteBackupData\(\) \{[\s\S]*?\n\}/,
+  /function buildCompleteBackupData\(\) \{[\s\S]*?\n\}(?=\n\nfunction formatBackupTimestamp)/,
 );
 
 if (!buildCompleteBackupDataSource) {
