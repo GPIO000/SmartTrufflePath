@@ -1028,7 +1028,7 @@ async function loadTruffleForecastModule() {
     const speciesProfile = TRUFFLE_SPECIES_FORECAST.find((item) => String(item.id) === speciesSelect.value) || TRUFFLE_SPECIES_FORECAST[0];
     const regionName = getCurrentGpsRegionName();
     const calendari = readStorageJSON('calendari_tartufi_custom', {});
-    const openSpeciesToday = getOpenSpeciesForRegion(calendari?.[regionName] ?? {});
+    const openSpeciesToday = getOpenSpeciesForRegion(calendari?.[regionName] ?? {}, new Date());
     const periodoRegionale = calendari?.[regionName]?.[speciesProfile.id] || '';
 
     if (!periodoRegionale) {
@@ -3486,19 +3486,6 @@ function openModule(moduleName, editMode = false) {
     let noteRegionaliSalvate = getRenderableStorageJSON('note_regionali_tartufi', {});
     let notaRegionaleCorrente = noteRegionaliSalvate[regioneCal] || '';
 
-    const specieTartufiCal = [
-        "Tuber magnatum Pico (Tartufo bianco pregiato)",
-        "Tuber melanosporum Vitt. (Tartufo nero di Norcia)",
-        "Tuber macrosporum Vitt. (Tartufo nero liscio)",
-        "Tuber brumale Vitt. (Tartufo nero d'inverno)",
-        "Tuber brumale var. moschatum De Ferry (Tartufo moscato)",
-        "Tuber aestivum Vitt. (Tartufo estivo o scorzone)",
-        "Tuber uncinatum Chatin (Tartufo uncinato)",
-        "Tuber borchii Vitt. / T. albidum Pico (Bianchetto o marzuolo)",
-        "Tuber mesentericum Vitt. (Tartufo nero di Bagnoli Irpino)"
-    ];
-    const defaultPeriodiCal = [];
-
     let calHtml = `
         <h2>📅 Calendario Raccolta (GPS)</h2>
         <p>Regione rilevata: <strong style="color:#4d8a98;">${regioneCal}</strong></p>
@@ -3507,9 +3494,9 @@ function openModule(moduleName, editMode = false) {
 
     const specieAperteOggi = getOpenSpeciesForRegion(datiRegioneCorrente);
     let specieAperteTrovate = specieAperteOggi.length;
-    const specieConDateSalvate = specieTartufiCal.reduce((count, _specie, id) => (
-        datiRegioneCorrente[id] ? count + 1 : count
-    ), 0);
+    const specieConDateSalvate = Object.values(datiRegioneCorrente)
+        .filter((periodo) => String(periodo ?? '').trim())
+        .length;
 
     specieAperteOggi.forEach((specie) => {
         const periodoSalvato = datiRegioneCorrente[specie.id] || '';
