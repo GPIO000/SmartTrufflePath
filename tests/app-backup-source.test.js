@@ -6,12 +6,6 @@ let buildCompleteBackupDataSource = '';
 beforeAll(() => {
   const appSource = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   buildCompleteBackupDataSource = extractFunctionSource(appSource, 'buildCompleteBackupData');
-  expect(getExternalDependencies(buildCompleteBackupDataSource)).toEqual([
-    'OFFLINE_REGIONI_PREFERITE_KEY',
-    'TRUFFLE_FORECAST_FEEDBACK_KEY',
-    '_BACKUP_DIR_LABEL_KEY',
-    'localStorage',
-  ]);
 });
 
 function extractFunctionSource(source, functionName) {
@@ -43,9 +37,12 @@ function extractFunctionSource(source, functionName) {
 }
 
 function getExternalDependencies(source) {
-  const sourceWithoutStrings = source.replace(/'[^']*'|"[^"]*"/g, '');
+  const sanitizedSource = source
+    .replace(/\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/`[^`]*`|'[^']*'|"[^"]*"/g, '');
   return [...new Set(
-    sourceWithoutStrings.match(/(?<![.\w$])([A-Za-z_][A-Za-z0-9_]*)\b(?!\s*:)/g) || [],
+    sanitizedSource.match(/(?<![.\w$])([A-Za-z_][A-Za-z0-9_]*)\b(?!\s*:)/g) || [],
   )].filter((identifier) => !['function', 'return', 'buildCompleteBackupData'].includes(identifier)).sort();
 }
 
@@ -69,6 +66,15 @@ function runBuildCompleteBackupData() {
 }
 
 describe('buildCompleteBackupData', () => {
+  it('dipende solo dalle chiavi storage attese', () => {
+    expect(getExternalDependencies(buildCompleteBackupDataSource)).toEqual([
+      'OFFLINE_REGIONI_PREFERITE_KEY',
+      'TRUFFLE_FORECAST_FEEDBACK_KEY',
+      '_BACKUP_DIR_LABEL_KEY',
+      'localStorage',
+    ]);
+  });
+
   it('mantiene la chiave canonica dei luoghi di raccolta nel payload backup', () => {
     const backupData = runBuildCompleteBackupData();
 
