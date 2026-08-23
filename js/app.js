@@ -919,7 +919,8 @@ function renderTruffleForecastResults(forecast, regionName, feedbackEntries, opt
     }
 
     const bestDay = forecast.bestDay;
-    const noOpenSpeciesToday = Number(options.openSpeciesTodayCount) === 0;
+    const { openSpeciesTodayCount = null } = options;
+    const noOpenSpeciesToday = openSpeciesTodayCount === 0;
     const noOpenSpeciesTodayHtml = noOpenSpeciesToday
         ? `
             <div class="module-card" style="margin-bottom:12px; background: rgba(29,40,30,0.96); border-left:4px solid #ef4444;">
@@ -3502,7 +3503,7 @@ function openModule(moduleName, editMode = false) {
         const periodoSalvato = datiRegioneCorrente[specie.id] || '';
         calHtml += `
             <div class="module-card" style="border-left: 4px solid #22c55e; margin-bottom: 10px; background: rgba(29,40,30,0.96); padding: 10px; border-radius: 6px;">
-                <strong style="color: #f6f1e6; font-size: 0.85rem; display: block;">🍄 [ID: ${specie.id}] ${specie.name}</strong>
+                <strong style="color: #f6f1e6; font-size: 0.85rem; display: block;">🍄 [ID: ${escapeHtml(String(specie.id))}] ${escapeHtml(specie.name)}</strong>
                 <div style="font-size: 0.75rem; color: #b8b0a0; margin-top: 4px;">🗓️ Periodo consentito: ${periodoSalvato}</div>
                 <div style="font-size: 0.75rem; margin-top: 6px;"><span style="color:#22c55e; font-weight:bold;">🟢 RACCOLTA APERTA</span></div>
             </div>
