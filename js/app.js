@@ -1655,6 +1655,11 @@ let reverseGeocodeInFlight = false;
 let lastReverseGeocodeAt = 0;
 let latestGpsSnapshot = null;
 
+const ELEVATION_API_URL = 'https://api.open-meteo.com/v1/elevation';
+const ELEVATION_GRID_DECIMALS = 2;
+const elevationCache = new Map();
+const elevationFetchInFlight = new Set();
+
 function getReverseGeocodeCacheKey(lat, lng) {
     return `${Number(lat).toFixed(REVERSE_GEOCODE_GRID_DECIMALS)},${Number(lng).toFixed(REVERSE_GEOCODE_GRID_DECIMALS)}`;
 }
@@ -1673,6 +1678,31 @@ function updateAltitudeIndicator(altitude) {
         el.style.display = '';
     } else {
         el.style.display = 'none';
+    }
+}
+
+async function fetchElevationFallback(lat, lng) {
+    const key = `${Number(lat).toFixed(ELEVATION_GRID_DECIMALS)},${Number(lng).toFixed(ELEVATION_GRID_DECIMALS)}`;
+    if (elevationCache.has(key)) return elevationCache.get(key);
+    if (elevationFetchInFlight.has(key)) return undefined;
+    elevationFetchInFlight.add(key);
+    try {
+        const url = `${ELEVATION_API_URL}?latitude=${encodeURIComponent(lat.toFixed(4))}&longitude=${encodeURIComponent(lng.toFixed(4))}`;
+        const resp = await fetch(url);
+        if (!resp.ok) {
+            elevationCache.set(key, null);
+            return undefined;
+        }
+        const data = await resp.json();
+        const elevation = Array.isArray(data.elevation) && data.elevation.length > 0 ? data.elevation[0] : undefined;
+        const normalized = normalizePoiAltitude(elevation) ?? null;
+        elevationCache.set(key, normalized);
+        return Number.isFinite(normalized) ? normalized : undefined;
+    } catch {
+        elevationCache.set(key, null);
+        return undefined;
+    } finally {
+        elevationFetchInFlight.delete(key);
     }
 }
 
@@ -1776,6 +1806,15 @@ if (navigator.geolocation) {
         }
         reverseGeocodePosition(lat, lng);
         updateAltitudeIndicator(altitude);
+        if (!Number.isFinite(altitude)) {
+            fetchElevationFallback(lat, lng).then(fallbackAltitude => {
+                if (Number.isFinite(fallbackAltitude)) {
+                    latestGpsSnapshot = { ...latestGpsSnapshot, altitude: fallbackAltitude };
+                    updateAltitudeIndicator(fallbackAltitude);
+                    userMarker?.setPopupContent(buildUserMarkerPopupHtml(fallbackAltitude));
+                }
+            });
+        }
         if (!userMarker) {
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup(buildUserMarkerPopupHtml(altitude)).openPopup();
             map.setView([lat, lng], getAdaptiveFocusZoom(18));
