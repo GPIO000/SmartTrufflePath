@@ -112,16 +112,16 @@ describe('buildBackupRestorePlan', () => {
       ],
       keysToRemove: ['storico_vendite'],
     });
+  });
 
-    it('accetta backupDirLabel come stringa semplice quando configurato', () => {
-      const content = {
-        backupDirLabel: 'Download/SmartTrufflePath/file backup',
-      };
+  it('accetta backupDirLabel come stringa semplice quando configurato', () => {
+    const content = {
+      backupDirLabel: 'Download/SmartTrufflePath/file backup',
+    };
 
-      expect(buildBackupRestorePlan(content, backupMap, ['backupDirLabel'])).toEqual({
-        entries: [['backup_dir_label', '"Download/SmartTrufflePath/file backup"']],
-        keysToRemove: ['storico_vendite', 'poi_list'],
-      });
+    expect(buildBackupRestorePlan(content, backupMap, ['backupDirLabel'])).toEqual({
+      entries: [['backup_dir_label', '"Download/SmartTrufflePath/file backup"']],
+      keysToRemove: ['storico_vendite', 'poi_list'],
     });
   });
 });
