@@ -38,6 +38,8 @@ export function formatPoiDisplayDate(savedAtIso) {
 }
 
 export function normalizePoiAltitude(altitude) {
+    if (altitude === null || altitude === undefined || typeof altitude === 'boolean') return undefined;
+    if (typeof altitude === 'string' && !altitude.trim()) return undefined;
     const numericAltitude = Number(altitude);
     if (!Number.isFinite(numericAltitude)) return undefined;
     return numericAltitude;
