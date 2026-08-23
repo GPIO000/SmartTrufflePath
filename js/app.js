@@ -3477,7 +3477,10 @@ function openModule(moduleName, editMode = false) {
     let regioneCal = getCurrentGpsRegionName();
 
     let allCalendari = getRenderableStorageJSON('calendari_tartufi_custom', {});
-    let datiRegioneCorrente = allCalendari[regioneCal] || {};
+    let datiRegioneCorrente = allCalendari[regioneCal];
+    if (!datiRegioneCorrente || typeof datiRegioneCorrente !== 'object' || Array.isArray(datiRegioneCorrente)) {
+        datiRegioneCorrente = {};
+    }
 
     let noteRegionaliSalvate = getRenderableStorageJSON('note_regionali_tartufi', {});
     let notaRegionaleCorrente = noteRegionaliSalvate[regioneCal] || '';
@@ -3489,7 +3492,7 @@ function openModule(moduleName, editMode = false) {
     `;
 
     const specieAperteOggi = getOpenSpeciesForRegion(datiRegioneCorrente);
-    let specieAperteTrovate = specieAperteOggi.length;
+    const specieAperteTrovate = specieAperteOggi.length;
     const specieConDateSalvate = Object.values(datiRegioneCorrente)
         .filter((periodo) => typeof periodo === 'string' && periodo.trim())
         .length;
