@@ -171,9 +171,9 @@
     }
   }
 
-  function notifyDataChange(key) {
+  function notifyDataChange(key, type = 'write') {
     if (key !== AUTO_BACKUP_SNAPSHOT_KEY && key !== AUTO_BACKUP_STATUS_KEY && typeof dataChangeListener === 'function') {
-      dataChangeListener(key);
+      dataChangeListener(key, type);
     }
   }
 
@@ -189,13 +189,13 @@
       const normalizedValue = String(value);
       localStorageOriginals.setItem(key, normalizedValue);
       putEntry(key, normalizedValue).catch(() => {});
-      notifyDataChange(key);
+      notifyDataChange(key, 'write');
     };
 
     localStorage.removeItem = (key) => {
       localStorageOriginals.removeItem(key);
       deleteEntry(key).catch(() => {});
-      notifyDataChange(key);
+      notifyDataChange(key, 'delete');
     };
 
     localStorage.clear = () => {
@@ -206,7 +206,7 @@
       }
       localStorageOriginals.clear();
       clearEntries().catch(() => {});
-      keys.forEach((k) => notifyDataChange(k));
+      keys.forEach((k) => notifyDataChange(k, 'delete'));
     };
   }
 

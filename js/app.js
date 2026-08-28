@@ -5691,7 +5691,8 @@ function setupAutomaticBackupLifecycle() {
     automaticBackupLifecycleInitialized = true;
     const api = window.TruffleStorage;
     if (api && typeof api.setDataChangeListener === 'function') {
-        api.setDataChangeListener(() => {
+        api.setDataChangeListener((_key, type) => {
+            if (type === 'delete') return;
             clearTimeout(dataChangeDebounceTimer);
             dataChangeDebounceTimer = setTimeout(() => runAutomaticLocalBackup(), AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS);
         });

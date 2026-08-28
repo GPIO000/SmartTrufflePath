@@ -149,7 +149,7 @@ describe('setDataChangeListener', () => {
     const listener = vi.fn();
     setDataChangeListener(listener);
     notifyDataChange('storico_vendite');
-    expect(listener).toHaveBeenCalledWith('storico_vendite');
+    expect(listener).toHaveBeenCalledWith('storico_vendite', 'write');
   });
 
   it('non chiama il listener per la chiave snapshot del backup', () => {
@@ -186,7 +186,21 @@ describe('setDataChangeListener', () => {
     const listener = vi.fn();
     setDataChangeListener(listener);
     notifyDataChange('spese_list');
-    expect(listener).toHaveBeenCalledWith('spese_list');
+    expect(listener).toHaveBeenCalledWith('spese_list', 'write');
+  });
+
+  it('passa type write di default se non specificato', () => {
+    const listener = vi.fn();
+    setDataChangeListener(listener);
+    notifyDataChange('storico_vendite');
+    expect(listener).toHaveBeenCalledWith('storico_vendite', 'write');
+  });
+
+  it('passa type delete quando esplicitamente specificato', () => {
+    const listener = vi.fn();
+    setDataChangeListener(listener);
+    notifyDataChange('storico_vendite', 'delete');
+    expect(listener).toHaveBeenCalledWith('storico_vendite', 'delete');
   });
 });
 
