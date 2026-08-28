@@ -93,11 +93,26 @@ function buildBackupRestorePlan(content, backupMap, plainStringBackupKeys = []) 
     };
 }
 
+const BACKUP_USER_DATA_KEYS = [
+    'tesserino', 'pagopa', 'archivioDocumentiList', 'f24', 'storicoVendite',
+    'luoghiRaccolta', 'poiList', 'dogsList', 'caneData', 'polizzeList',
+    'storicoRaccolta', 'rubricaClienti', 'speseList', 'vetHistoryList',
+    'heatDiaryList', 'vetClinicsList', 'calendariTartufiCustom',
+    'noteRegionaliTartufi', 'truffleForecastFeedback', 'offlineRegioniPreferite'
+];
+
+function isBackupDataMeaningful(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+    return BACKUP_USER_DATA_KEYS.some((key) => data[key] != null);
+}
+
 export {
     normalizeBackupEntry,
     extractValidBackupEntries,
     buildBackupRestorePlan,
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
-    buildAutomaticBackupPathLabel
+    buildAutomaticBackupPathLabel,
+    BACKUP_USER_DATA_KEYS,
+    isBackupDataMeaningful
 };

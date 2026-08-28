@@ -13,7 +13,8 @@ import {
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
     buildAutomaticBackupPathLabel,
-    buildBackupRestorePlan
+    buildBackupRestorePlan,
+    isBackupDataMeaningful
 } from './backup-utils.js';
 import {
     countCachedTileUrls,
@@ -5669,6 +5670,7 @@ async function runAutomaticLocalBackup() {
         if (!hasDestinationLabel && !hasStoredHandle) return;
     }
     const backupData = buildCompleteBackupData();
+    if (!isBackupDataMeaningful(backupData)) return;
     const fingerprint = JSON.stringify(backupData);
     if (fingerprint === lastAutomaticBackupFingerprint) return;
     const backupSaved = await downloadBackupFile(backupData, { automatic: true });
