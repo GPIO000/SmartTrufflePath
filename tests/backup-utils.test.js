@@ -6,6 +6,8 @@ import {
   AUTOMATIC_BACKUP_APP_FOLDER_NAME,
   AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
   buildAutomaticBackupPathLabel,
+  BACKUP_USER_DATA_KEYS,
+  isBackupDataMeaningful,
 } from '../js/backup-utils.js';
 
 describe('normalizeBackupEntry', () => {
@@ -139,5 +141,38 @@ describe('buildBackupRestorePlan', () => {
       entries: [['luoghi_raccolta', '["A"]']],
       keysToRemove: [],
     });
+  });
+});
+
+describe('isBackupDataMeaningful', () => {
+  it('restituisce false per un oggetto senza dati utente (tutti null)', () => {
+    const data = BACKUP_USER_DATA_KEYS.reduce((acc, k) => { acc[k] = null; return acc; }, {});
+    expect(isBackupDataMeaningful(data)).toBe(false);
+  });
+
+  it('restituisce false per un oggetto vuoto', () => {
+    expect(isBackupDataMeaningful({})).toBe(false);
+  });
+
+  it('restituisce false per valori non-oggetto', () => {
+    expect(isBackupDataMeaningful(null)).toBe(false);
+    expect(isBackupDataMeaningful(undefined)).toBe(false);
+    expect(isBackupDataMeaningful([])).toBe(false);
+    expect(isBackupDataMeaningful('stringa')).toBe(false);
+  });
+
+  it('restituisce true se almeno un campo dati utente è non-null', () => {
+    expect(isBackupDataMeaningful({ storicoVendite: '[1,2,3]' })).toBe(true);
+    expect(isBackupDataMeaningful({ poiList: '[]' })).toBe(true);
+    expect(isBackupDataMeaningful({ dogsList: '[{"nome":"Rex"}]' })).toBe(true);
+  });
+
+  it('restituisce false se solo backupDirLabel è presente (non è un dato utente)', () => {
+    expect(isBackupDataMeaningful({ backupDirLabel: 'Download/SmartTrufflePath/file backup' })).toBe(false);
+  });
+
+  it('restituisce true con solo una chiave dati utente valorizzata e le altre null', () => {
+    const data = { ...BACKUP_USER_DATA_KEYS.reduce((acc, k) => { acc[k] = null; return acc; }, {}), tesserino: '{"nome":"Mario"}' };
+    expect(isBackupDataMeaningful(data)).toBe(true);
   });
 });

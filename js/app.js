@@ -13,7 +13,8 @@ import {
     AUTOMATIC_BACKUP_APP_FOLDER_NAME,
     AUTOMATIC_BACKUP_FILES_FOLDER_NAME,
     buildAutomaticBackupPathLabel,
-    buildBackupRestorePlan
+    buildBackupRestorePlan,
+    isBackupDataMeaningful
 } from './backup-utils.js';
 import {
     countCachedTileUrls,
@@ -5669,6 +5670,7 @@ async function runAutomaticLocalBackup() {
         if (!hasDestinationLabel && !hasStoredHandle) return;
     }
     const backupData = buildCompleteBackupData();
+    if (!isBackupDataMeaningful(backupData)) return;
     const fingerprint = JSON.stringify(backupData);
     if (fingerprint === lastAutomaticBackupFingerprint) return;
     const backupSaved = await downloadBackupFile(backupData, { automatic: true });
@@ -5691,7 +5693,8 @@ function setupAutomaticBackupLifecycle() {
     automaticBackupLifecycleInitialized = true;
     const api = window.TruffleStorage;
     if (api && typeof api.setDataChangeListener === 'function') {
-        api.setDataChangeListener(() => {
+        api.setDataChangeListener((_key, type) => {
+            if (type === 'delete') return;
             clearTimeout(dataChangeDebounceTimer);
             dataChangeDebounceTimer = setTimeout(() => runAutomaticLocalBackup(), AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS);
         });
