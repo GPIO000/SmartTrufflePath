@@ -1719,6 +1719,10 @@ const reverseGeocodeCache = new Map();
 let reverseGeocodeInFlight = false;
 let lastReverseGeocodeAt = 0;
 let latestGpsSnapshot = null;
+let gpsWatchId = null;
+let gpsTimeoutRetryCount = 0;
+const GPS_TIMEOUT_MAX_RETRIES = 5;
+const GPS_TIMEOUT_RETRY_DELAY_MS = 3000;
 
 const ELEVATION_API_URL = 'https://api.open-meteo.com/v1/elevation';
 const ELEVATION_GRID_DECIMALS = 2;
@@ -1858,8 +1862,14 @@ async function reverseGeocodePosition(lat, lng) {
     }
 }
 
-if (navigator.geolocation) {
-    navigator.geolocation.watchPosition((position) => {
+function startGpsWatch() {
+    if (!navigator.geolocation) return;
+    if (gpsWatchId !== null) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+        gpsWatchId = null;
+    }
+    gpsWatchId = navigator.geolocation.watchPosition((position) => {
+        gpsTimeoutRetryCount = 0;
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         const altitude = normalizePoiAltitude(position.coords.altitude);
@@ -1902,7 +1912,20 @@ if (navigator.geolocation) {
         console.warn("Errore GPS: " + error.message);
         const dot = document.getElementById('gps-status-dot');
         if (dot) dot.style.backgroundColor = '#ef4444';
-    }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 });
+        // error.code 3 = TIMEOUT — restart the watch to recover GPS signal in offline mode
+        if (error.code === 3 && gpsTimeoutRetryCount < GPS_TIMEOUT_MAX_RETRIES) {
+            gpsTimeoutRetryCount++;
+            showToast(`📡 Segnale GPS in attesa… nuovo tentativo (${gpsTimeoutRetryCount}/${GPS_TIMEOUT_MAX_RETRIES})`, 'info');
+            if (gpsWatchId !== null) {
+                navigator.geolocation.clearWatch(gpsWatchId);
+                gpsWatchId = null;
+            }
+            setTimeout(startGpsWatch, GPS_TIMEOUT_RETRY_DELAY_MS);
+        }
+    }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 });
+}
+if (navigator.geolocation) {
+    startGpsWatch();
 }
 function renderAllPoiMarkers() {
     Object.values(poiMapMarkers).forEach(marker => map.removeLayer(marker));
