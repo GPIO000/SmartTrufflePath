@@ -1721,8 +1721,10 @@ let lastReverseGeocodeAt = 0;
 let latestGpsSnapshot = null;
 let gpsWatchId = null;
 let gpsTimeoutRetryCount = 0;
+let gpsRetryTimerId = null;
 const GPS_TIMEOUT_MAX_RETRIES = 5;
-const GPS_TIMEOUT_RETRY_DELAY_MS = 3000;
+const GPS_TIMEOUT_BASE_DELAY_MS = 3000;
+const GPS_LAST_POSITION_KEY = 'gps_last_known_position';
 
 const ELEVATION_API_URL = 'https://api.open-meteo.com/v1/elevation';
 const ELEVATION_GRID_DECIMALS = 2;
@@ -1844,6 +1846,9 @@ async function reverseGeocodePosition(lat, lng) {
         return;
     }
 
+    // Skip network call when offline — the fetch would fail silently anyway
+    if (!navigator.onLine) return;
+
     if (reverseGeocodeInFlight) return;
 
     const now = Date.now();
@@ -1864,16 +1869,28 @@ async function reverseGeocodePosition(lat, lng) {
 
 function startGpsWatch() {
     if (!navigator.geolocation) return;
+    // Cancel any pending retry timer before starting a new watch
+    if (gpsRetryTimerId !== null) {
+        clearTimeout(gpsRetryTimerId);
+        gpsRetryTimerId = null;
+    }
     if (gpsWatchId !== null) {
         navigator.geolocation.clearWatch(gpsWatchId);
         gpsWatchId = null;
     }
+    // Use maximumAge:0 on retries to force a fresh hardware reading
+    const isRetry = gpsTimeoutRetryCount > 0;
     gpsWatchId = navigator.geolocation.watchPosition((position) => {
         gpsTimeoutRetryCount = 0;
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         const altitude = normalizePoiAltitude(position.coords.altitude);
         latestGpsSnapshot = { lat, lng, altitude };
+        // Persist last known position for offline dead-reckoning display.
+        // GPS coordinates are stored locally on the user's device only, by design.
+        try {
+            localStorage.setItem(GPS_LAST_POSITION_KEY, JSON.stringify({ lat, lng, altitude: Number.isFinite(altitude) ? altitude : null, ts: Date.now() })); // codeql[js/clear-text-storage-of-sensitive-data]
+        } catch { /* quota exceeded or private mode — ignore */ }
         const dot = document.getElementById('gps-status-dot');
         if (dot) {
             dot.style.backgroundColor = '#22c55e';
@@ -1913,16 +1930,34 @@ function startGpsWatch() {
         const dot = document.getElementById('gps-status-dot');
         if (dot) dot.style.backgroundColor = '#ef4444';
         // error.code 3 = TIMEOUT — restart the watch to recover GPS signal in offline mode
-        if (error.code === 3 && gpsTimeoutRetryCount < GPS_TIMEOUT_MAX_RETRIES) {
-            gpsTimeoutRetryCount++;
-            showToast(`📡 Segnale GPS in attesa… nuovo tentativo (${gpsTimeoutRetryCount}/${GPS_TIMEOUT_MAX_RETRIES})`, 'info');
-            if (gpsWatchId !== null) {
-                navigator.geolocation.clearWatch(gpsWatchId);
-                gpsWatchId = null;
+        if (error.code === 3) {
+            if (gpsTimeoutRetryCount < GPS_TIMEOUT_MAX_RETRIES) {
+                gpsTimeoutRetryCount++;
+                // Exponential backoff: 3s, 6s, 12s, 24s, 48s
+                const delay = GPS_TIMEOUT_BASE_DELAY_MS * Math.pow(2, gpsTimeoutRetryCount - 1);
+                showToast(`📡 Segnale GPS in attesa… nuovo tentativo (${gpsTimeoutRetryCount}/${GPS_TIMEOUT_MAX_RETRIES})`, 'info');
+                if (gpsWatchId !== null) {
+                    navigator.geolocation.clearWatch(gpsWatchId);
+                    gpsWatchId = null;
+                }
+                gpsRetryTimerId = setTimeout(startGpsWatch, delay);
+            } else {
+                showToast('❌ GPS non disponibile dopo più tentativi. Controlla i permessi o riavvia l\'app.', 'error');
+                showLastKnownGpsPosition();
             }
-            setTimeout(startGpsWatch, GPS_TIMEOUT_RETRY_DELAY_MS);
         }
-    }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 });
+    }, { enableHighAccuracy: true, maximumAge: isRetry ? 0 : 10000, timeout: 15000 });
+}
+function showLastKnownGpsPosition() {
+    try {
+        const raw = localStorage.getItem(GPS_LAST_POSITION_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (!Number.isFinite(saved?.lat) || !Number.isFinite(saved?.lng) || !Number.isFinite(saved?.ts)) return;
+        const minutesAgo = Math.round((Date.now() - saved.ts) / 60000);
+        const gpsText = document.getElementById('gps-status-text');
+        if (gpsText) gpsText.textContent = `📍 Ultima posizione nota: ${minutesAgo === 0 ? 'adesso' : `${minutesAgo} min fa`} (${saved.lat.toFixed(4)}, ${saved.lng.toFixed(4)})`;
+    } catch { /* ignore */ }
 }
 if (navigator.geolocation) {
     startGpsWatch();
@@ -7648,6 +7683,11 @@ window.addEventListener('online', () => {
     updateOfflineMapRuntimeStatusIndicator();
     updateZoomIndicator();
     autoRiscaricaRegioniOfflineSeNecessario();
+    // Reset GPS retry state and restart watch when connectivity returns
+    if (gpsTimeoutRetryCount > 0) {
+        gpsTimeoutRetryCount = 0;
+        startGpsWatch();
+    }
 });
 
 window.addEventListener('offline', () => {
