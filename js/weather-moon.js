@@ -1,7 +1,7 @@
 import { onConnectivityChange, fetchWithOfflineCheck, getStatusString } from './offline-api-manager.js';
 
-const CACHE_TTL_MS = 30 * 60 * 1000;
-const MIN_MOVE_KM = 5;
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const MIN_MOVE_KM = 20;
 const FETCH_TIMEOUT_MS = 8000;
 const CURRENT_WIDGET_ID = 'weather-moon-widget';
 const DESTINATION_WIDGET_ID = 'weather-destination-widget';
@@ -49,6 +49,10 @@ let _lastComparisonDestinationLng = null;
 let _lastComparisonFetchTs = 0;
 let _requestSeq = 0;
 const _inFlightFetches = new Map();
+const WEATHER_PLACEHOLDER = {
+    current: { temperature_2m: 0, weather_code: 3, wind_speed_10m: 0, relative_humidity_2m: 0 },
+    daily: {}
+};
 
 function esc(value) {
     const div = document.createElement('div');
@@ -319,6 +323,16 @@ function cloneState(data, label, status, dataSource, expanded = false) {
     return { data, label, status, dataSource, expanded };
 }
 
+function buildFallbackState(previousState, cachedEntry, label, status) {
+    if (cachedEntry?.payload) {
+        return cloneState(cachedEntry.payload, label, status, 'stale', previousState?.expanded ?? false);
+    }
+    if (previousState?.data) {
+        return cloneState(previousState.data, label, status, 'stale', previousState.expanded);
+    }
+    return cloneState(WEATHER_PLACEHOLDER, label, status, 'error', true);
+}
+
 let _currentState = null;
 let _destinationState = null;
 
@@ -399,8 +413,7 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
             _currentState = cloneState(_lastData, label, status, 'stale');
             renderCurrent();
         } else {
-            const placeholder = { current: { temperature_2m: 0, weather_code: 3, wind_speed_10m: 0, relative_humidity_2m: 0 }, daily: {} };
-            _currentState = cloneState(placeholder, label, status, 'error', true);
+            _currentState = cloneState(WEATHER_PLACEHOLDER, label, status, 'error', true);
             renderCurrent();
         }
     }
@@ -424,6 +437,7 @@ export async function updateWeatherMoonComparison(currentLocation, destinationLo
         : haversineKm(destinationLat, destinationLng, _lastComparisonDestinationLat, _lastComparisonDestinationLng) >= MIN_MOVE_KM;
     const shouldRefreshCurrent = !currentCached || currentMoved || elapsed >= CACHE_TTL_MS;
     const shouldRefreshDestination = !destinationCached || destinationMoved || elapsed >= CACHE_TTL_MS;
+    const requestSeq = ++_requestSeq;
 
     if (!shouldRefreshCurrent && !shouldRefreshDestination) {
         _lastData = currentCached.payload;
@@ -438,27 +452,43 @@ export async function updateWeatherMoonComparison(currentLocation, destinationLo
         return;
     }
 
-    const [currentData, destinationData] = await Promise.all([
+    const [currentResult, destinationResult] = await Promise.allSettled([
         shouldRefreshCurrent ? getWeatherFetch(currentLat, currentLng) : Promise.resolve(currentCached.payload),
         shouldRefreshDestination ? getWeatherFetch(destinationLat, destinationLng) : Promise.resolve(destinationCached.payload)
     ]);
 
-    if (shouldRefreshCurrent) saveCache(currentLat, currentLng, currentData);
-    if (shouldRefreshDestination) saveCache(destinationLat, destinationLng, destinationData);
+    if (requestSeq !== _requestSeq) return;
 
-    _lastData = currentData;
-    _lastLabel = currentLocation?.label || null;
-    _lastFetchLat = currentLat;
-    _lastFetchLng = currentLng;
-    _lastFetchTs = Date.now();
-    _lastComparisonCurrentLat = currentLat;
-    _lastComparisonCurrentLng = currentLng;
-    _lastComparisonDestinationLat = destinationLat;
-    _lastComparisonDestinationLng = destinationLng;
-    _lastComparisonFetchTs = Date.now();
+    const currentLabel = currentLocation?.label || null;
+    const destinationLabel = destinationLocation?.label || null;
 
-    _currentState = cloneState(currentData, currentLocation?.label || null, null, shouldRefreshCurrent ? 'live' : 'cache');
-    _destinationState = cloneState(destinationData, destinationLocation?.label || null, null, shouldRefreshDestination ? 'live' : 'cache');
+    if (currentResult.status === 'fulfilled') {
+        if (shouldRefreshCurrent) saveCache(currentLat, currentLng, currentResult.value);
+        _lastData = currentResult.value;
+        _lastLabel = currentLabel;
+        _lastFetchLat = currentLat;
+        _lastFetchLng = currentLng;
+        _lastFetchTs = Date.now();
+        _currentState = cloneState(currentResult.value, currentLabel, null, shouldRefreshCurrent ? 'live' : 'cache', _currentState?.expanded ?? false);
+    } else {
+        _currentState = buildFallbackState(_currentState, currentCached, currentLabel, normalizeError(currentResult.reason));
+    }
+
+    if (destinationResult.status === 'fulfilled') {
+        if (shouldRefreshDestination) saveCache(destinationLat, destinationLng, destinationResult.value);
+        _destinationState = cloneState(destinationResult.value, destinationLabel, null, shouldRefreshDestination ? 'live' : 'cache', _destinationState?.expanded ?? false);
+    } else {
+        _destinationState = buildFallbackState(_destinationState, destinationCached, destinationLabel, normalizeError(destinationResult.reason));
+    }
+
+    if (currentResult.status === 'fulfilled' || destinationResult.status === 'fulfilled') {
+        _lastComparisonCurrentLat = currentLat;
+        _lastComparisonCurrentLng = currentLng;
+        _lastComparisonDestinationLat = destinationLat;
+        _lastComparisonDestinationLng = destinationLng;
+        _lastComparisonFetchTs = Date.now();
+    }
+
     renderCurrent();
     renderDestination();
 }

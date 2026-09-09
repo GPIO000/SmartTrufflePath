@@ -256,15 +256,12 @@ export async function fetchWithOfflineCheck(url, options = {}, apiName = null) {
  */
 export function getStatusString() {
     const status = _isOnline ? '🟢 Online' : '🔴 Offline';
-    const uptime = _lastOnlineTime
-        ? `(online da ${Math.round(getOnlineTime() / 1000)}s)`
-        : '(offline)';
     const unavailableCount = _apiUnavailableReasons.size;
     const unavailableStr = unavailableCount > 0
         ? ` | ${unavailableCount} API temporaneamente non disponibili`
         : '';
 
-    return `${status} ${uptime}${unavailableStr}`;
+    return `${status}${unavailableStr}`;
 }
 
 // ── Helpers privati ────────────────────────────────────────────────────────
