@@ -5706,9 +5706,26 @@ async function _requestBackupReauth() {
 }
 
 let _backupFolderPromptInProgress = false;
+let _initialDisclaimerAccepted = false;
+let _resolveInitialDisclaimerAccepted = null;
+const _initialDisclaimerAcceptedPromise = new Promise((resolve) => {
+    _resolveInitialDisclaimerAccepted = resolve;
+});
+
+function _markInitialDisclaimerAccepted() {
+    if (_initialDisclaimerAccepted) return;
+    _initialDisclaimerAccepted = true;
+    if (typeof _resolveInitialDisclaimerAccepted === 'function') {
+        _resolveInitialDisclaimerAccepted();
+        _resolveInitialDisclaimerAccepted = null;
+    }
+}
 
 async function _requestBackupFolderForDataChanges() {
     if (_backupFolderPromptInProgress || _backupReauthInProgress) return false;
+    if (!_initialDisclaimerAccepted) {
+        await _initialDisclaimerAcceptedPromise;
+    }
     _backupFolderPromptInProgress = true;
     try {
         const confirmed = await appConfirm(
@@ -6424,6 +6441,7 @@ function aggiornaVistaDisclaimer() {
                 // Azione per il tasto "Accetta e Continua"
                 document.getElementById('btn-accetta-disclaimer').addEventListener('click', () => {
                     modalOverlay.style.display = 'none';
+                    _markInitialDisclaimerAccepted();
                 });
 
                 // Azione per il tasto "Abbandona"
