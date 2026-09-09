@@ -41,6 +41,12 @@ let _lastData = null;
 let _lastLabel = null;
 let _lastFetchLat = null;
 let _lastFetchLng = null;
+let _lastFetchTs = 0;
+let _lastComparisonCurrentLat = null;
+let _lastComparisonCurrentLng = null;
+let _lastComparisonDestinationLat = null;
+let _lastComparisonDestinationLng = null;
+let _lastComparisonFetchTs = 0;
 let _requestSeq = 0;
 const _inFlightFetches = new Map();
 
@@ -70,7 +76,7 @@ function loadCache(lat, lng) {
         if (!parsed || typeof parsed !== 'object') return null;
         if (!parsed.ts || Date.now() - parsed.ts > CACHE_TTL_MS) return null;
         if (!parsed.payload || typeof parsed.payload !== 'object') return null;
-        return parsed.payload;
+        return parsed;
     } catch {
         return null;
     }
@@ -203,10 +209,15 @@ function dayItem(data, index) {
     if (Number.isFinite(daily.et0_fao_evapotranspiration?.[index])) {
         extra.push(`ET₀ ${daily.et0_fao_evapotranspiration[index].toFixed(1)}`);
     }
+    const rawDate = daily.time?.[index];
+    const computedDate = rawDate ? new Date(`${rawDate}T12:00:00`) : new Date(Date.now() + index * 24 * 60 * 60 * 1000);
+    const dayLabel = Number.isNaN(computedDate.getTime())
+        ? ''
+        : `${['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'][computedDate.getDay()]} ${String(computedDate.getDate()).padStart(2, '0')}/${String(computedDate.getMonth() + 1).padStart(2, '0')}`;
 
     return `
         <li class="wm-day-item">
-            <div class="wm-day-main">${icon} ${Number.isFinite(tMax) ? Math.round(tMax) : '–'}° / ${Number.isFinite(tMin) ? Math.round(tMin) : '–'}° · 🌧️ ${Number.isFinite(rain) ? rain : 0}mm · 💨 ${Number.isFinite(wind) ? Math.round(wind) : '–'}km/h</div>
+            <div class="wm-day-main">${dayLabel ? `${esc(dayLabel)} · ` : ''}${icon} ${Number.isFinite(tMax) ? Math.round(tMax) : '–'}° / ${Number.isFinite(tMin) ? Math.round(tMin) : '–'}° · 🌧️ ${Number.isFinite(rain) ? rain : 0}mm · 💨 ${Number.isFinite(wind) ? Math.round(wind) : '–'}km/h</div>
             <div class="wm-moon-row">${moon.icon} ${esc(moon.name)}</div>
             ${extra.length ? `<div class="wm-extra-row">${extra.map(esc).join(' · ')}</div>` : ''}
         </li>
@@ -338,7 +349,8 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
 
     if (!force && label === null && _lastFetchLat !== null && _lastFetchLng !== null) {
         const km = haversineKm(lat, lng, _lastFetchLat, _lastFetchLng);
-        if (km < MIN_MOVE_KM) {
+        const elapsed = Date.now() - _lastFetchTs;
+        if (km < MIN_MOVE_KM && elapsed < CACHE_TTL_MS) {
             renderCurrent();
             return;
         }
@@ -355,11 +367,12 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
 
     const cached = loadCache(lat, lng);
     if (cached) {
-        _lastData = cached;
+        _lastData = cached.payload;
         _lastLabel = label;
         _lastFetchLat = lat;
         _lastFetchLng = lng;
-        _currentState = cloneState(cached, label, null, 'cache');
+        _lastFetchTs = Number.isFinite(cached.ts) ? cached.ts : Date.now();
+        _currentState = cloneState(cached.payload, label, null, 'cache');
         renderCurrent();
         return;
     }
@@ -373,6 +386,7 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
         _lastLabel = label;
         _lastFetchLat = lat;
         _lastFetchLng = lng;
+        _lastFetchTs = Date.now();
         _currentState = cloneState(data, label, null, 'live');
         renderCurrent();
     } catch (error) {
@@ -399,21 +413,52 @@ export async function updateWeatherMoonComparison(currentLocation, destinationLo
     const destinationLng = Number(destinationLocation?.lng);
     if (!Number.isFinite(currentLat) || !Number.isFinite(currentLng) || !Number.isFinite(destinationLat) || !Number.isFinite(destinationLng)) return;
 
+    const currentCached = loadCache(currentLat, currentLng);
+    const destinationCached = loadCache(destinationLat, destinationLng);
+    const elapsed = Date.now() - _lastComparisonFetchTs;
+    const currentMoved = _lastComparisonCurrentLat === null || _lastComparisonCurrentLng === null
+        ? true
+        : haversineKm(currentLat, currentLng, _lastComparisonCurrentLat, _lastComparisonCurrentLng) >= MIN_MOVE_KM;
+    const destinationMoved = _lastComparisonDestinationLat === null || _lastComparisonDestinationLng === null
+        ? true
+        : haversineKm(destinationLat, destinationLng, _lastComparisonDestinationLat, _lastComparisonDestinationLng) >= MIN_MOVE_KM;
+    const shouldRefreshCurrent = !currentCached || currentMoved || elapsed >= CACHE_TTL_MS;
+    const shouldRefreshDestination = !destinationCached || destinationMoved || elapsed >= CACHE_TTL_MS;
+
+    if (!shouldRefreshCurrent && !shouldRefreshDestination) {
+        _lastData = currentCached.payload;
+        _lastLabel = currentLocation?.label || null;
+        _lastFetchLat = currentLat;
+        _lastFetchLng = currentLng;
+        _lastFetchTs = Number.isFinite(currentCached.ts) ? currentCached.ts : Date.now();
+        _currentState = cloneState(currentCached.payload, currentLocation?.label || null, null, 'cache');
+        _destinationState = cloneState(destinationCached.payload, destinationLocation?.label || null, null, 'cache');
+        renderCurrent();
+        renderDestination();
+        return;
+    }
+
     const [currentData, destinationData] = await Promise.all([
-        getWeatherFetch(currentLat, currentLng),
-        getWeatherFetch(destinationLat, destinationLng)
+        shouldRefreshCurrent ? getWeatherFetch(currentLat, currentLng) : Promise.resolve(currentCached.payload),
+        shouldRefreshDestination ? getWeatherFetch(destinationLat, destinationLng) : Promise.resolve(destinationCached.payload)
     ]);
 
-    saveCache(currentLat, currentLng, currentData);
-    saveCache(destinationLat, destinationLng, destinationData);
+    if (shouldRefreshCurrent) saveCache(currentLat, currentLng, currentData);
+    if (shouldRefreshDestination) saveCache(destinationLat, destinationLng, destinationData);
 
     _lastData = currentData;
     _lastLabel = currentLocation?.label || null;
     _lastFetchLat = currentLat;
     _lastFetchLng = currentLng;
+    _lastFetchTs = Date.now();
+    _lastComparisonCurrentLat = currentLat;
+    _lastComparisonCurrentLng = currentLng;
+    _lastComparisonDestinationLat = destinationLat;
+    _lastComparisonDestinationLng = destinationLng;
+    _lastComparisonFetchTs = Date.now();
 
-    _currentState = cloneState(currentData, currentLocation?.label || null, null, 'live');
-    _destinationState = cloneState(destinationData, destinationLocation?.label || null, null, 'live');
+    _currentState = cloneState(currentData, currentLocation?.label || null, null, shouldRefreshCurrent ? 'live' : 'cache');
+    _destinationState = cloneState(destinationData, destinationLocation?.label || null, null, shouldRefreshDestination ? 'live' : 'cache');
     renderCurrent();
     renderDestination();
 }
