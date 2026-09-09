@@ -1724,6 +1724,7 @@ let gpsTimeoutRetryCount = 0;
 let gpsRetryTimerId = null;
 const GPS_TIMEOUT_MAX_RETRIES = 5;
 const GPS_TIMEOUT_BASE_DELAY_MS = 3000;
+const GPS_RETRY_RECOVERY_INTERVAL_MS = 60000;
 const GPS_LAST_POSITION_KEY = 'gps_last_known_position';
 
 const ELEVATION_API_URL = 'https://api.open-meteo.com/v1/elevation';
@@ -1929,8 +1930,8 @@ function startGpsWatch() {
         console.warn("Errore GPS: " + error.message);
         const dot = document.getElementById('gps-status-dot');
         if (dot) dot.style.backgroundColor = '#ef4444';
-        // error.code 3 = TIMEOUT — restart the watch to recover GPS signal in offline mode
-        if (error.code === 3) {
+        // error.code 3 = TIMEOUT / 2 = POSITION_UNAVAILABLE — restart the watch to recover GPS signal
+        if (error.code === 3 || error.code === 2) {
             if (gpsTimeoutRetryCount < GPS_TIMEOUT_MAX_RETRIES) {
                 gpsTimeoutRetryCount++;
                 // Exponential backoff: 3s, 6s, 12s, 24s, 48s
@@ -1942,9 +1943,17 @@ function startGpsWatch() {
                 }
                 gpsRetryTimerId = setTimeout(startGpsWatch, delay);
             } else {
-                showToast('❌ GPS non disponibile dopo più tentativi. Controlla i permessi o riavvia l\'app.', 'error');
+                showToast('⚠️ GPS non disponibile al momento. Nuovo tentativo automatico tra 1 minuto.', 'warning');
+                if (gpsWatchId !== null) {
+                    navigator.geolocation.clearWatch(gpsWatchId);
+                    gpsWatchId = null;
+                }
+                gpsRetryTimerId = setTimeout(startGpsWatch, GPS_RETRY_RECOVERY_INTERVAL_MS);
                 showLastKnownGpsPosition();
             }
+        } else if (error.code === 1) {
+            showToast('❌ Permesso GPS negato. Abilita la posizione nelle impostazioni del browser/app.', 'error');
+            showLastKnownGpsPosition();
         }
     }, { enableHighAccuracy: true, maximumAge: isRetry ? 0 : 10000, timeout: 15000 });
 }
