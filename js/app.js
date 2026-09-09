@@ -5418,7 +5418,7 @@ async function _resolveAutomaticBackupDirectory(selectedDirHandle) {
     };
 }
 
-async function configureAutomaticBackupFolder(forceReselect = false) {
+async function configureAutomaticBackupFolder(forceReselect = false, { skipIntroAlert = false } = {}) {
     if (!window.showDirectoryPicker) {
         await appAlert("Il browser non supporta la scelta guidata della cartella backup. Verrà usato il download standard del file.");
         return null;
@@ -5427,12 +5427,14 @@ async function configureAutomaticBackupFolder(forceReselect = false) {
     try {
         let selectedDirHandle = forceReselect ? null : await _loadBackupDirHandle();
         if (!selectedDirHandle) {
-            await appAlert(
-                `📁 Configurazione backup automatico\n\n` +
-                `1. Seleziona la cartella Download del dispositivo.\n` +
-                `2. L'app creerà (o riutilizzerà) automaticamente il percorso ${buildAutomaticBackupPathLabel('Download')}.\n` +
-                `3. Il file backup_truffle_automatico.json verrà salvato sempre lì e il percorso sarà registrato.`
-            );
+            if (!skipIntroAlert) {
+                await appAlert(
+                    `📁 Configurazione backup automatico\n\n` +
+                    `1. Seleziona la cartella Download del dispositivo.\n` +
+                    `2. L'app creerà (o riutilizzerà) automaticamente il percorso ${buildAutomaticBackupPathLabel('Download')}.\n` +
+                    `3. Il file backup_truffle_automatico.json verrà salvato sempre lì e il percorso sarà registrato.`
+                );
+            }
             selectedDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
         } else {
             const permission = await selectedDirHandle.requestPermission({ mode: 'readwrite' });
@@ -5464,7 +5466,7 @@ async function configureAutomaticBackupFolder(forceReselect = false) {
 }
 
 async function chooseAutomaticBackupFolder() {
-    const configuredFolder = await configureAutomaticBackupFolder(true);
+    const configuredFolder = await configureAutomaticBackupFolder(true, { skipIntroAlert: true });
     if (configuredFolder) {
         showToast(`Cartella backup registrata: ${configuredFolder.destinationLabel}.`, 'success');
     }
@@ -5695,7 +5697,7 @@ async function _requestBackupReauth() {
             "Dopo l'aggiornamento o la reinstallazione dell'app il permesso di accesso alla cartella backup non è più valido.\n\n" +
             'Premi OK per selezionare di nuovo la cartella e ripristinare il backup automatico.'
         );
-        const configuredFolder = await configureAutomaticBackupFolder(true);
+        const configuredFolder = await configureAutomaticBackupFolder(true, { skipIntroAlert: true });
         if (configuredFolder) {
             showToast(`Cartella backup registrata: ${configuredFolder.destinationLabel}.`, 'success');
             await runAutomaticLocalBackup();
