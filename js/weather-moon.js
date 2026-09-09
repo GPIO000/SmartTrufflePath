@@ -358,8 +358,19 @@ function renderDestination() {
     attachToggle(DESTINATION_WIDGET_ID, () => _destinationState);
 }
 
+function clearDestinationWeather() {
+    _destinationState = null;
+    const destinationWidget = document.getElementById(DESTINATION_WIDGET_ID);
+    if (destinationWidget) {
+        destinationWidget.innerHTML = '';
+        destinationWidget.style.display = 'none';
+    }
+    hidePanel(DESTINATION_WIDGET_ID);
+}
+
 export async function updateWeatherMoon(lat, lng, label = null, force = false) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    clearDestinationWeather();
 
     if (!force && label === null && _lastFetchLat !== null && _lastFetchLng !== null) {
         const km = haversineKm(lat, lng, _lastFetchLat, _lastFetchLng);
@@ -371,13 +382,6 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
     }
 
     const requestSeq = ++_requestSeq;
-    _destinationState = null;
-    const destinationWidget = document.getElementById(DESTINATION_WIDGET_ID);
-    if (destinationWidget) {
-        destinationWidget.innerHTML = '';
-        destinationWidget.style.display = 'none';
-    }
-    hidePanel(DESTINATION_WIDGET_ID);
 
     const cached = loadCache(lat, lng);
     if (cached) {
@@ -445,8 +449,8 @@ export async function updateWeatherMoonComparison(currentLocation, destinationLo
         _lastFetchLat = currentLat;
         _lastFetchLng = currentLng;
         _lastFetchTs = Number.isFinite(currentCached.ts) ? currentCached.ts : Date.now();
-        _currentState = cloneState(currentCached.payload, currentLocation?.label || null, null, 'cache');
-        _destinationState = cloneState(destinationCached.payload, destinationLocation?.label || null, null, 'cache');
+        _currentState = cloneState(currentCached.payload, currentLocation?.label || null, null, 'cache', _currentState?.expanded ?? false);
+        _destinationState = cloneState(destinationCached.payload, destinationLocation?.label || null, null, 'cache', _destinationState?.expanded ?? false);
         renderCurrent();
         renderDestination();
         return;
