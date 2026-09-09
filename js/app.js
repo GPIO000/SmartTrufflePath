@@ -5708,6 +5708,7 @@ async function _requestBackupReauth() {
 }
 
 let _backupFolderPromptInProgress = false;
+let _backupFolderPromptPromise = null;
 let _initialDisclaimerAccepted = false;
 let _resolveInitialDisclaimerAccepted = null;
 const _initialDisclaimerAcceptedPromise = new Promise((resolve) => {
@@ -5724,24 +5725,33 @@ function _markInitialDisclaimerAccepted() {
 }
 
 async function _requestBackupFolderForDataChanges() {
-    if (_backupFolderPromptInProgress || _backupReauthInProgress) return false;
-    if (!_initialDisclaimerAccepted) {
-        await _initialDisclaimerAcceptedPromise;
-    }
-    _backupFolderPromptInProgress = true;
+    if (_backupFolderPromptPromise) return _backupFolderPromptPromise;
+    if (_backupReauthInProgress) return false;
+    _backupFolderPromptPromise = (async () => {
+        if (!_initialDisclaimerAccepted) {
+            await _initialDisclaimerAcceptedPromise;
+        }
+        if (_backupReauthInProgress) return false;
+        _backupFolderPromptInProgress = true;
+        try {
+            const confirmed = await appConfirm(
+                '📁 Backup automatico non configurato\n\n' +
+                'Hai appena creato, modificato o eliminato dei dati.\n\n' +
+                'Per salvare automaticamente le modifiche, seleziona ora la cartella Download del dispositivo.'
+            );
+            if (!confirmed) return false;
+            const configuredFolder = await configureAutomaticBackupFolder(true);
+            if (!configuredFolder) return false;
+            showToast(`Cartella backup registrata: ${configuredFolder.destinationLabel}.`, 'success');
+            return true;
+        } finally {
+            _backupFolderPromptInProgress = false;
+        }
+    })();
     try {
-        const confirmed = await appConfirm(
-            '📁 Backup automatico non configurato\n\n' +
-            'Hai appena creato, modificato o eliminato dei dati.\n\n' +
-            'Per salvare automaticamente le modifiche, seleziona ora la cartella Download del dispositivo.'
-        );
-        if (!confirmed) return false;
-        const configuredFolder = await configureAutomaticBackupFolder(true);
-        if (!configuredFolder) return false;
-        showToast(`Cartella backup registrata: ${configuredFolder.destinationLabel}.`, 'success');
-        return true;
+        return await _backupFolderPromptPromise;
     } finally {
-        _backupFolderPromptInProgress = false;
+        _backupFolderPromptPromise = null;
     }
 }
 
@@ -5773,14 +5783,36 @@ let automaticBackupLifecycleInitialized = false;
 let lastAutomaticBackupFingerprint = '';
 let dataChangeDebounceTimer = null;
 let _backupReauthInProgress = false;
+const AUTOMATIC_BACKUP_TRIGGER_KEYS = new Set([
+    'tesserino_data',
+    'pagopa_data',
+    'archivio_documenti_list',
+    'f24_data',
+    'storico_vendite',
+    'luoghi_raccolta',
+    'poi_list',
+    'dogs_list',
+    'cane_data',
+    'polizze_list',
+    'storico_raccolta_giornaliera',
+    'rubrica_clienti',
+    'spese_list',
+    'vet_history_list',
+    'heat_diary_list',
+    'vet_clinics_list',
+    'calendari_tartufi_custom',
+    'note_regionali_tartufi',
+    TRUFFLE_FORECAST_FEEDBACK_KEY,
+    OFFLINE_REGIONI_PREFERITE_KEY
+]);
 
 function setupAutomaticBackupLifecycle() {
     if (automaticBackupLifecycleInitialized) return;
     automaticBackupLifecycleInitialized = true;
     const api = window.TruffleStorage;
     if (api && typeof api.setDataChangeListener === 'function') {
-        api.setDataChangeListener((_key, type) => {
-            if (type === 'delete') return;
+        api.setDataChangeListener((key, type) => {
+            if (type === 'delete' || !AUTOMATIC_BACKUP_TRIGGER_KEYS.has(key)) return;
             clearTimeout(dataChangeDebounceTimer);
             dataChangeDebounceTimer = setTimeout(() => runAutomaticLocalBackup(), AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS);
         });
