@@ -5783,14 +5783,36 @@ let automaticBackupLifecycleInitialized = false;
 let lastAutomaticBackupFingerprint = '';
 let dataChangeDebounceTimer = null;
 let _backupReauthInProgress = false;
+const AUTOMATIC_BACKUP_TRIGGER_KEYS = new Set([
+    'tesserino_data',
+    'pagopa_data',
+    'archivio_documenti_list',
+    'f24_data',
+    'storico_vendite',
+    'luoghi_raccolta',
+    'poi_list',
+    'dogs_list',
+    'cane_data',
+    'polizze_list',
+    'storico_raccolta_giornaliera',
+    'rubrica_clienti',
+    'spese_list',
+    'vet_history_list',
+    'heat_diary_list',
+    'vet_clinics_list',
+    'calendari_tartufi_custom',
+    'note_regionali_tartufi',
+    TRUFFLE_FORECAST_FEEDBACK_KEY,
+    OFFLINE_REGIONI_PREFERITE_KEY
+]);
 
 function setupAutomaticBackupLifecycle() {
     if (automaticBackupLifecycleInitialized) return;
     automaticBackupLifecycleInitialized = true;
     const api = window.TruffleStorage;
     if (api && typeof api.setDataChangeListener === 'function') {
-        api.setDataChangeListener((_key, type) => {
-            if (type === 'delete') return;
+        api.setDataChangeListener((key, type) => {
+            if (type === 'delete' || !AUTOMATIC_BACKUP_TRIGGER_KEYS.has(key)) return;
             clearTimeout(dataChangeDebounceTimer);
             dataChangeDebounceTimer = setTimeout(() => runAutomaticLocalBackup(), AUTO_BACKUP_DATA_CHANGE_DEBOUNCE_MS);
         });
