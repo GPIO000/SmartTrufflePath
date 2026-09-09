@@ -298,8 +298,8 @@ describe('updateWeatherMoon — cache', () => {
     it('non usa la cache scaduta', async () => {
         const mockData = fakeWeatherResponse();
         const cacheKey = 'wm_cache_44.00_11.00';
-        // Timestamp di 2 ore fa (> 30 min TTL)
-        localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now() - 2 * 60 * 60 * 1000, payload: mockData }));
+        // Timestamp di 7 ore fa (> 6 ore TTL)
+        localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now() - 7 * 60 * 60 * 1000, payload: mockData }));
 
         const mockFetch = vi.fn().mockResolvedValue({
             ok: true,
