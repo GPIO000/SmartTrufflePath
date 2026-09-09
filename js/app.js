@@ -5708,6 +5708,7 @@ async function _requestBackupReauth() {
 }
 
 let _backupFolderPromptInProgress = false;
+let _backupFolderPromptPromise = null;
 let _initialDisclaimerAccepted = false;
 let _resolveInitialDisclaimerAccepted = null;
 const _initialDisclaimerAcceptedPromise = new Promise((resolve) => {
@@ -5724,24 +5725,33 @@ function _markInitialDisclaimerAccepted() {
 }
 
 async function _requestBackupFolderForDataChanges() {
-    if (_backupFolderPromptInProgress || _backupReauthInProgress) return false;
-    if (!_initialDisclaimerAccepted) {
-        await _initialDisclaimerAcceptedPromise;
-    }
-    _backupFolderPromptInProgress = true;
+    if (_backupFolderPromptPromise) return _backupFolderPromptPromise;
+    if (_backupReauthInProgress) return false;
+    _backupFolderPromptPromise = (async () => {
+        if (!_initialDisclaimerAccepted) {
+            await _initialDisclaimerAcceptedPromise;
+        }
+        if (_backupReauthInProgress) return false;
+        _backupFolderPromptInProgress = true;
+        try {
+            const confirmed = await appConfirm(
+                '📁 Backup automatico non configurato\n\n' +
+                'Hai appena creato, modificato o eliminato dei dati.\n\n' +
+                'Per salvare automaticamente le modifiche, seleziona ora la cartella Download del dispositivo.'
+            );
+            if (!confirmed) return false;
+            const configuredFolder = await configureAutomaticBackupFolder(true);
+            if (!configuredFolder) return false;
+            showToast(`Cartella backup registrata: ${configuredFolder.destinationLabel}.`, 'success');
+            return true;
+        } finally {
+            _backupFolderPromptInProgress = false;
+        }
+    })();
     try {
-        const confirmed = await appConfirm(
-            '📁 Backup automatico non configurato\n\n' +
-            'Hai appena creato, modificato o eliminato dei dati.\n\n' +
-            'Per salvare automaticamente le modifiche, seleziona ora la cartella Download del dispositivo.'
-        );
-        if (!confirmed) return false;
-        const configuredFolder = await configureAutomaticBackupFolder(true);
-        if (!configuredFolder) return false;
-        showToast(`Cartella backup registrata: ${configuredFolder.destinationLabel}.`, 'success');
-        return true;
+        return await _backupFolderPromptPromise;
     } finally {
-        _backupFolderPromptInProgress = false;
+        _backupFolderPromptPromise = null;
     }
 }
 
