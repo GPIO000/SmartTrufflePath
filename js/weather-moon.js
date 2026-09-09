@@ -1,16 +1,16 @@
-import { isOnline, canFetchAPI, onConnectivityChange, fetchWithOfflineCheck, getStatusString } from './offline-api-manager.js';
-import { calcMoonPhase } from './weather-moon.js';
+import { onConnectivityChange, fetchWithOfflineCheck, getStatusString } from './offline-api-manager.js';
 
-const CACHE_TTL_MS     = 30 * 60 * 1000; // 30 minuti
-const MIN_MOVE_KM      = 5;              // soglia spostamento per nuovo fetch
-const REQUEST_TIMEOUT_MS = 8000;
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const MIN_MOVE_KM = 5;
+const FETCH_TIMEOUT_MS = 8000;
+const CURRENT_WIDGET_ID = 'weather-moon-widget';
+const DESTINATION_WIDGET_ID = 'weather-destination-widget';
 
-// Codici WMO → emoji + descrizione italiana
 const WMO_CODES = {
-    0:  { icon: '☀️',  label: 'Sereno' },
-    1:  { icon: '🌤️', label: 'Prevalentemente sereno' },
-    2:  { icon: '⛅',  label: 'Parzialmente nuvoloso' },
-    3:  { icon: '☁️',  label: 'Coperto' },
+    0: { icon: '☀️', label: 'Sereno' },
+    1: { icon: '🌤️', label: 'Prevalentemente sereno' },
+    2: { icon: '⛅', label: 'Parzialmente nuvoloso' },
+    3: { icon: '☁️', label: 'Coperto' },
     45: { icon: '🌫️', label: 'Nebbia' },
     48: { icon: '🌫️', label: 'Nebbia con brina' },
     51: { icon: '🌦️', label: 'Pioggerella leggera' },
@@ -18,288 +18,101 @@ const WMO_CODES = {
     55: { icon: '🌧️', label: 'Pioggerella densa' },
     61: { icon: '🌧️', label: 'Pioggia leggera' },
     63: { icon: '🌧️', label: 'Pioggia moderata' },
-    65: { icon: '⛈️', label: 'Pioggia pesante' },
-    71: { icon: '❄️',  label: 'Neve leggera' },
-    73: { icon: '❄️',  label: 'Neve moderata' },
-    75: { icon: '❄️',  label: 'Neve pesante' },
+    65: { icon: '⛈️', label: 'Pioggia intensa' },
+    71: { icon: '❄️', label: 'Neve leggera' },
+    73: { icon: '❄️', label: 'Neve moderata' },
+    75: { icon: '❄️', label: 'Neve intensa' },
     80: { icon: '🌧️', label: 'Rovescio leggero' },
     81: { icon: '⛈️', label: 'Rovescio moderato' },
     82: { icon: '⛈️', label: 'Rovescio violento' },
-    85: { icon: '❄️',  label: 'Rovescio di neve leggero' },
-    86: { icon: '❄️',  label: 'Rovescio di neve pesante' },
     95: { icon: '⛈️', label: 'Temporale' },
-    96: { icon: '⛈️', label: 'Temporale con grandine leggera' },
-    99: { icon: '⛈️', label: 'Temporale con grandine pesante' }
+    96: { icon: '⛈️', label: 'Temporale con grandine' },
+    99: { icon: '⛈️', label: 'Temporale violento' }
 };
 
-// ── Cache locale ───────────────────────────────────────────────────────────
+let _lastData = null;
+let _lastLabel = null;
+let _lastFetchLat = null;
+let _lastFetchLng = null;
+let _requestSeq = 0;
+const _inFlightFetches = new Map();
 
-const CACHE_KEY_PREFIX = 'weather_cache_';
-const _cache = new Map();
-
-function getCacheKey(lat, lng) {
-    return `${CACHE_KEY_PREFIX}${lat.toFixed(4)}_${lng.toFixed(4)}`;
+function esc(value) {
+    const div = document.createElement('div');
+    div.textContent = String(value ?? '');
+    return div.innerHTML;
 }
-
-function loadCache(lat, lng) {
-    const key = getCacheKey(lat, lng);
-    const cached = _cache.get(key);
-    if (cached && Date.now() - cached.savedAt < CACHE_TTL_MS) {
-        return cached.data;
-    }
-    _cache.delete(key);
-    return null;
-}
-
-function saveCache(lat, lng, data) {
-    const key = getCacheKey(lat, lng);
-    _cache.set(key, { data, savedAt: Date.now() });
-}
-
-// ── Fetch Open-Meteo con offline check ─────────────────────────────────────
-
-async function fetchWeather(lat, lng) {
-    const url = new URL('https://api.open-meteo.com/v1/forecast');
-    url.searchParams.set('latitude',   lat.toFixed(4));
-    url.searchParams.set('longitude',  lng.toFixed(4));
-    url.searchParams.set('current',    'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m');
-    url.searchParams.set('daily',      [
-        'weather_code',
-        'temperature_2m_max',
-        'temperature_2m_min',
-        'precipitation_sum',
-        'wind_speed_10m_max',
-    ].join(','));
-    url.searchParams.set('forecast_days', '4');
-    url.searchParams.set('timezone',      'auto');
-
-    // 🔑 Usa fetchWithOfflineCheck invece di fetch diretto
-    const resp = await fetchWithOfflineCheck(url.toString(), {}, 'weather-api');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return resp.json();
-}
-
-function createWeatherError(code, message, cause = null) {
-    const error = new Error(message);
-    error.code = code;
-    error.cause = cause;
-    return error;
-}
-
-function describeWeatherError(error) {
-    if (error?.code === 'OFFLINE') {
-        return {
-            logMessage: 'Dispositivo offline - usando dati in cache',
-            shortMessage: 'Offline',
-            detail: 'La connessione è offline. Viene visualizzata l\'ultima previsione meteo disponibile.'
-        };
-    }
-    if (error?.code === 'TIMEOUT') {
-        return {
-            logMessage: 'Timeout richiesta meteo',
-            shortMessage: 'Timeout',
-            detail: 'Il server meteo ha impiegato troppo tempo a rispondere.'
-        };
-    }
-    if (error?.code === 'API_UNAVAILABLE') {
-        return {
-            logMessage: `API meteo temporaneamente non disponibile: ${error.apiName}`,
-            shortMessage: 'API non disponibile',
-            detail: `${error.apiName} è temporaneamente non disponibile.`
-        };
-    }
-    if (error?.code === 'NETWORK_ERROR') {
-        return {
-            logMessage: 'Errore di rete generale',
-            shortMessage: 'Errore rete',
-            detail: 'Si è verificato un errore di rete. Controlla la tua connessione.'
-        };
-    }
-    return {
-        logMessage: `Errore meteo: ${error?.message || 'sconosciuto'}`,
-        shortMessage: 'Errore',
-        detail: error?.message || 'Errore sconosciuto nel caricamento del meteo.'
-    };
-}
-
-// ── Rendering ─────────────────────────────────────────────────────────────────
 
 function wmoInfo(code) {
     return WMO_CODES[Number(code)] || { icon: '❓', label: 'Sconosciuto' };
 }
 
-/**
- * Descrizione testuale dello stato dei dati meteo visualizzati.
- * @param {'live'|'cache'|'stale'|'error'} dataSource
- * @param {object|null} errorStatus  Oggetto da describeWeatherError, solo per 'stale'/'error'
- * @returns {{ badge: string, detail: string }}
- *   badge  — testo breve per la compact bar
- *   detail — testo esteso per il pannello espanso
- */
-function dataSourceLabel(dataSource, errorStatus = null) {
-    switch (dataSource) {
-        case 'live':
-            return {
-                badge: '🟢 In tempo reale',
-                detail: `Ultimo aggiornamento meteo: ora. ${getStatusString()}`
-            };
-        case 'cache':
-            return {
-                badge: '🟡 Dalla cache',
-                detail: `Dati meteo caricati dalla cache locale (ultimi 30 min). ${getStatusString()}`
-            };
-        case 'stale':
-            return {
-                badge: '🟠 Dati obsoleti',
-                detail: `Dati meteo dalla cache, ma recente tentativo di aggiornamento non riuscito. ${errorStatus?.detail || ''}`
-            };
-        case 'error':
-            return {
-                badge: '🔴 Errore',
-                detail: `Impossibile caricare i dati meteo. ${errorStatus?.detail || 'Riprova più tardi.'}`
-            };
-        default:
-            return { badge: '❓', detail: 'Stato sconosciuto' };
-    }
-}
-
-function renderWidget(widgetId, data, label, status = null, dataSource = 'live', expanded = false, setExpanded = () => {}) {
-    const widget = document.getElementById(widgetId);
-    if (!widget) return;
-
-    const current = data?.current || {};
-    const daily = Array.isArray(data?.daily) ? data.daily : [];
-    const { icon: wmoIcon } = wmoInfo(current.weather_code);
-    const temp = Math.round(current.temperature_2m || 0);
-    const wind = Math.round(current.wind_speed_10m || 0);
-    const humidity = Math.round(current.relative_humidity_2m || 0);
-
-    const { badge, detail } = dataSourceLabel(dataSource, status);
-
-    const compactHtml = `
-        <div class="wm-compact">
-            <span class="wm-emoji">${wmoIcon}</span>
-            <span class="wm-temp">${temp}°C</span>
-            <span class="wm-badge">${badge}</span>
-        </div>
-    `;
-
-    const nextDay = daily?.[1];
-    const tempMax = nextDay?.temperature_2m_max || '–';
-    const tempMin = nextDay?.temperature_2m_min || '–';
-    const precipSum = nextDay?.precipitation_sum || 0;
-    const precipLabel = precipSum > 0 ? `${precipSum}mm` : 'asciutto';
-    const windMax = nextDay?.wind_speed_10m_max || '–';
-
-    const panelHtml = `
-        <div class="wm-panel">
-            <div class="wm-header">
-                <span class="wm-title">${label || 'Meteo'}</span>
-                <span class="wm-close" aria-label="Chiudi">×</span>
-            </div>
-            <div class="wm-current">
-                <span class="wm-emoji-large">${wmoIcon}</span>
-                <div class="wm-current-details">
-                    <div>${temp}°C, Vento ${wind}km/h, Umidità ${humidity}%</div>
-                    <div class="wm-data-source">${detail}</div>
-                </div>
-            </div>
-            <div class="wm-forecast">
-                <strong>Domani:</strong> ${tempMax}°–${tempMin}°C, ${precipLabel}, Vento ${windMax}km/h
-            </div>
-        </div>
-    `;
-
-    widget.innerHTML = compactHtml + panelHtml;
-    const compactBar = widget.querySelector('.wm-compact');
-    const closeBtn = widget.querySelector('.wm-close');
-
-    if (compactBar) {
-        compactBar.addEventListener('click', () => setExpanded(!expanded));
-    }
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => setExpanded(false));
-    }
-
-    if (expanded) {
-        widget.classList.add('expanded');
-    } else {
-        widget.classList.remove('expanded');
-    }
-}
-
-function hideWidget(widgetId) {
-    const widget = document.getElementById(widgetId);
-    if (widget) {
-        widget.innerHTML = '';
-        widget.style.display = 'none';
-    }
-}
-
-function renderWeatherState(widgetId, state, expanded, setExpanded) {
-    if (!state?.data) {
-        renderError(widgetId, state?.status, null);
-        return;
-    }
-    renderWidget(widgetId, state.data, null, state.status, state.dataSource, expanded, setExpanded);
-}
-
-function renderComparisonWidget(currentLocation, destinationLocation) {
-    // Implementazione per il widget di comparazione (mantieni come era)
-}
-
-function _esc(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-function _timeLabel() {
-    const now = new Date();
-    return now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-}
-
-function renderError(widgetId, status = null, label = null) {
-    const widget = document.getElementById(widgetId);
-    if (!widget) return;
-
-    const message = status?.shortMessage || 'Errore sconosciuto';
-    const detail = status?.detail || 'Impossibile caricare i dati.';
-
-    widget.innerHTML = `
-        <div class="wm-compact error">
-            <span>🔴 ${message}</span>
-        </div>
-        <div class="wm-panel">
-            <div class="wm-header">
-                <span class="wm-title">Errore</span>
-                <span class="wm-close" aria-label="Chiudi">×</span>
-            </div>
-            <div class="wm-error-message">${_esc(detail)}</div>
-        </div>
-    `;
-
-    const closeBtn = widget.querySelector('.wm-close');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => hideWidget(widgetId));
-    }
-}
-
-// ── API pubblica ──────────────────────────────────────────────────────────────
-
-let _lastData       = null;
-let _lastLabel      = null;
-let _lastStatus     = null;
-let _lastDataSource = null;
-let _lastRenderMode = 'single';
-let _lastComparisonState = null;
-let _requestSeq     = 0;
-let _lastFetchLat   = null;
-let _lastFetchLng   = null;
-const _inFlightFetches = new Map();
-
 function requestKey(lat, lng) {
     return `${lat.toFixed(4)}_${lng.toFixed(4)}`;
+}
+
+function cacheKey(lat, lng) {
+    return `wm_cache_${lat.toFixed(2)}_${lng.toFixed(2)}`;
+}
+
+function loadCache(lat, lng) {
+    try {
+        const raw = localStorage.getItem(cacheKey(lat, lng));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        if (!parsed.ts || Date.now() - parsed.ts > CACHE_TTL_MS) return null;
+        if (!parsed.payload || typeof parsed.payload !== 'object') return null;
+        return parsed.payload;
+    } catch {
+        return null;
+    }
+}
+
+function saveCache(lat, lng, payload) {
+    try {
+        localStorage.setItem(cacheKey(lat, lng), JSON.stringify({ ts: Date.now(), payload }));
+    } catch {
+        // ignore quota/private mode
+    }
+}
+
+function withTimeout(promise, ms) {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            const error = new Error('Timeout richiesta API');
+            error.code = 'TIMEOUT';
+            reject(error);
+        }, ms);
+        promise
+            .then((result) => {
+                clearTimeout(timeoutId);
+                resolve(result);
+            })
+            .catch((error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+            });
+    });
+}
+
+async function fetchWeather(lat, lng) {
+    const url = new URL('https://api.open-meteo.com/v1/forecast');
+    url.searchParams.set('latitude', lat.toFixed(4));
+    url.searchParams.set('longitude', lng.toFixed(4));
+    url.searchParams.set('current', 'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m');
+    url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,soil_temperature_0cm,et0_fao_evapotranspiration');
+    url.searchParams.set('forecast_days', '4');
+    url.searchParams.set('timezone', 'auto');
+
+    const response = await withTimeout(fetchWithOfflineCheck(url.toString(), {}, 'weather-api'), FETCH_TIMEOUT_MS);
+    if (!response?.ok) {
+        const httpError = new Error(`HTTP ${response?.status ?? '0'}`);
+        httpError.code = 'HTTP_ERROR';
+        httpError.status = response?.status;
+        throw httpError;
+    }
+    return response.json();
 }
 
 function getWeatherFetch(lat, lng) {
@@ -314,138 +127,303 @@ function getWeatherFetch(lat, lng) {
     return promise;
 }
 
-async function resolveWeatherState(lat, lng, fallbackState = null) {
-    const cached = loadCache(lat, lng);
-    if (cached) {
-        return {
-            data: cached,
-            status: null,
-            dataSource: 'cache',
-        };
+function normalizeError(error) {
+    const rawMessage = String(error?.message || '');
+    if (error?.code === 'TIMEOUT') {
+        return { short: 'Timeout', detail: 'Timeout richiesta meteo' };
     }
-
-    try {
-        const data = await getWeatherFetch(lat, lng);
-        saveCache(lat, lng, data);
-        return {
-            data,
-            status: null,
-            dataSource: 'live',
-        };
-    } catch (err) {
-        const errorStatus = describeWeatherError(err);
-        console.warn('[WeatherMoon] Fetch fallito:', errorStatus.logMessage);
-        if (fallbackState?.data) {
-            return {
-                data: fallbackState.data,
-                status: errorStatus,
-                dataSource: 'stale',
-            };
-        }
-        return {
-            data: null,
-            status: errorStatus,
-            dataSource: 'error',
-        };
+    if (error?.code === 'HTTP_ERROR') {
+        return { short: 'Errore API', detail: `Errore API ${error.status ?? ''}`.trim() };
     }
+    if (error?.code === 'OFFLINE' || error?.code === 'NETWORK_ERROR' || /network|fetch/i.test(String(error?.message ?? ''))) {
+        return { short: 'Offline', detail: 'Rete non disponibile' };
+    }
+    if (error?.code === 'API_UNAVAILABLE') {
+        return { short: 'API non disponibile', detail: `${error.apiName || 'API'} non disponibile` };
+    }
+    const httpMatch = rawMessage.match(/HTTP\s*(\d{3})/i);
+    if (httpMatch) {
+        return { short: 'Errore API', detail: `Errore API ${httpMatch[1]}` };
+    }
+    if (rawMessage.toUpperCase().includes('HTTP')) {
+        return { short: 'Errore API', detail: rawMessage.replace(/HTTP\s*/i, 'Errore API ') };
+    }
+    return { short: 'Errore', detail: rawMessage || 'Errore sconosciuto' };
 }
 
-/**
- * Aggiorna il widget meteo/luna per le coordinate fornite.
- * @param {number}      lat
- * @param {number}      lng
- * @param {string|null} [label]  Etichetta opzionale (es. nome POI). Se null usa posizione GPS.
- * @param {boolean}     [force]  Se true ignora la soglia di spostamento.
- */
-export async function updateWeatherMoon(lat, lng, label = null, force = false) {
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    const requestSeq = ++_requestSeq;
-    hideWidget('weather-destination-widget');
-    _lastRenderMode = 'single';
-    _lastComparisonState = null;
+function buildCompactHtml(data, label, dataSource) {
+    const current = data?.current || {};
+    const icon = wmoInfo(current.weather_code).icon;
+    const temperature = Math.round(Number(current.temperature_2m) || 0);
 
-    // Spostamento minimo per GPS (evita fetch continue camminando)
-    if (!force && label === null && _lastFetchLat !== null) {
-        const km = haversineKm(lat, lng, _lastFetchLat, _lastFetchLng);
-        if (km < MIN_MOVE_KM) {
-            refreshUI();
-            return;
-        }
+    let badgeClass = 'wm-data-badge--live';
+    let badgeText = 'Aggiornato';
+    if (dataSource === 'cache') {
+        badgeClass = 'wm-data-badge--cache';
+        badgeText = 'Cache';
+    } else if (dataSource === 'stale') {
+        badgeClass = 'wm-data-badge--stale';
+        badgeText = 'Dati precedenti';
+    } else if (dataSource === 'error') {
+        badgeClass = 'wm-data-badge--error';
+        badgeText = 'Meteo n.d.';
     }
 
-    const widget = document.getElementById('weather-moon-widget');
-    if (widget) {
-        widget.style.display = 'flex';
-        widget.innerHTML = '<div class="wm-loading">⏳ Caricamento...</div>';
-    }
-
-    try {
-        const state = await resolveWeatherState(lat, lng, { data: _lastData, status: _lastStatus });
-        if (requestSeq !== _requestSeq) return; // Cancella se richiesta più recente
-
-        _lastData = state.data;
-        _lastStatus = state.status;
-        _lastDataSource = state.dataSource;
-        _lastLabel = label;
-        _lastFetchLat = lat;
-        _lastFetchLng = lng;
-
-        refreshUI();
-    } catch (err) {
-        console.error('[WeatherMoon] Errore inaspettato:', err);
-        if (requestSeq !== _requestSeq) return;
-        renderError('weather-moon-widget', describeWeatherError(err), label);
-    }
+    return `
+        <div class="wm-compact">
+            <span class="wm-emoji">${icon}</span>
+            <span class="wm-temp">${temperature}°</span>
+            <span class="wm-title-inline">${esc(label || 'Meteo')}</span>
+            <span class="wm-data-badge ${badgeClass}">${badgeText}</span>
+        </div>
+    `;
 }
 
-export function refreshMoonOnly() {
-    refreshUI(true);
+function dayItem(data, index) {
+    const daily = data?.daily || {};
+    const code = daily.weather_code?.[index] ?? data?.current?.weather_code ?? 0;
+    const icon = wmoInfo(code).icon;
+    const tMax = daily.temperature_2m_max?.[index];
+    const tMin = daily.temperature_2m_min?.[index];
+    const rain = daily.precipitation_sum?.[index];
+    const wind = daily.wind_speed_10m_max?.[index];
+    const moon = calcMoonPhase(new Date(Date.now() + index * 24 * 60 * 60 * 1000));
+
+    const extra = [];
+    if (Number.isFinite(daily.soil_temperature_0cm?.[index])) {
+        extra.push(`🪱 Suolo ${Math.round(daily.soil_temperature_0cm[index])}°C`);
+    }
+    if (Number.isFinite(daily.et0_fao_evapotranspiration?.[index])) {
+        extra.push(`ET₀ ${daily.et0_fao_evapotranspiration[index].toFixed(1)}`);
+    }
+
+    return `
+        <li class="wm-day-item">
+            <div class="wm-day-main">${icon} ${Number.isFinite(tMax) ? Math.round(tMax) : '–'}° / ${Number.isFinite(tMin) ? Math.round(tMin) : '–'}° · 🌧️ ${Number.isFinite(rain) ? rain : 0}mm · 💨 ${Number.isFinite(wind) ? Math.round(wind) : '–'}km/h</div>
+            <div class="wm-moon-row">${moon.icon} ${esc(moon.name)}</div>
+            ${extra.length ? `<div class="wm-extra-row">${extra.map(esc).join(' · ')}</div>` : ''}
+        </li>
+    `;
 }
 
-function refreshUI(moonOnly = false) {
-    const widget = document.getElementById('weather-moon-widget');
+function buildPanelHtml(data, label, status = null, dataSource = 'live') {
+    const current = data?.current || {};
+    const icon = wmoInfo(current.weather_code).icon;
+    const temp = Math.round(Number(current.temperature_2m) || 0);
+    const wind = Math.round(Number(current.wind_speed_10m) || 0);
+    const humidity = Math.round(Number(current.relative_humidity_2m) || 0);
+
+    let detail = `Ultimo aggiornamento: ${getStatusString()}`;
+    if (dataSource === 'cache') detail = `Dati da cache locale. ${getStatusString()}`;
+    if (dataSource === 'stale') detail = `Dati precedenti. ${status?.detail || ''}`;
+    if (dataSource === 'error') detail = status?.detail || 'Errore caricamento meteo';
+
+    const days = [0, 1, 2, 3].map((idx) => dayItem(data, idx)).join('');
+
+    return `
+        <div class="wm-panel">
+            <div class="wm-header">
+                <span class="wm-title">${esc(label || 'Meteo')}</span>
+                <span class="wm-close" aria-label="Chiudi">×</span>
+            </div>
+            <div class="wm-current">
+                <span class="wm-emoji-large">${icon}</span>
+                <div class="wm-current-details">
+                    <div>${temp}°C, Vento ${wind}km/h, Umidità ${humidity}%</div>
+                    <div class="wm-data-source">${esc(detail)}</div>
+                </div>
+            </div>
+            <ul class="wm-days-list">${days}</ul>
+        </div>
+    `;
+}
+
+function renderCollapsed(widgetId, data, label, dataSource) {
+    const widget = document.getElementById(widgetId);
     if (!widget) return;
-
-    if (!_lastData) {
-        renderError('weather-moon-widget', { shortMessage: 'Nessun dato', detail: 'Carica una posizione per visualizzare il meteo.' }, _lastLabel);
-        return;
-    }
-
-    if (!moonOnly) {
-        let expanded = false;
-        const setExpanded = (value) => {
-            expanded = value;
-            renderWeatherState('weather-moon-widget', {
-                data: _lastData,
-                status: _lastStatus,
-                dataSource: _lastDataSource
-            }, expanded, setExpanded);
-        };
-        renderWeatherState('weather-moon-widget', {
-            data: _lastData,
-            status: _lastStatus,
-            dataSource: _lastDataSource
-        }, expanded, setExpanded);
-    }
+    widget.style.display = 'block';
+    widget.innerHTML = buildCompactHtml(data, label, dataSource);
 }
 
-// 🔔 Registra callback per cambi di connettività
-onConnectivityChange((isOnline) => {
-    console.log(`[WeatherMoon] Connettività cambiata: ${isOnline ? 'online' : 'offline'}`);
-    if (isOnline && _lastFetchLat !== null && _lastFetchLng !== null) {
-        // Quando torna online, ricarica il meteo
-        updateWeatherMoon(_lastFetchLat, _lastFetchLng, _lastLabel, true);
-    }
-});
+function hidePanel(widgetId) {
+    const panel = document.getElementById(`${widgetId}-panel`);
+    if (panel) panel.innerHTML = '';
+}
 
-// ── Utilities ──────────────────────────────────────────────────────────────────
+function showPanel(widgetId, data, label, status, dataSource) {
+    const panel = document.getElementById(`${widgetId}-panel`);
+    if (!panel) return;
+    panel.innerHTML = buildPanelHtml(data, label, status, dataSource);
+}
+
+function attachToggle(widgetId, stateGetter) {
+    const widget = document.getElementById(widgetId);
+    if (!widget) return;
+    const compact = widget.querySelector('.wm-compact');
+    if (!compact) return;
+    compact.onclick = () => {
+        const state = stateGetter();
+        if (!state) return;
+        state.expanded = !state.expanded;
+        if (state.expanded) {
+            showPanel(widgetId, state.data, state.label, state.status, state.dataSource);
+            const close = document.getElementById(`${widgetId}-panel`)?.querySelector('.wm-close');
+            if (close) close.onclick = () => {
+                state.expanded = false;
+                hidePanel(widgetId);
+            };
+        } else {
+            hidePanel(widgetId);
+        }
+    };
+}
 
 function haversineKm(lat1, lng1, lat2, lng2) {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+        + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+        * Math.sin(dLng / 2) * Math.sin(dLng / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
+
+function cloneState(data, label, status, dataSource, expanded = false) {
+    return { data, label, status, dataSource, expanded };
+}
+
+let _currentState = null;
+let _destinationState = null;
+
+function renderCurrent() {
+    if (!_currentState?.data) return;
+    renderCollapsed(CURRENT_WIDGET_ID, _currentState.data, _currentState.label, _currentState.dataSource);
+    if (_currentState.expanded) showPanel(CURRENT_WIDGET_ID, _currentState.data, _currentState.label, _currentState.status, _currentState.dataSource);
+    else hidePanel(CURRENT_WIDGET_ID);
+    attachToggle(CURRENT_WIDGET_ID, () => _currentState);
+}
+
+function renderDestination() {
+    if (!_destinationState?.data) return;
+    renderCollapsed(DESTINATION_WIDGET_ID, _destinationState.data, _destinationState.label, _destinationState.dataSource);
+    if (_destinationState.expanded) showPanel(DESTINATION_WIDGET_ID, _destinationState.data, _destinationState.label, _destinationState.status, _destinationState.dataSource);
+    else hidePanel(DESTINATION_WIDGET_ID);
+    attachToggle(DESTINATION_WIDGET_ID, () => _destinationState);
+}
+
+export async function updateWeatherMoon(lat, lng, label = null, force = false) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    if (!force && label === null && _lastFetchLat !== null && _lastFetchLng !== null) {
+        const km = haversineKm(lat, lng, _lastFetchLat, _lastFetchLng);
+        if (km < MIN_MOVE_KM) {
+            renderCurrent();
+            return;
+        }
+    }
+
+    const requestSeq = ++_requestSeq;
+    _destinationState = null;
+    const destinationWidget = document.getElementById(DESTINATION_WIDGET_ID);
+    if (destinationWidget) {
+        destinationWidget.innerHTML = '';
+        destinationWidget.style.display = 'none';
+    }
+    hidePanel(DESTINATION_WIDGET_ID);
+
+    const cached = loadCache(lat, lng);
+    if (cached) {
+        _lastData = cached;
+        _lastLabel = label;
+        _lastFetchLat = lat;
+        _lastFetchLng = lng;
+        _currentState = cloneState(cached, label, null, 'cache');
+        renderCurrent();
+        return;
+    }
+
+    try {
+        const data = await getWeatherFetch(lat, lng);
+        if (requestSeq !== _requestSeq) return;
+        saveCache(lat, lng, data);
+
+        _lastData = data;
+        _lastLabel = label;
+        _lastFetchLat = lat;
+        _lastFetchLng = lng;
+        _currentState = cloneState(data, label, null, 'live');
+        renderCurrent();
+    } catch (error) {
+        if (requestSeq !== _requestSeq) return;
+        const status = normalizeError(error);
+        if (_lastData) {
+            _lastLabel = label;
+            _lastFetchLat = lat;
+            _lastFetchLng = lng;
+            _currentState = cloneState(_lastData, label, status, 'stale');
+            renderCurrent();
+        } else {
+            const placeholder = { current: { temperature_2m: 0, weather_code: 3, wind_speed_10m: 0, relative_humidity_2m: 0 }, daily: {} };
+            _currentState = cloneState(placeholder, label, status, 'error');
+            renderCollapsed(CURRENT_WIDGET_ID, placeholder, label, 'error');
+            showPanel(CURRENT_WIDGET_ID, placeholder, label, status, 'error');
+            attachToggle(CURRENT_WIDGET_ID, () => _currentState);
+        }
+    }
+}
+
+export async function updateWeatherMoonComparison(currentLocation, destinationLocation) {
+    const currentLat = Number(currentLocation?.lat);
+    const currentLng = Number(currentLocation?.lng);
+    const destinationLat = Number(destinationLocation?.lat);
+    const destinationLng = Number(destinationLocation?.lng);
+    if (!Number.isFinite(currentLat) || !Number.isFinite(currentLng) || !Number.isFinite(destinationLat) || !Number.isFinite(destinationLng)) return;
+
+    const [currentData, destinationData] = await Promise.all([
+        getWeatherFetch(currentLat, currentLng),
+        getWeatherFetch(destinationLat, destinationLng)
+    ]);
+
+    saveCache(currentLat, currentLng, currentData);
+    saveCache(destinationLat, destinationLng, destinationData);
+
+    _lastData = currentData;
+    _lastLabel = currentLocation?.label || null;
+    _lastFetchLat = currentLat;
+    _lastFetchLng = currentLng;
+
+    _currentState = cloneState(currentData, currentLocation?.label || null, null, 'live');
+    _destinationState = cloneState(destinationData, destinationLocation?.label || null, null, 'live');
+    renderCurrent();
+    renderDestination();
+}
+
+export function refreshMoonOnly() {
+    if (_currentState?.data) {
+        renderCurrent();
+    }
+}
+
+export function calcMoonPhase(date = new Date()) {
+    const ref = new Date(Date.UTC(2000, 0, 6, 18, 14, 0));
+    const current = date instanceof Date ? date : new Date(date);
+    const cycle = 29.53058867;
+    const days = (current.getTime() - ref.getTime()) / (24 * 60 * 60 * 1000);
+    const phase = ((days % cycle) + cycle) % cycle / cycle;
+
+    if (phase < 0.03 || phase >= 0.97) return { icon: '🌑', name: 'Luna nuova' };
+    if (phase < 0.22) return { icon: '🌒', name: 'Luna crescente' };
+    if (phase < 0.28) return { icon: '🌓', name: 'Quarto crescente' };
+    if (phase < 0.47) return { icon: '🌔', name: 'Gibbosa crescente' };
+    if (phase < 0.53) return { icon: '🌕', name: 'Luna piena' };
+    if (phase < 0.72) return { icon: '🌖', name: 'Gibbosa calante' };
+    if (phase < 0.78) return { icon: '🌗', name: 'Quarto calante' };
+    return { icon: '🌘', name: 'Luna calante' };
+}
+
+onConnectivityChange((online) => {
+    if (online && Number.isFinite(_lastFetchLat) && Number.isFinite(_lastFetchLng)) {
+        updateWeatherMoon(_lastFetchLat, _lastFetchLng, _lastLabel, true).catch(() => {});
+    }
+});
