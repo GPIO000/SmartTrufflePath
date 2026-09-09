@@ -36,6 +36,7 @@ function fakeWeatherResponse(overrides = {}) {
             ...overrides.current,
         },
         daily: {
+            time: ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04'],
             weather_code: [0, 1, 2, 3],
             temperature_2m_max: [20, 21, 22, 23],
             temperature_2m_min: [10, 11, 12, 13],
@@ -193,6 +194,26 @@ describe('updateWeatherMoonComparison', () => {
         expect(widgetPanel.innerHTML).toContain('wm-days-list');
         expect(destPanel.innerHTML).toContain('wm-days-list');
         expect(destPanel.innerHTML).toContain('📍 Bosco Nord');
+    });
+
+    it('evita chiamate continue se posizione invariata entro 30 minuti', async () => {
+        const mockFetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(fakeWeatherResponse()),
+        });
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoonComparison } = await freshImport();
+
+        await updateWeatherMoonComparison(
+            { lat: 44, lng: 11, label: 'Sei qui' },
+            { lat: 45, lng: 12, label: '📍 Bosco Nord' }
+        );
+        await updateWeatherMoonComparison(
+            { lat: 44, lng: 11, label: 'Sei qui' },
+            { lat: 45, lng: 12, label: '📍 Bosco Nord' }
+        );
+
+        expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 });
 
@@ -414,6 +435,28 @@ describe('updateWeatherMoon — soglia spostamento GPS', () => {
         expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
+    it('aggiorna dopo circa 30 minuti anche senza spostamento', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-09-01T10:00:00Z'));
+        const mockFetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(fakeWeatherResponse()),
+        });
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoon } = await freshImport();
+
+        try {
+            await updateWeatherMoon(44.0, 11.0, null, true);
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+
+            await vi.advanceTimersByTimeAsync(31 * 60 * 1000);
+            await updateWeatherMoon(44.0, 11.0, null, false);
+            expect(mockFetch).toHaveBeenCalledTimes(2);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('esegue un nuovo fetch se lo spostamento è ≥ 5 km', async () => {
         const mockFetch = vi.fn().mockResolvedValue({
             ok: true,
@@ -516,6 +559,7 @@ describe('updateWeatherMoon — pannello espandibile', () => {
         expect(widgetPanel.querySelector('.wm-panel')).not.toBeNull();
         expect(widgetPanel.innerHTML).toContain('wm-days-list');
         expect(widgetPanel.innerHTML).toContain('wm-moon-row');
+        expect(widgetPanel.innerHTML).toContain('01/09');
     });
 
     it('doppio click chiude il pannello espanso', async () => {
