@@ -5,6 +5,8 @@ const MIN_MOVE_KM = 20;
 const FETCH_TIMEOUT_MS = 8000;
 const CURRENT_WIDGET_ID = 'weather-moon-widget';
 const DESTINATION_WIDGET_ID = 'weather-destination-widget';
+const CURRENT_COMPARISON_LABEL = 'Meteo posizione';
+const DESTINATION_COMPARISON_LABEL = 'Meteo destinazione';
 const DAILY_FIELDS = [
     'weather_code',
     'temperature_2m_max',
@@ -449,8 +451,8 @@ export async function updateWeatherMoonComparison(currentLocation, destinationLo
         _lastFetchLat = currentLat;
         _lastFetchLng = currentLng;
         _lastFetchTs = Number.isFinite(currentCached.ts) ? currentCached.ts : Date.now();
-        _currentState = cloneState(currentCached.payload, currentLocation?.label || null, null, 'cache', _currentState?.expanded ?? false);
-        _destinationState = cloneState(destinationCached.payload, destinationLocation?.label || null, null, 'cache', _destinationState?.expanded ?? false);
+        _currentState = cloneState(currentCached.payload, CURRENT_COMPARISON_LABEL, null, 'cache', _currentState?.expanded ?? false);
+        _destinationState = cloneState(destinationCached.payload, DESTINATION_COMPARISON_LABEL, null, 'cache', _destinationState?.expanded ?? false);
         renderCurrent();
         renderDestination();
         return;
@@ -463,8 +465,8 @@ export async function updateWeatherMoonComparison(currentLocation, destinationLo
 
     if (requestSeq !== _requestSeq) return;
 
-    const currentLabel = currentLocation?.label || null;
-    const destinationLabel = destinationLocation?.label || null;
+    const currentLabel = CURRENT_COMPARISON_LABEL;
+    const destinationLabel = DESTINATION_COMPARISON_LABEL;
 
     if (currentResult.status === 'fulfilled') {
         if (shouldRefreshCurrent) saveCache(currentLat, currentLng, currentResult.value);
