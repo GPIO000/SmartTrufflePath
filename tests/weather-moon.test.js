@@ -224,6 +224,23 @@ describe('updateWeatherMoon — fetch fallito', () => {
         expect(widgetPanel.innerHTML).toContain('Errore API 400');
         expect(widgetPanel.innerHTML).toContain('Bosco Nord');
     });
+
+    it('consente di chiudere il pannello errore con il pulsante ×', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: false,
+            status: 400,
+        }));
+        const { updateWeatherMoon } = await freshImport();
+
+        await updateWeatherMoon(44.0, 11.0, 'Bosco Nord', true);
+
+        const widgetPanel = document.getElementById(CURRENT_WIDGET_ID + '-panel');
+        const closeBtn = widgetPanel.querySelector('.wm-close');
+        expect(closeBtn).not.toBeNull();
+
+        closeBtn.click();
+        expect(widgetPanel.innerHTML).toBe('');
+    });
 });
 
 describe('updateWeatherMoon — cache', () => {
