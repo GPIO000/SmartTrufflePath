@@ -72,6 +72,7 @@ let destinationWidget;
 
 beforeEach(() => {
     localStorage.clear();
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, value: true });
     const widgets = makeWidgets();
     widget = widgets.current;
     destinationWidget = widgets.destination;
@@ -196,7 +197,7 @@ describe('updateWeatherMoonComparison', () => {
         expect(destPanel.innerHTML).toContain('📍 Bosco Nord');
     });
 
-    it('evita chiamate continue se posizione invariata entro 30 minuti', async () => {
+    it('evita chiamate continue se posizione invariata entro 6 ore', async () => {
         const mockFetch = vi.fn().mockResolvedValue({
             ok: true,
             json: () => Promise.resolve(fakeWeatherResponse()),
@@ -418,7 +419,7 @@ describe('refreshMoonOnly', () => {
 });
 
 describe('updateWeatherMoon — soglia spostamento GPS', () => {
-    it('non esegue un nuovo fetch se lo spostamento è < 5 km', async () => {
+    it('non esegue un nuovo fetch se lo spostamento è < 20 km', async () => {
         const mockFetch = vi.fn().mockResolvedValue({
             ok: true,
             json: () => Promise.resolve(fakeWeatherResponse()),
@@ -430,12 +431,12 @@ describe('updateWeatherMoon — soglia spostamento GPS', () => {
         await updateWeatherMoon(44.0, 11.0, null, true);
         expect(mockFetch).toHaveBeenCalledTimes(1);
 
-        // Seconda chiamata: coordinate quasi identiche (< 5 km), label=null → deve saltare il fetch
-        await updateWeatherMoon(44.001, 11.001, null, false);
+        // Seconda chiamata: ~11 km di distanza, sotto la soglia di 20 km
+        await updateWeatherMoon(44.1, 11.0, null, false);
         expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('aggiorna dopo circa 30 minuti anche senza spostamento', async () => {
+    it('aggiorna dopo circa 6 ore anche senza spostamento', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-09-01T10:00:00Z'));
         const mockFetch = vi.fn().mockResolvedValue({
@@ -449,7 +450,7 @@ describe('updateWeatherMoon — soglia spostamento GPS', () => {
             await updateWeatherMoon(44.0, 11.0, null, true);
             expect(mockFetch).toHaveBeenCalledTimes(1);
 
-            await vi.advanceTimersByTimeAsync(31 * 60 * 1000);
+            await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000 + 60 * 1000);
             await updateWeatherMoon(44.0, 11.0, null, false);
             expect(mockFetch).toHaveBeenCalledTimes(2);
         } finally {
@@ -457,7 +458,7 @@ describe('updateWeatherMoon — soglia spostamento GPS', () => {
         }
     });
 
-    it('esegue un nuovo fetch se lo spostamento è ≥ 5 km', async () => {
+    it('esegue un nuovo fetch se lo spostamento è ≥ 20 km', async () => {
         const mockFetch = vi.fn().mockResolvedValue({
             ok: true,
             json: () => Promise.resolve(fakeWeatherResponse()),
@@ -468,8 +469,8 @@ describe('updateWeatherMoon — soglia spostamento GPS', () => {
         await updateWeatherMoon(44.0, 11.0, null, true);
         expect(mockFetch).toHaveBeenCalledTimes(1);
 
-        // ~110 km di distanza → supera la soglia di 5 km
-        await updateWeatherMoon(45.0, 11.0, null, false);
+        // ~22 km di distanza → supera la soglia di 20 km
+        await updateWeatherMoon(44.2, 11.0, null, false);
         expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
@@ -485,12 +486,71 @@ describe('updateWeatherMoon — soglia spostamento GPS', () => {
         await updateWeatherMoon(44.0, 11.0, null, true);
         expect(mockFetch).toHaveBeenCalledTimes(1);
 
-        // Seconda chiamata: stessa posizione (< 5 km), con label → il controllo
+        // Seconda chiamata: stessa posizione (< 20 km), con label → il controllo
         // spostamento GPS è saltato; la cache è valida → viene usata (no nuovo fetch)
         await updateWeatherMoon(44.0, 11.0, 'POI', false);
         // Il fetch non viene ripetuto perché la cache è valida, ma il widget mostra il label
         expect(mockFetch).toHaveBeenCalledTimes(1);
         expect(widget.innerHTML).toContain('POI');
+    });
+});
+
+describe('updateWeatherMoonComparison — offline', () => {
+    it('mostra fallback di errore coerente quando la rete è assente', async () => {
+        Object.defineProperty(window.navigator, 'onLine', { configurable: true, value: false });
+        const mockFetch = vi.fn();
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoonComparison } = await freshImport();
+
+        await expect(updateWeatherMoonComparison(
+            { lat: 44, lng: 11, label: 'Sei qui' },
+            { lat: 45, lng: 12, label: '📍 Bosco Nord' }
+        )).resolves.toBeUndefined();
+
+        expect(mockFetch).not.toHaveBeenCalled();
+        expect(widget.innerHTML).toContain('Meteo n.d.');
+        expect(destinationWidget.innerHTML).toContain('Meteo n.d.');
+        expect(document.getElementById(CURRENT_WIDGET_ID + '-panel').innerHTML).toContain('Rete non disponibile');
+        expect(document.getElementById(DESTINATION_WIDGET_ID + '-panel').innerHTML).toContain('Rete non disponibile');
+    });
+
+    it('mantiene i dati precedenti quando un refresh del confronto fallisce offline', async () => {
+        const mockFetch = vi.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve(fakeWeatherResponse({ current: { temperature_2m: 21 } })),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve(fakeWeatherResponse({ current: { temperature_2m: 16 } })),
+            });
+        vi.stubGlobal('fetch', mockFetch);
+        const { updateWeatherMoonComparison } = await freshImport();
+
+        await updateWeatherMoonComparison(
+            { lat: 44, lng: 11, label: 'Sei qui' },
+            { lat: 45, lng: 12, label: '📍 Bosco Nord' }
+        );
+
+        widget.querySelector('.wm-compact').click();
+        destinationWidget.querySelector('.wm-compact').click();
+        Object.defineProperty(window.navigator, 'onLine', { configurable: true, value: false });
+        const { initConnectivityMonitoring } = await import('../js/offline-api-manager.js');
+        initConnectivityMonitoring();
+        window.dispatchEvent(new Event('offline'));
+
+        await expect(updateWeatherMoonComparison(
+            { lat: 44.25, lng: 11, label: 'Sei qui' },
+            { lat: 45.25, lng: 12, label: '📍 Bosco Nord' }
+        )).resolves.toBeUndefined();
+
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+        expect(widget.innerHTML).toContain('wm-data-badge--stale');
+        expect(widget.innerHTML).toContain('21°');
+        expect(destinationWidget.innerHTML).toContain('wm-data-badge--stale');
+        expect(destinationWidget.innerHTML).toContain('16°');
+        expect(document.getElementById(CURRENT_WIDGET_ID + '-panel').innerHTML).toContain('Rete non disponibile');
+        expect(document.getElementById(DESTINATION_WIDGET_ID + '-panel').innerHTML).toContain('Rete non disponibile');
     });
 });
 
