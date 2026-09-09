@@ -180,11 +180,11 @@ describe('updateWeatherMoonComparison', () => {
             { lat: 45, lng: 12, label: '📍 Bosco Nord' }
         );
 
-        expect(widget.innerHTML).toContain('Sei qui');
+        expect(widget.innerHTML).toContain('Meteo posizione');
         expect(widget.innerHTML).toContain('21°');
 
         expect(destinationWidget.style.display).toBe('block');
-        expect(destinationWidget.innerHTML).toContain('📍 Bosco Nord');
+        expect(destinationWidget.innerHTML).toContain('Meteo destinazione');
         expect(destinationWidget.innerHTML).toContain('16°');
 
         widget.querySelector('.wm-compact').click();
@@ -194,7 +194,7 @@ describe('updateWeatherMoonComparison', () => {
         const destPanel = document.getElementById(DESTINATION_WIDGET_ID + '-panel');
         expect(widgetPanel.innerHTML).toContain('wm-days-list');
         expect(destPanel.innerHTML).toContain('wm-days-list');
-        expect(destPanel.innerHTML).toContain('📍 Bosco Nord');
+        expect(destPanel.innerHTML).toContain('Meteo destinazione');
     });
 
     it('evita chiamate continue se posizione invariata entro 6 ore', async () => {
