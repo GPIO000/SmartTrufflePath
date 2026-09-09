@@ -789,7 +789,9 @@ textarea:focus-visible {
     display: flex;
     align-items: flex-start;
     gap: 8px;
+    padding: 0 8px;
     width: 100%;
+    box-sizing: border-box;
 }
 
 .weather-panel-slot {
@@ -826,6 +828,8 @@ textarea:focus-visible {
     box-shadow: 0 2px 8px rgba(0,0,0,0.45);
     transition: background 0.2s;
     outline: none;
+    width: 100%;
+    box-sizing: border-box;
 }
 .wm-compact:hover,
 .wm-compact:focus-visible {
