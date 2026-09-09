@@ -5,6 +5,13 @@ const MIN_MOVE_KM = 5;
 const FETCH_TIMEOUT_MS = 8000;
 const CURRENT_WIDGET_ID = 'weather-moon-widget';
 const DESTINATION_WIDGET_ID = 'weather-destination-widget';
+const DAILY_FIELDS = [
+    'weather_code',
+    'temperature_2m_max',
+    'temperature_2m_min',
+    'precipitation_sum',
+    'wind_speed_10m_max'
+];
 
 const WMO_CODES = {
     0: { icon: '☀️', label: 'Sereno' },
@@ -101,7 +108,7 @@ async function fetchWeather(lat, lng) {
     url.searchParams.set('latitude', lat.toFixed(4));
     url.searchParams.set('longitude', lng.toFixed(4));
     url.searchParams.set('current', 'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m');
-    url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,soil_temperature_0cm,et0_fao_evapotranspiration');
+    url.searchParams.set('daily', DAILY_FIELDS.join(','));
     url.searchParams.set('forecast_days', '4');
     url.searchParams.set('timezone', 'auto');
 
@@ -256,6 +263,18 @@ function showPanel(widgetId, data, label, status, dataSource) {
     panel.innerHTML = buildPanelHtml(data, label, status, dataSource);
 }
 
+function bindPanelClose(widgetId, stateGetter) {
+    const close = document.getElementById(`${widgetId}-panel`)?.querySelector('.wm-close');
+    if (!close) return;
+    close.onclick = (event) => {
+        event.stopPropagation();
+        const state = stateGetter();
+        if (!state) return;
+        state.expanded = false;
+        hidePanel(widgetId);
+    };
+}
+
 function attachToggle(widgetId, stateGetter) {
     const widget = document.getElementById(widgetId);
     if (!widget) return;
@@ -267,11 +286,7 @@ function attachToggle(widgetId, stateGetter) {
         state.expanded = !state.expanded;
         if (state.expanded) {
             showPanel(widgetId, state.data, state.label, state.status, state.dataSource);
-            const close = document.getElementById(`${widgetId}-panel`)?.querySelector('.wm-close');
-            if (close) close.onclick = () => {
-                state.expanded = false;
-                hidePanel(widgetId);
-            };
+            bindPanelClose(widgetId, stateGetter);
         } else {
             hidePanel(widgetId);
         }
@@ -299,7 +314,10 @@ let _destinationState = null;
 function renderCurrent() {
     if (!_currentState?.data) return;
     renderCollapsed(CURRENT_WIDGET_ID, _currentState.data, _currentState.label, _currentState.dataSource);
-    if (_currentState.expanded) showPanel(CURRENT_WIDGET_ID, _currentState.data, _currentState.label, _currentState.status, _currentState.dataSource);
+    if (_currentState.expanded) {
+        showPanel(CURRENT_WIDGET_ID, _currentState.data, _currentState.label, _currentState.status, _currentState.dataSource);
+        bindPanelClose(CURRENT_WIDGET_ID, () => _currentState);
+    }
     else hidePanel(CURRENT_WIDGET_ID);
     attachToggle(CURRENT_WIDGET_ID, () => _currentState);
 }
@@ -307,7 +325,10 @@ function renderCurrent() {
 function renderDestination() {
     if (!_destinationState?.data) return;
     renderCollapsed(DESTINATION_WIDGET_ID, _destinationState.data, _destinationState.label, _destinationState.dataSource);
-    if (_destinationState.expanded) showPanel(DESTINATION_WIDGET_ID, _destinationState.data, _destinationState.label, _destinationState.status, _destinationState.dataSource);
+    if (_destinationState.expanded) {
+        showPanel(DESTINATION_WIDGET_ID, _destinationState.data, _destinationState.label, _destinationState.status, _destinationState.dataSource);
+        bindPanelClose(DESTINATION_WIDGET_ID, () => _destinationState);
+    }
     else hidePanel(DESTINATION_WIDGET_ID);
     attachToggle(DESTINATION_WIDGET_ID, () => _destinationState);
 }
@@ -365,10 +386,8 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
             renderCurrent();
         } else {
             const placeholder = { current: { temperature_2m: 0, weather_code: 3, wind_speed_10m: 0, relative_humidity_2m: 0 }, daily: {} };
-            _currentState = cloneState(placeholder, label, status, 'error');
-            renderCollapsed(CURRENT_WIDGET_ID, placeholder, label, 'error');
-            showPanel(CURRENT_WIDGET_ID, placeholder, label, status, 'error');
-            attachToggle(CURRENT_WIDGET_ID, () => _currentState);
+            _currentState = cloneState(placeholder, label, status, 'error', true);
+            renderCurrent();
         }
     }
 }
