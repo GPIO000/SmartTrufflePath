@@ -332,7 +332,7 @@ function buildFallbackState(previousState, cachedEntry, label, status) {
     if (previousState?.data) {
         return cloneState(previousState.data, label, status, 'stale', previousState.expanded);
     }
-    return cloneState(WEATHER_PLACEHOLDER, label, status, 'error', previousState?.expanded ?? false);
+    return cloneState(WEATHER_PLACEHOLDER, label, status, 'error', previousState?.expanded ?? true);
 }
 
 let _currentState = null;
@@ -419,7 +419,7 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
             _currentState = cloneState(_lastData, label, status, 'stale', _currentState?.expanded ?? false);
             renderCurrent();
         } else {
-            _currentState = cloneState(WEATHER_PLACEHOLDER, label, status, 'error', _currentState?.expanded ?? false);
+            _currentState = cloneState(WEATHER_PLACEHOLDER, label, status, 'error', _currentState?.expanded ?? true);
             renderCurrent();
         }
     }
