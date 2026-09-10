@@ -332,7 +332,7 @@ function buildFallbackState(previousState, cachedEntry, label, status) {
     if (previousState?.data) {
         return cloneState(previousState.data, label, status, 'stale', previousState.expanded);
     }
-    return cloneState(WEATHER_PLACEHOLDER, label, status, 'error', true);
+    return cloneState(WEATHER_PLACEHOLDER, label, status, 'error', previousState?.expanded ?? false);
 }
 
 let _currentState = null;
@@ -392,7 +392,7 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
         _lastFetchLat = lat;
         _lastFetchLng = lng;
         _lastFetchTs = Number.isFinite(cached.ts) ? cached.ts : Date.now();
-        _currentState = cloneState(cached.payload, label, null, 'cache');
+        _currentState = cloneState(cached.payload, label, null, 'cache', _currentState?.expanded ?? false);
         renderCurrent();
         return;
     }
@@ -407,7 +407,7 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
         _lastFetchLat = lat;
         _lastFetchLng = lng;
         _lastFetchTs = Date.now();
-        _currentState = cloneState(data, label, null, 'live');
+        _currentState = cloneState(data, label, null, 'live', _currentState?.expanded ?? false);
         renderCurrent();
     } catch (error) {
         if (requestSeq !== _requestSeq) return;
@@ -416,10 +416,10 @@ export async function updateWeatherMoon(lat, lng, label = null, force = false) {
             _lastLabel = label;
             _lastFetchLat = lat;
             _lastFetchLng = lng;
-            _currentState = cloneState(_lastData, label, status, 'stale');
+            _currentState = cloneState(_lastData, label, status, 'stale', _currentState?.expanded ?? false);
             renderCurrent();
         } else {
-            _currentState = cloneState(WEATHER_PLACEHOLDER, label, status, 'error', true);
+            _currentState = cloneState(WEATHER_PLACEHOLDER, label, status, 'error', _currentState?.expanded ?? false);
             renderCurrent();
         }
     }
