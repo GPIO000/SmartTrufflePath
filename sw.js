@@ -24,18 +24,25 @@ const LOCAL_ASSETS = [
   './js/fiscal-utils.js',
   './js/backup-utils.js',
   './js/offline-cache-utils.js',
+  './js/offline-api-manager.js',
   './js/offline-map-download-utils.js',
   './js/poi-utils.js',
+  './js/poi-forecast.js',
   './js/sw-utils.js',
   './js/truffle-forecast.js',
-  './js/weather-moon.js'
+  './js/weather-moon.js',
+  './vendor/leaflet/leaflet.css',
+  './vendor/leaflet/leaflet.js',
+  './vendor/leaflet/images/layers.png',
+  './vendor/leaflet/images/layers-2x.png',
+  './vendor/leaflet/images/marker-icon.png',
+  './vendor/leaflet/images/marker-icon-2x.png',
+  './vendor/leaflet/images/marker-shadow.png'
 ];
 
 // Asset CDN esterni: vengono aggiunti alla cache in modalità best-effort.
 // Un eventuale fallimento non blocca l'installazione del Service Worker.
 const EXTERNAL_ASSETS = [
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
 
