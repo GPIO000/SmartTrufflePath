@@ -2004,13 +2004,14 @@ function startGpsWatch() {
         // Persist last known position for offline dead-reckoning display.
         // GPS coordinates are stored locally on the user's device only, by design.
         try {
+            // codeql[js/clear-text-storage-of-sensitive-data]
             localStorage.setItem(GPS_LAST_POSITION_KEY, JSON.stringify({
                 lat,
                 lng,
                 altitude: Number.isFinite(altitude) ? altitude : null,
                 accuracy: Number.isFinite(latestGpsAccuracy) ? latestGpsAccuracy : null,
                 ts: Date.now()
-            })); // codeql[js/clear-text-storage-of-sensitive-data]
+            }));
         } catch { /* quota exceeded or private mode — ignore */ }
         const dot = document.getElementById('gps-status-dot');
         const gpsSignal = getGpsSignalStatus(latestGpsAccuracy);
@@ -2097,7 +2098,7 @@ function showLastKnownGpsPosition() {
     const minutesAgo = getLastKnownGpsAgeMinutes(saved);
     gpsRuntimeState = 'fallback';
     setGpsHeaderText(
-        `📍 Ultima posizione nota: ${escapeHtml(formatMinutesAgo(minutesAgo))} (${saved.lat.toFixed(4)}, ${saved.lng.toFixed(4)})`,
+        `📍 Ultima posizione nota: ${escapeHtml(formatMinutesAgo(minutesAgo))}`,
         `Ultima posizione nota ${formatMinutesAgo(minutesAgo)}`
     );
     renderRuntimeStatusStrip();

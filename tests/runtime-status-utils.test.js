@@ -16,6 +16,26 @@ describe('getGpsSignalStatus', () => {
         });
     });
 
+    it('copre i rami sconosciuto, utilizzabile e borderline', () => {
+        expect(getGpsSignalStatus(Number.NaN)).toEqual({
+            tone: 'ok',
+            label: 'GPS attivo',
+            detail: 'Precisione non disponibile'
+        });
+
+        expect(getGpsSignalStatus(55)).toEqual({
+            tone: 'warning',
+            label: 'GPS utilizzabile',
+            detail: 'Precisione ~55 m'
+        });
+
+        expect(getGpsSignalStatus(95)).toEqual({
+            tone: 'warning',
+            label: 'GPS borderline',
+            detail: 'Precisione ~95 m'
+        });
+    });
+
     it('classifica un fix debole oltre i 100 metri', () => {
         expect(getGpsSignalStatus(135)).toEqual({
             tone: 'error',
@@ -39,6 +59,14 @@ describe('getInternetStatus', () => {
             detail: 'Rete attiva ma tile mappa non disponibili'
         });
     });
+
+    it('mostra lo stato online quando la rete è sana', () => {
+        expect(getInternetStatus({ online: true, tileNetworkUnavailable: false })).toEqual({
+            tone: 'ok',
+            label: 'Internet disponibile',
+            detail: 'Servizi online raggiungibili'
+        });
+    });
 });
 
 describe('getAppReadinessStatus', () => {
@@ -51,6 +79,38 @@ describe('getAppReadinessStatus', () => {
             tone: 'ok',
             label: 'App offline pronta',
             detail: 'Cache iniziale collegata a questa schermata'
+        });
+    });
+
+    it('copre browser non supportati, registrazione fallita e prima apertura', () => {
+        expect(getAppReadinessStatus({
+            serviceWorkerSupported: false,
+            hasController: false,
+            registrationFailed: false
+        })).toEqual({
+            tone: 'error',
+            label: 'Offline non supportato',
+            detail: 'Browser senza Service Worker'
+        });
+
+        expect(getAppReadinessStatus({
+            serviceWorkerSupported: true,
+            hasController: false,
+            registrationFailed: true
+        })).toEqual({
+            tone: 'error',
+            label: 'Cache offline non pronta',
+            detail: 'Apri o ricarica l’app con internet'
+        });
+
+        expect(getAppReadinessStatus({
+            serviceWorkerSupported: true,
+            hasController: false,
+            registrationFailed: false
+        })).toEqual({
+            tone: 'warning',
+            label: 'Prima apertura online',
+            detail: 'Completa la cache iniziale e riapri l’app'
         });
     });
 });
