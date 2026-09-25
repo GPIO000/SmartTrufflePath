@@ -28,6 +28,7 @@ const LOCAL_ASSETS = [
   './js/offline-map-download-utils.js',
   './js/poi-utils.js',
   './js/poi-forecast.js',
+  './js/runtime-status-utils.js',
   './js/sw-utils.js',
   './js/truffle-forecast.js',
   './js/weather-moon.js',

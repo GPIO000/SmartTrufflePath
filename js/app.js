@@ -53,6 +53,12 @@ import {
     POI_SCORE_MAX,
     POI_SCORE_MID_THRESHOLD
 } from './poi-forecast.js';
+import {
+    formatMinutesAgo,
+    getAppReadinessStatus,
+    getGpsSignalStatus,
+    getInternetStatus
+} from './runtime-status-utils.js';
 
 window.TruffleStorage = TruffleStorage;
 
@@ -136,10 +142,12 @@ async function registerAppServiceWorker() {
         });
         lastServiceWorkerRegistrationError = null;
         console.log('Service Worker registered:', registration.scope);
+        renderRuntimeStatusStrip();
         return registration;
     } catch (error) {
         lastServiceWorkerRegistrationError = error;
         console.error('Service Worker registration failed:', error);
+        renderRuntimeStatusStrip();
         return null;
     }
 }
@@ -1719,6 +1727,7 @@ const reverseGeocodeCache = new Map();
 let reverseGeocodeInFlight = false;
 let lastReverseGeocodeAt = 0;
 let latestGpsSnapshot = null;
+let latestGpsAccuracy = null;
 let gpsWatchId = null;
 let gpsTimeoutRetryCount = 0;
 let gpsRetryTimerId = null;
@@ -1726,6 +1735,7 @@ const GPS_TIMEOUT_MAX_RETRIES = 5;
 const GPS_TIMEOUT_BASE_DELAY_MS = 3000;
 const GPS_RETRY_RECOVERY_INTERVAL_MS = 60000;
 const GPS_LAST_POSITION_KEY = 'gps_last_known_position';
+let gpsRuntimeState = 'searching';
 
 const ELEVATION_API_URL = 'https://api.open-meteo.com/v1/elevation';
 const ELEVATION_GRID_DECIMALS = 2;
@@ -1783,6 +1793,103 @@ function buildUserMarkerPopupHtml(altitude) {
     return altitudeText ? `<b>Sei qui</b><br><small>${escapeHtml(altitudeText)}</small>` : '<b>Sei qui</b>';
 }
 
+function readLastKnownGpsPosition() {
+    try {
+        const raw = localStorage.getItem(GPS_LAST_POSITION_KEY);
+        if (!raw) return null;
+        const saved = JSON.parse(raw);
+        if (!Number.isFinite(saved?.lat) || !Number.isFinite(saved?.lng) || !Number.isFinite(saved?.ts)) return null;
+        return {
+            lat: saved.lat,
+            lng: saved.lng,
+            altitude: Number.isFinite(saved?.altitude) ? saved.altitude : undefined,
+            ts: saved.ts
+        };
+    } catch {
+        return null;
+    }
+}
+
+function getLastKnownGpsAgeMinutes(savedPosition = readLastKnownGpsPosition()) {
+    if (!savedPosition || !Number.isFinite(savedPosition.ts)) return null;
+    return Math.max(0, Math.round((Date.now() - savedPosition.ts) / 60000));
+}
+
+function getGpsHeaderSignalSuffix() {
+    if (gpsRuntimeState !== 'live') return '';
+    const gpsSignal = getGpsSignalStatus(latestGpsAccuracy);
+    return ` • ${gpsSignal.detail.toLowerCase()}`;
+}
+
+function setGpsHeaderText(html, title) {
+    const gpsText = document.getElementById('gps-status-text');
+    if (gpsText) gpsText.innerHTML = html;
+    const dot = document.getElementById('gps-status-dot');
+    if (dot && title) dot.title = title;
+}
+
+function renderRuntimeStatusStrip() {
+    const statusStrip = document.getElementById('runtime-status-strip');
+    if (!statusStrip) return;
+
+    const appStatus = getAppReadinessStatus({
+        serviceWorkerSupported: 'serviceWorker' in navigator,
+        hasController: Boolean(navigator.serviceWorker?.controller),
+        registrationFailed: Boolean(lastServiceWorkerRegistrationError)
+    });
+    const internetStatus = getInternetStatus({
+        online: navigator.onLine,
+        tileNetworkUnavailable: isTileNetworkUnavailable
+    });
+
+    let gpsStatus;
+    if (!navigator.geolocation) {
+        gpsStatus = {
+            tone: 'error',
+            label: 'GPS non supportato',
+            detail: 'Usa un browser con geolocalizzazione'
+        };
+    } else if (gpsRuntimeState === 'denied') {
+        gpsStatus = {
+            tone: 'error',
+            label: 'GPS negato',
+            detail: 'Abilita il permesso posizione'
+        };
+    } else if (gpsRuntimeState === 'fallback') {
+        const savedPosition = readLastKnownGpsPosition();
+        const ageMinutes = getLastKnownGpsAgeMinutes(savedPosition);
+        gpsStatus = savedPosition
+            ? {
+                tone: 'warning',
+                label: 'GPS non disponibile',
+                detail: `Ultima posizione ${formatMinutesAgo(ageMinutes)}`
+            }
+            : {
+                tone: 'warning',
+                label: 'GPS in attesa',
+                detail: 'Segnale non ancora disponibile'
+            };
+    } else if (gpsRuntimeState === 'live') {
+        gpsStatus = getGpsSignalStatus(latestGpsAccuracy);
+    } else {
+        gpsStatus = {
+            tone: gpsTimeoutRetryCount > 0 ? 'warning' : 'ok',
+            label: 'GPS in ricerca',
+            detail: gpsTimeoutRetryCount > 0
+                ? `Nuovo tentativo ${gpsTimeoutRetryCount}/${GPS_TIMEOUT_MAX_RETRIES}`
+                : 'App aperta, attendo fix'
+        };
+    }
+
+    const statuses = [appStatus, internetStatus, gpsStatus];
+    statusStrip.innerHTML = statuses.map((status) => `
+        <div class="runtime-status-pill runtime-status-${escapeHtml(status.tone)}">
+            <strong>${escapeHtml(status.label)}</strong>
+            <small>${escapeHtml(status.detail)}</small>
+        </div>
+    `).join('');
+}
+
 function updateGpsStatusTextFromLocation(locationData, lat, lng) {
     const gpsText = document.getElementById('gps-status-text');
     if (!gpsText) return;
@@ -1794,7 +1901,9 @@ function updateGpsStatusTextFromLocation(locationData, lat, lng) {
     if (regione) parti.push(`<b>${escapeHtml(regione)}</b>`);
     if (provincia) parti.push(`<b>${escapeHtml(provincia)}</b>`);
     if (comune) parti.push(`<b>${escapeHtml(comune)}</b>`);
-    gpsText.innerHTML = parti.length > 0 ? `GPS: ${parti.join(' > ')}` : `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    const locationText = parti.length > 0 ? `GPS: ${parti.join(' > ')}` : `GPS attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    const signalSuffix = getGpsHeaderSignalSuffix();
+    gpsText.innerHTML = `${locationText}${escapeHtml(signalSuffix)}`;
 }
 
 function cacheReverseGeocodeLocation(lat, lng, locationData) {
@@ -1870,6 +1979,9 @@ async function reverseGeocodePosition(lat, lng) {
 
 function startGpsWatch() {
     if (!navigator.geolocation) return;
+    gpsRuntimeState = 'searching';
+    renderRuntimeStatusStrip();
+    setGpsHeaderText('SmartTruffle Path • App aperta, GPS in ricerca', 'GPS in ricerca…');
     // Cancel any pending retry timer before starting a new watch
     if (gpsRetryTimerId !== null) {
         clearTimeout(gpsRetryTimerId);
@@ -1886,17 +1998,28 @@ function startGpsWatch() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         const altitude = normalizePoiAltitude(position.coords.altitude);
-        latestGpsSnapshot = { lat, lng, altitude };
+        latestGpsAccuracy = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null;
+        latestGpsSnapshot = { lat, lng, altitude, accuracy: latestGpsAccuracy };
+        gpsRuntimeState = 'live';
         // Persist last known position for offline dead-reckoning display.
         // GPS coordinates are stored locally on the user's device only, by design.
         try {
-            localStorage.setItem(GPS_LAST_POSITION_KEY, JSON.stringify({ lat, lng, altitude: Number.isFinite(altitude) ? altitude : null, ts: Date.now() })); // codeql[js/clear-text-storage-of-sensitive-data]
+            localStorage.setItem(GPS_LAST_POSITION_KEY, JSON.stringify({
+                lat,
+                lng,
+                altitude: Number.isFinite(altitude) ? altitude : null,
+                accuracy: Number.isFinite(latestGpsAccuracy) ? latestGpsAccuracy : null,
+                ts: Date.now()
+            })); // codeql[js/clear-text-storage-of-sensitive-data]
         } catch { /* quota exceeded or private mode — ignore */ }
         const dot = document.getElementById('gps-status-dot');
+        const gpsSignal = getGpsSignalStatus(latestGpsAccuracy);
         if (dot) {
-            dot.style.backgroundColor = '#22c55e';
-            dot.title = `GPS Attivo: ${lat.toFixed(4)}, ${lng.toFixed(4)}${Number.isFinite(altitude) ? ` • ${formatPoiAltitude(altitude)}` : ''}`;
+            dot.style.backgroundColor = gpsSignal.tone === 'error' ? '#ef4444' : (gpsSignal.tone === 'warning' ? '#f59e0b' : '#22c55e');
+            dot.title = `${gpsSignal.label}: ${gpsSignal.detail}${Number.isFinite(altitude) ? ` • ${formatPoiAltitude(altitude)}` : ''}`;
         }
+        renderRuntimeStatusStrip();
+        updateGpsStatusTextFromLocation(null, lat, lng);
         reverseGeocodePosition(lat, lng);
         updateAltitudeIndicator(altitude);
         if (!Number.isFinite(altitude)) {
@@ -1934,15 +2057,19 @@ function startGpsWatch() {
         if (error.code === 3 || error.code === 2) {
             if (gpsTimeoutRetryCount < GPS_TIMEOUT_MAX_RETRIES) {
                 gpsTimeoutRetryCount++;
+                gpsRuntimeState = 'searching';
                 // Exponential backoff: 3s, 6s, 12s, 24s, 48s
                 const delay = GPS_TIMEOUT_BASE_DELAY_MS * Math.pow(2, gpsTimeoutRetryCount - 1);
                 showToast(`📡 Segnale GPS in attesa… nuovo tentativo (${gpsTimeoutRetryCount}/${GPS_TIMEOUT_MAX_RETRIES})`, 'info');
+                setGpsHeaderText('SmartTruffle Path • GPS in ricerca', 'Segnale GPS in attesa');
+                renderRuntimeStatusStrip();
                 if (gpsWatchId !== null) {
                     navigator.geolocation.clearWatch(gpsWatchId);
                     gpsWatchId = null;
                 }
                 gpsRetryTimerId = setTimeout(startGpsWatch, delay);
             } else {
+                gpsRuntimeState = 'fallback';
                 showToast('⚠️ GPS non disponibile al momento. Nuovo tentativo automatico tra 1 minuto.', 'warning');
                 if (gpsWatchId !== null) {
                     navigator.geolocation.clearWatch(gpsWatchId);
@@ -1952,24 +2079,35 @@ function startGpsWatch() {
                 showLastKnownGpsPosition();
             }
         } else if (error.code === 1) {
+            gpsRuntimeState = 'denied';
             showToast('❌ Permesso GPS negato. Abilita la posizione nelle impostazioni del browser/app.', 'error');
             showLastKnownGpsPosition();
+            renderRuntimeStatusStrip();
         }
     }, { enableHighAccuracy: true, maximumAge: isRetry ? 0 : 10000, timeout: 15000 });
 }
 function showLastKnownGpsPosition() {
-    try {
-        const raw = localStorage.getItem(GPS_LAST_POSITION_KEY);
-        if (!raw) return;
-        const saved = JSON.parse(raw);
-        if (!Number.isFinite(saved?.lat) || !Number.isFinite(saved?.lng) || !Number.isFinite(saved?.ts)) return;
-        const minutesAgo = Math.round((Date.now() - saved.ts) / 60000);
-        const gpsText = document.getElementById('gps-status-text');
-        if (gpsText) gpsText.textContent = `📍 Ultima posizione nota: ${minutesAgo === 0 ? 'adesso' : `${minutesAgo} min fa`} (${saved.lat.toFixed(4)}, ${saved.lng.toFixed(4)})`;
-    } catch { /* ignore */ }
+    const saved = readLastKnownGpsPosition();
+    if (!saved) {
+        setGpsHeaderText('SmartTruffle Path • GPS non disponibile', 'GPS non disponibile');
+        renderRuntimeStatusStrip();
+        return;
+    }
+
+    const minutesAgo = getLastKnownGpsAgeMinutes(saved);
+    gpsRuntimeState = 'fallback';
+    setGpsHeaderText(
+        `📍 Ultima posizione nota: ${escapeHtml(formatMinutesAgo(minutesAgo))} (${saved.lat.toFixed(4)}, ${saved.lng.toFixed(4)})`,
+        `Ultima posizione nota ${formatMinutesAgo(minutesAgo)}`
+    );
+    renderRuntimeStatusStrip();
 }
 if (navigator.geolocation) {
     startGpsWatch();
+} else {
+    gpsRuntimeState = 'fallback';
+    setGpsHeaderText('SmartTruffle Path • GPS non supportato', 'GPS non supportato');
+    renderRuntimeStatusStrip();
 }
 function renderAllPoiMarkers() {
     Object.values(poiMapMarkers).forEach(marker => map.removeLayer(marker));
@@ -2243,19 +2381,31 @@ function importSharedPoint() {
 }
 
 async function triggerSOS() {
-    if (userMarker) {
-        const pos = userMarker.getLatLng();
-        const msg = buildEmergencyLocationMessage(
-            'EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO.',
-            pos.lat,
-            pos.lng,
-            getSavedSenderName(),
-            'Emergenza'
-        );
-        const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
-        if (method === 'sms') { window.location.href = `sms:?body=${encodeURIComponent(msg)}`; }
-        else if (method === 'whatsapp') { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
-    } else { showToast("Impossibile rilevare le coordinate GPS.", 'error'); }
+    const savedPosition = readLastKnownGpsPosition();
+    const livePosition = userMarker ? userMarker.getLatLng() : null;
+    const pos = livePosition || savedPosition;
+    if (!pos) {
+        showToast("Impossibile rilevare le coordinate GPS.", 'error');
+        return;
+    }
+
+    const isLastKnown = !livePosition && savedPosition;
+    const ageMinutes = isLastKnown ? getLastKnownGpsAgeMinutes(savedPosition) : null;
+    const msg = buildEmergencyLocationMessage(
+        isLastKnown
+            ? `EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO. ULTIMA POSIZIONE NOTA (${formatMinutesAgo(ageMinutes)})`
+            : 'EMERGENZA SONO IN DIFFICOLTÀ HO BISOGNO DI AIUTO.',
+        pos.lat,
+        pos.lng,
+        getSavedSenderName(),
+        isLastKnown ? 'Emergenza (ultima posizione nota)' : 'Emergenza'
+    );
+    if (isLastKnown) {
+        showToast(`⚠️ GPS live assente: invio l'ultima posizione nota (${formatMinutesAgo(ageMinutes)}).`, 'warning');
+    }
+    const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
+    if (method === 'sms') { window.location.href = `sms:?body=${encodeURIComponent(msg)}`; }
+    else if (method === 'whatsapp') { window.location.href = `whatsapp://send?text=${encodeURIComponent(msg)}`; }
 }
 function openModule(moduleName, editMode = false) {
     const drawer = document.getElementById('app-drawer');
@@ -3539,6 +3689,11 @@ function openModule(moduleName, editMode = false) {
             let clinicHtml = `
                 <h2>Soccorso Veterinario & Cliniche Veterinarie</h2>
                 <p>Gestisci i numeri d'emergenza dei veterinari:</p>
+                <div class="module-card card-gap">
+                    <strong class="text-accent">📶 GPS e connessione in emergenza</strong>
+                    <p class="text-muted small-text" style="margin-top:8px;">La schermata si apre anche senza fix GPS live. Se il segnale è debole o assente, l'app prova a usare l'ultima posizione nota salvata sul dispositivo.</p>
+                    <p class="text-subtle small-text" style="margin-top:6px;">Per prepararti all'offline apri l'app almeno una volta con internet, completa la cache iniziale e scarica la mappa offline. Se serve, puoi anche salvare un punto manuale sulla mappa e comunicarlo come riferimento.</p>
+                </div>
                 <div class="module-card" style="margin-bottom: 20px; background: rgba(29,40,30,0.96); border: 1px solid rgba(255,255,255,0.07);">
                     <h3 style="font-size:0.9rem; color:#f6f1e6; margin-bottom:10px;">➕ Aggiungi Clinica H24</h3>
                     <label>Nome Clinica o Medico:</label>
@@ -5867,19 +6022,31 @@ async function deleteVetClinic(index) {
 }
 
 async function shareLocationToVet(telNumber) {
-    if (userMarker) {
-        const pos = userMarker.getLatLng();
-        const msg = buildEmergencyLocationMessage(
-            'EMERGENZA VETERINARIA!',
-            pos.lat,
-            pos.lng,
-            getSavedSenderName(),
-            'Emergenza veterinaria'
-        );
-        const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
-        if (method === 'sms') { window.location.href = `sms:${telNumber}?body=${encodeURIComponent(msg)}`; }
-        else if (method === 'whatsapp') { window.location.href = `whatsapp://send?phone=${encodeURIComponent(telNumber)}&text=${encodeURIComponent(msg)}`; }
-    } else { showToast("GPS non disponibile.", 'error'); }
+    const savedPosition = readLastKnownGpsPosition();
+    const livePosition = userMarker ? userMarker.getLatLng() : null;
+    const pos = livePosition || savedPosition;
+    if (!pos) {
+        showToast("GPS non disponibile.", 'error');
+        return;
+    }
+
+    const isLastKnown = !livePosition && savedPosition;
+    const ageMinutes = isLastKnown ? getLastKnownGpsAgeMinutes(savedPosition) : null;
+    const msg = buildEmergencyLocationMessage(
+        isLastKnown
+            ? `EMERGENZA VETERINARIA! ULTIMA POSIZIONE NOTA (${formatMinutesAgo(ageMinutes)})`
+            : 'EMERGENZA VETERINARIA!',
+        pos.lat,
+        pos.lng,
+        getSavedSenderName(),
+        isLastKnown ? 'Emergenza veterinaria (ultima posizione nota)' : 'Emergenza veterinaria'
+    );
+    if (isLastKnown) {
+        showToast(`⚠️ GPS live assente: invio l'ultima posizione nota (${formatMinutesAgo(ageMinutes)}).`, 'warning');
+    }
+    const method = await appChooseSendMethod('Come vuoi inviare il messaggio di emergenza?');
+    if (method === 'sms') { window.location.href = `sms:${telNumber}?body=${encodeURIComponent(msg)}`; }
+    else if (method === 'whatsapp') { window.location.href = `whatsapp://send?phone=${encodeURIComponent(telNumber)}&text=${encodeURIComponent(msg)}`; }
 }
 
 function shareLocationToVetByIndex(index) {
@@ -6912,11 +7079,11 @@ async function mostraInfoModulo(moduleName) {
         'spese': "ℹ️ **Guida - Gestione Spese Tartufaio**\n\nTraccia tutte le spese vive connesse all'attività (carburante, attrezzatura, visite veterinarie e tasse) e visualizza il totale dell'anno corrente.",
         'bilancio': "ℹ️ **Guida - Contabilità & Bilancio Annuo**\n\nMonitora i guadagni netti, le spese totali, l'utile effettivo e verifica in tempo reale il rispetto della soglia limite di occasionalità di 7.000,00 €.",
         'export': `ℹ️ Guida - Report & Backup Dati\n\nEsporta i dati contabili in formato CSV.\n\nIl backup automatico ti guida a scegliere la cartella Download del dispositivo e poi crea/usa sempre il percorso ${buildAutomaticBackupPathLabel('Download')} per salvare backup_truffle_automatico.json. Usa '📁 Imposta Cartella Backup' per registrare o cambiare il percorso, poi '💾 Salva Backup Ora' per forzarlo manualmente.\n\nSe il browser non supporta la scelta guidata della cartella, l'app usa il normale download del file JSON.`,
-        'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza, includendo link apribili direttamente in Google Maps e Apple Maps.",
+        'vet-emergency': "ℹ️ **Guida - Pronto Soccorso & Cliniche H24**\n\nMemorizza i contatti delle cliniche veterinarie aperte 24 ore su 24 e invia rapidamente la tua posizione GPS in caso di emergenza, includendo link apribili direttamente in Google Maps e Apple Maps.\n\nSe il GPS live è assente, l'app prova a usare l'ultima posizione nota salvata sul dispositivo e lo segnala chiaramente nel messaggio.",
         'clienti': "ℹ️ **Guida - Rubrica Clienti**\n\nVisualizza l'elenco dei tuoi clienti ordinati per volume d'acquisto, consulta lo storico, aggiungi nuovi nominativi e gestisci modifiche, note ed eliminazioni.",
         'archivio': "ℹ️ **Guida - Archivio Date per Regione**\n\nGestisci e personalizza i calendari regionali di raccolta dei tartufi o estrai automaticamente le date incollando il testo normativo ufficiale.",
         'calendario': "ℹ️ **Guida - Calendario Raccolta (GPS)**\n\nVerifica in base alla tua posizione GPS attuale quali specie di tartufo hanno il periodo di raccolta attualmente aperto o chiuso.",
-        'mappa_offline': "ℹ️ **Guida - Download Mappa Offline**\n\nSeleziona le regioni italiane che ti interessano, premi '💾 Salva Preferenze' per registrarle (anche per svuotarle) e poi usa '📥 Scarica Regioni Selezionate' quando vuoi scaricare la cache. I quadratini della mappa (tile) vengono salvati nella memoria del browser. La mappa funzionerà anche senza connessione internet, finché la cache non viene svuotata dal sistema.\n\n🔄 **Re-download automatico**: l'app ricorda le regioni e il livello di zoom scelti. Se il browser svuota la cache, non appena torni online la mappa viene riscaricata in automatico, senza che tu debba fare nulla. Se il provider rallenta o blocca temporaneamente i download, l'app riduce il ritmo, aspetta e poi riprende da sola dalle tile mancanti.\n\nConsigli:\n• Usa la connessione Wi-Fi per scaricare\n• Zoom 14 è il miglior compromesso tra dettaglio e spazio\n• Puoi eliminare la cache in qualsiasi momento con il tasto apposito"
+        'mappa_offline': "ℹ️ **Guida - Download Mappa Offline**\n\nSeleziona le regioni italiane che ti interessano, premi '💾 Salva Preferenze' per registrarle (anche per svuotarle) e poi usa '📥 Scarica Regioni Selezionate' quando vuoi scaricare la cache. I quadratini della mappa (tile) vengono salvati nella memoria del browser. La mappa funzionerà anche senza connessione internet, finché la cache non viene svuotata dal sistema.\n\n🔄 **Re-download automatico**: l'app ricorda le regioni e il livello di zoom scelti. Se il browser svuota la cache, non appena torni online la mappa viene riscaricata in automatico, senza che tu debba fare nulla. Se il provider rallenta o blocca temporaneamente i download, l'app riduce il ritmo, aspetta e poi riprende da sola dalle tile mancanti.\n\nConsigli:\n• Apri l'app almeno una volta con internet per completare la cache iniziale\n• Usa la connessione Wi-Fi per scaricare\n• Zoom 14 è il miglior compromesso tra dettaglio e spazio\n• Puoi eliminare la cache in qualsiasi momento con il tasto apposito"
     };
 
     const messaggio = guideTesti[moduleName] || "ℹ️ Guida non disponibile per questo modulo.";
@@ -7739,9 +7906,11 @@ async function autoRiscaricaRegioniOfflineSeNecessario() {
 }
 
 window.addEventListener('online', () => {
+    showToast('🌐 Internet disponibile di nuovo.', 'success');
     applyMapConnectivityZoomCap();
     updateOfflineMapRuntimeStatusIndicator();
     updateZoomIndicator();
+    renderRuntimeStatusStrip();
     autoRiscaricaRegioniOfflineSeNecessario();
     // Reset GPS retry state and restart watch when connectivity returns
     if (gpsTimeoutRetryCount > 0) {
@@ -7751,9 +7920,11 @@ window.addEventListener('online', () => {
 });
 
 window.addEventListener('offline', () => {
+    showToast('📵 Internet assente: uso dati locali e cache offline.', 'warning');
     clampMapZoomForOffline();
     updateOfflineMapRuntimeStatusIndicator();
     updateZoomIndicator();
+    renderRuntimeStatusStrip();
 });
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -7763,6 +7934,7 @@ if ('serviceWorker' in navigator) {
             return;
         }
         updateOfflineMapRuntimeStatusIndicator();
+        renderRuntimeStatusStrip();
     });
     navigator.serviceWorker.addEventListener('message', (event) => {
         const messageType = event?.data?.type;
@@ -7772,6 +7944,7 @@ if ('serviceWorker' in navigator) {
                 clampMapZoomForOffline();
                 updateOfflineMapRuntimeStatusIndicator();
                 updateZoomIndicator();
+                renderRuntimeStatusStrip();
             }
             return;
         }
@@ -7781,6 +7954,7 @@ if ('serviceWorker' in navigator) {
                 applyMapConnectivityZoomCap();
                 updateOfflineMapRuntimeStatusIndicator();
                 updateZoomIndicator();
+                renderRuntimeStatusStrip();
                 autoRiscaricaRegioniOfflineSeNecessario();
             }
         }
