@@ -159,8 +159,7 @@ textarea:focus-visible {
     box-shadow: var(--shadow-soft);
 }
 
-.runtime-status-pill strong,
-.runtime-status-pill small {
+.runtime-status-pill strong {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -174,6 +173,8 @@ textarea:focus-visible {
 .runtime-status-pill small {
     font-size: 0.7rem;
     color: var(--text-secondary);
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .runtime-status-ok {

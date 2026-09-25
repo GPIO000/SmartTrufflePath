@@ -1795,7 +1795,7 @@ function buildUserMarkerPopupHtml(altitude) {
 
 function readLastKnownGpsPosition() {
     try {
-        const raw = localStorage.getItem(GPS_LAST_POSITION_KEY);
+        const raw = sessionStorage.getItem(GPS_LAST_POSITION_KEY);
         if (!raw) return null;
         const saved = JSON.parse(raw);
         if (!Number.isFinite(saved?.lat) || !Number.isFinite(saved?.lng) || !Number.isFinite(saved?.ts)) return null;
@@ -1844,6 +1844,12 @@ function renderRuntimeStatusStrip() {
 
     let gpsStatus;
     if (!navigator.geolocation) {
+        gpsStatus = {
+            tone: 'error',
+            label: 'GPS non supportato',
+            detail: 'Usa un browser con geolocalizzazione'
+        };
+    } else if (gpsRuntimeState === 'unsupported') {
         gpsStatus = {
             tone: 'error',
             label: 'GPS non supportato',
@@ -2002,10 +2008,9 @@ function startGpsWatch() {
         latestGpsSnapshot = { lat, lng, altitude, accuracy: latestGpsAccuracy };
         gpsRuntimeState = 'live';
         // Persist last known position for offline dead-reckoning display.
-        // GPS coordinates are stored locally on the user's device only, by design.
+        // GPS coordinates are kept only for the current app session to limit exposure.
         try {
-            // codeql[js/clear-text-storage-of-sensitive-data]
-            localStorage.setItem(GPS_LAST_POSITION_KEY, JSON.stringify({
+            sessionStorage.setItem(GPS_LAST_POSITION_KEY, JSON.stringify({
                 lat,
                 lng,
                 altitude: Number.isFinite(altitude) ? altitude : null,
@@ -2106,7 +2111,7 @@ function showLastKnownGpsPosition() {
 if (navigator.geolocation) {
     startGpsWatch();
 } else {
-    gpsRuntimeState = 'fallback';
+    gpsRuntimeState = 'unsupported';
     setGpsHeaderText('SmartTruffle Path • GPS non supportato', 'GPS non supportato');
     renderRuntimeStatusStrip();
 }
