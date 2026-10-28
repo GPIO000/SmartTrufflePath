@@ -4,6 +4,7 @@ import {
   calcolaDettaglioRitenuta,
   calcolaImportoTotale,
   calcolaStatoSogliaVendite,
+  getNextLottoNumber,
   parseDataItaliana,
   riepilogaAcquistiCliente,
   sommaVenditeAnno
@@ -37,6 +38,25 @@ describe('fiscal-utils', () => {
     ];
 
     expect(sommaVenditeAnno(storico, 2026)).toBeCloseTo(350.5, 5);
+  });
+
+  it('inizia da uno il progressivo del lotto per ogni anno', () => {
+    expect(getNextLottoNumber([], new Date(2026, 9, 28))).toBe('LOTTO-20261028-01');
+
+    const storico = [
+      { data: '15/01/2026', lotto: 'LOTTO-20260115-01' },
+      { data: '15/10/2025', lotto: 'LOTTO-20251015-09' }
+    ];
+    expect(getNextLottoNumber(storico, new Date(2026, 9, 28))).toBe('LOTTO-20261028-02');
+    expect(getNextLottoNumber(storico, new Date(2027, 0, 1))).toBe('LOTTO-20270101-01');
+  });
+
+  it('rispetta il progressivo salvato anche se la ricevuta più recente è stata eliminata', () => {
+    const storico = [
+      { data: '15/01/2026', lotto: 'LOTTO-20260115-01' },
+      { data: '16/01/2026', lotto: 'LOTTO-20260116-05' }
+    ];
+    expect(getNextLottoNumber(storico, new Date(2026, 9, 28), 6)).toBe('LOTTO-20261028-07');
   });
 
   it('segnala il superamento della soglia annuale', () => {
