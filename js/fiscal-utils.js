@@ -51,6 +51,35 @@ function parseDataVendita(dataStringa) {
     return Number.isNaN(data.getTime()) ? null : data;
 }
 
+export function getNextLottoNumber(storicoVendite = [], dataEmissione = new Date(), progressivoSalvato = 0) {
+    const data = dataEmissione instanceof Date ? dataEmissione : new Date(dataEmissione);
+    if (Number.isNaN(data.getTime())) throw new TypeError('Data di emissione non valida.');
+
+    const anno = data.getFullYear();
+    let ricevuteNellAnno = 0;
+    let progressivoMassimo = Number.isFinite(Number(progressivoSalvato)) ? Math.max(0, Number(progressivoSalvato)) : 0;
+
+    for (const vendita of storicoVendite) {
+        const dataVendita = parseDataVendita(vendita && vendita.data ? vendita.data : '');
+        if (!dataVendita || dataVendita.getFullYear() !== anno) continue;
+
+        ricevuteNellAnno += 1;
+        const lottoMatch = String(vendita.lotto || '').match(/^LOTTO-(\d{4})\d{4}-(\d+)$/);
+        if (lottoMatch && Number(lottoMatch[1]) === anno) {
+            progressivoMassimo = Math.max(progressivoMassimo, Number(lottoMatch[2]));
+        }
+    }
+
+    const progressivo = Math.max(ricevuteNellAnno, progressivoMassimo) + 1;
+    const dataLotto = [
+        String(anno).padStart(4, '0'),
+        String(data.getMonth() + 1).padStart(2, '0'),
+        String(data.getDate()).padStart(2, '0')
+    ].join('');
+
+    return `LOTTO-${dataLotto}-${String(progressivo).padStart(2, '0')}`;
+}
+
 export function riepilogaAcquistiCliente(storicoVendite = [], nomeCliente = '') {
     const nomeClienteNormalizzato = String(nomeCliente || '').trim().toLowerCase();
     const filtraPerCliente = Boolean(nomeClienteNormalizzato);

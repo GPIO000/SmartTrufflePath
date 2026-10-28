@@ -22,7 +22,7 @@ import {
     summarizeTileCoverage
 } from './offline-cache-utils.js';
 import { downloadTileBatchesWithRecovery, downloadTileWithRetry, isValidCachedTileResponse } from './offline-map-download-utils.js';
-import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite, riepilogaAcquistiCliente } from './fiscal-utils.js';
+import { calcolaDettaglioRitenuta, calcolaImportoTotale, calcolaStatoSogliaVendite, getNextLottoNumber, riepilogaAcquistiCliente } from './fiscal-utils.js';
 import {
     buildEmergencyLocationMessage,
     buildSharedPoiMessage,
@@ -2464,6 +2464,13 @@ function openModule(moduleName, editMode = false) {
             
             const storicoRicevutePreview = readStorageJSON('storico_vendite', []);
             const prossimaNumerazione = storicoRicevutePreview.length + 1;
+            const dataEmissioneRicevuta = new Date();
+            const chiaveProgressivoLotto = `progressivo_lotto_${dataEmissioneRicevuta.getFullYear()}`;
+            const prossimoLotto = getNextLottoNumber(
+                storicoRicevutePreview,
+                dataEmissioneRicevuta,
+                Number(localStorage.getItem(chiaveProgressivoLotto)) || 0
+            );
             
             const annoCorrenteReg = new Date().getFullYear();
             let f24ValidoPreview = false;
@@ -2545,7 +2552,7 @@ function openModule(moduleName, editMode = false) {
                     <select id="r-comune" class="mod-input" ${eventActionAttrs('change', 'handleLuogoSelectChange', ['r-comune'])}>${buildLuoghiSelectOptions()}</select>
                     
                     <label>Codice Lotto / Tracciabilità:</label>
-                    <input type="text" id="r-lotto" class="mod-input" value="LOTTO-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-01" placeholder="Codice lotto">
+                    <input type="text" id="r-lotto" class="mod-input" value="${prossimoLotto}" placeholder="Codice lotto" readonly>
                     
                     <div id="container-f24-field" style="display:${f24ValidoPreview ? 'block' : 'none'};">
                         <label>N. Protocollo F24 ELIDE collegato:</label>
@@ -4686,7 +4693,8 @@ async function registraVenditaConPrezzoKg() {
     const pesoGrammi = parseFloat((document.getElementById('pesoGrammi') || {}).value) || 0;
     const qualitaScelta = (document.getElementById('r-qualita') || {}).value || '';
     const importoTotale = parseFloat((document.getElementById('importoTotale') || {}).value) || 0;
-    const dataOdierna = new Date().toLocaleDateString();
+    const dataEmissioneRicevuta = new Date();
+    const dataOdierna = dataEmissioneRicevuta.toLocaleDateString();
     
     let importoRitenuta = '0.00';
     let importoNetto = importoTotale.toFixed(2);
@@ -4775,7 +4783,11 @@ async function registraVenditaConPrezzoKg() {
         ritenuta: importoRitenuta,
         netto: importoNetto,
         luogoRaccolta: luogoAreaRaccolta, 
-        lotto: (document.getElementById('r-lotto') || {}).value?.trim() || '', 
+        lotto: getNextLottoNumber(
+            storico,
+            dataEmissioneRicevuta,
+            Number(localStorage.getItem(`progressivo_lotto_${dataEmissioneRicevuta.getFullYear()}`)) || 0
+        ),
         f24: regimeScelto === 'sostitutiva' ? protocolloF24 : 'ESENTE (Ritenuta d\'Acconto 23% su 78%)', 
         metodoPagamento,
         ibanVenditore,
@@ -4787,6 +4799,10 @@ async function registraVenditaConPrezzoKg() {
     
     storico.push(vendita);
     localStorage.setItem('storico_vendite', JSON.stringify(storico));
+    localStorage.setItem(
+        `progressivo_lotto_${dataEmissioneRicevuta.getFullYear()}`,
+        vendita.lotto.match(/-(\d+)$/)[1]
+    );
     aggiungiLuogoRaccolta(luogoAreaRaccolta);
     
     const nuovoIndice = storico.length - 1;
